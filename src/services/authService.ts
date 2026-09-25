@@ -265,17 +265,15 @@ export const authService = {
     }
 
     // Buscar si corresponde a un hermano conocido
-    const defaultName = email.includes('carlos')
-      ? 'Carlos Mendoza'
+    const defaultName = email.includes('denzel') || email.includes('castillosucre') || email.includes('cslaw')
+      ? 'Denzel Coronado'
       : email.includes('andres')
       ? 'Andrés Rojas'
-      : 'Hermano Masón';
+      : 'Denzel Coronado';
 
-    const fallbackRole = email.includes('carlos')
-      ? 'vm'
-      : email.includes('andres')
+    const fallbackRole = email.includes('andres')
       ? 'sec'
-      : 'her';
+      : 'vm';
 
     const roleInfo = institutionalRoles.find((r) => r.id === fallbackRole)!;
 
