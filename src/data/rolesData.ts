@@ -1,10 +1,9 @@
 import type { Role, InstitutionalRoleCode, Permission } from '@/types';
 
 export const institutionalRoles: Role[] = [
-  // Dignatarios
   {
     id: 'vm',
-    name: 'Venerable Maestro',
+    name: 'Venerable',
     category: 'dignatario',
     order: 1,
     technicalRole: 'admin',
@@ -22,26 +21,10 @@ export const institutionalRoles: Role[] = [
     ],
   },
   {
-    id: 'pv',
-    name: 'Primer Vigilante',
-    category: 'dignatario',
-    order: 2,
-    technicalRole: 'dignitary',
-    defaultPermissions: ['view', 'create', 'edit', 'manage_events', 'view_sensitive_info'],
-  },
-  {
-    id: 'sv',
-    name: 'Segundo Vigilante',
-    category: 'dignatario',
-    order: 3,
-    technicalRole: 'dignitary',
-    defaultPermissions: ['view', 'create', 'edit', 'manage_events'],
-  },
-  {
     id: 'sec',
     name: 'Secretario',
     category: 'dignatario',
-    order: 4,
+    order: 2,
     technicalRole: 'admin',
     defaultPermissions: [
       'view',
@@ -63,97 +46,47 @@ export const institutionalRoles: Role[] = [
     id: 'tes',
     name: 'Tesorero',
     category: 'dignatario',
-    order: 5,
+    order: 3,
     technicalRole: 'treasurer',
     defaultPermissions: ['view', 'create', 'edit', 'export_data', 'view_sensitive_info'],
   },
   {
-    id: 'ora',
-    name: 'Orador',
+    id: 'vig',
+    name: 'Vigilantes',
     category: 'dignatario',
-    order: 6,
+    order: 4,
     technicalRole: 'dignitary',
-    defaultPermissions: ['view', 'approve', 'manage_minutes'],
+    defaultPermissions: ['view', 'create', 'edit', 'manage_events', 'manage_attendance', 'view_sensitive_info'],
   },
   {
-    id: 'mc',
-    name: 'Maestro de Ceremonia',
+    id: 'pm',
+    name: 'Past Master',
     category: 'dignatario',
-    order: 7,
-    technicalRole: 'dignitary',
-    defaultPermissions: ['view', 'create', 'manage_events', 'manage_attendance'],
-  },
-  {
-    id: 'vmi',
-    name: 'Venerable Maestro Inmediato',
-    category: 'dignatario',
-    order: 8,
+    order: 5,
     technicalRole: 'dignitary',
     defaultPermissions: ['view', 'view_sensitive_info'],
   },
-  // Oficiales
   {
-    id: 'pe',
-    name: 'Primer Experto',
-    category: 'oficial',
-    order: 9,
-    technicalRole: 'member',
-    defaultPermissions: ['view', 'manage_attendance'],
-  },
-  {
-    id: 'se',
-    name: 'Segundo Experto',
-    category: 'oficial',
-    order: 10,
-    technicalRole: 'member',
-    defaultPermissions: ['view'],
-  },
-  {
-    id: 'pd',
-    name: 'Primer Diácono',
-    category: 'oficial',
-    order: 11,
-    technicalRole: 'member',
-    defaultPermissions: ['view'],
-  },
-  {
-    id: 'sd',
-    name: 'Segundo Diácono',
-    category: 'oficial',
-    order: 12,
-    technicalRole: 'member',
-    defaultPermissions: ['view'],
-  },
-  {
-    id: 'gt',
-    name: 'Guarda Templo',
-    category: 'oficial',
-    order: 13,
-    technicalRole: 'member',
-    defaultPermissions: ['view', 'manage_attendance'],
-  },
-  {
-    id: 'hos',
-    name: 'Hospitalario',
-    category: 'oficial',
-    order: 14,
-    technicalRole: 'member',
-    defaultPermissions: ['view', 'edit'],
-  },
-  {
-    id: 'arm',
-    name: 'Maestro de la Armonía',
-    category: 'oficial',
-    order: 15,
-    technicalRole: 'member',
-    defaultPermissions: ['view'],
-  },
-  // General
-  {
-    id: 'her',
-    name: 'Hermano',
+    id: 'mae',
+    name: 'Maestro',
     category: 'general',
-    order: 16,
+    order: 6,
+    technicalRole: 'member',
+    defaultPermissions: ['view', 'create', 'edit'],
+  },
+  {
+    id: 'comp',
+    name: 'Compañero',
+    category: 'general',
+    order: 7,
+    technicalRole: 'member',
+    defaultPermissions: ['view'],
+  },
+  {
+    id: 'apr',
+    name: 'Aprendiz',
+    category: 'general',
+    order: 8,
     technicalRole: 'member',
     defaultPermissions: ['view'],
   },
@@ -176,7 +109,17 @@ export const permissionLabels: Record<Permission, { title: string; description: 
 };
 
 export function getRoleById(id: string): Role | undefined {
-  return institutionalRoles.find((r) => r.id === id);
+  if (!id) return institutionalRoles.find((r) => r.id === 'apr');
+  const direct = institutionalRoles.find((r) => r.id === id);
+  if (direct) return direct;
+  // Aliases de compatibilidad
+  if (id === 'her') return institutionalRoles.find((r) => r.id === 'apr');
+  if (id === 'pv' || id === 'sv') return institutionalRoles.find((r) => r.id === 'vig');
+  if (id === 'vmi') return institutionalRoles.find((r) => r.id === 'pm');
+  if (id === 'ora' || id === 'mc' || id === 'pe' || id === 'se' || id === 'pd' || id === 'sd' || id === 'gt' || id === 'hos' || id === 'arm') {
+    return institutionalRoles.find((r) => r.id === 'mae');
+  }
+  return institutionalRoles.find((r) => r.id === 'apr') || institutionalRoles[0];
 }
 
 export function hasRolePermission(roleId: InstitutionalRoleCode, permission: Permission): boolean {

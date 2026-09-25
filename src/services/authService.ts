@@ -264,24 +264,49 @@ export const authService = {
       throw new Error('Ingresa un correo válido y una contraseña de al menos 6 caracteres.');
     }
 
-    // Buscar si corresponde a un hermano conocido
-    const defaultName = email.includes('denzel') || email.includes('castillosucre') || email.includes('cslaw')
-      ? 'Denzel Coronado'
-      : email.includes('andres')
-      ? 'Andrés Rojas'
-      : 'Denzel Coronado';
+    const cleanEmail = email.trim().toLowerCase();
 
-    const fallbackRole = email.includes('andres')
-      ? 'sec'
-      : 'vm';
+    // 1. Buscar si ya existe en la lista de miembros locales
+    let matchedName = '';
+    let matchedRole: InstitutionalRoleCode = 'apr';
+    let matchedMemberId: string | undefined;
 
-    const roleInfo = institutionalRoles.find((r) => r.id === fallbackRole)!;
+    try {
+      const rawMembers = localStorage.getItem('logia_members_data');
+      if (rawMembers) {
+        const membersList = JSON.parse(rawMembers);
+        const found = membersList.find((m: any) => m.email && m.email.toLowerCase() === cleanEmail);
+        if (found) {
+          matchedName = `${found.firstName || ''} ${found.lastName || ''}`.trim();
+          matchedRole = found.roleId || 'apr';
+          matchedMemberId = found.id;
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    // 2. Si no se encontró en miembros, verificar si es la cuenta del Venerable Maestro
+    if (!matchedName) {
+      if (cleanEmail === 'asistente4@castillosucre.com' || cleanEmail.includes('denzel') || cleanEmail.includes('castillosucre')) {
+        matchedName = 'Denzel Coronado';
+        matchedRole = 'vm';
+        matchedMemberId = 'm-denzel';
+      } else {
+        const username = cleanEmail.split('@')[0];
+        matchedName = username.charAt(0).toUpperCase() + username.slice(1);
+        matchedRole = 'apr';
+      }
+    }
+
+    const roleInfo = institutionalRoles.find((r) => r.id === matchedRole) || institutionalRoles.find((r) => r.id === 'apr')!;
 
     const mockProfile: UserProfile = {
-      id: `u-${Date.now()}`,
-      email,
-      displayName: defaultName,
-      roleId: fallbackRole,
+      id: matchedMemberId || `u-${Date.now()}`,
+      email: cleanEmail,
+      memberId: matchedMemberId,
+      displayName: matchedName,
+      roleId: matchedRole,
       technicalRole: roleInfo.technicalRole,
       identityVerified: true,
       identityStatus: 'verified',
@@ -290,8 +315,9 @@ export const authService = {
 
     const user: User = {
       id: mockProfile.id,
-      email,
-      displayName: defaultName,
+      email: cleanEmail,
+      memberId: matchedMemberId,
+      displayName: matchedName,
       isAuthenticated: true,
       profile: mockProfile,
     };
@@ -311,7 +337,7 @@ export const authService = {
     lastName: string,
     invitationCode?: string
   ): Promise<User> {
-    let assignedRoleId: InstitutionalRoleCode = 'her';
+    let assignedRoleId: InstitutionalRoleCode = 'apr';
     if (invitationCode && invitationCode.trim()) {
       const invCheck = await this.validateInvitation(invitationCode, email);
       if (invCheck.valid && invCheck.invitation) {
@@ -319,11 +345,12 @@ export const authService = {
       }
     }
 
+    const cleanEmail = email.trim().toLowerCase();
     const displayName = `${firstName.trim()} ${lastName.trim()}`;
 
     if (isSupabaseConfigured()) {
       const { data, error } = await supabase.auth.signUp({
-        email: email.trim(),
+        email: cleanEmail,
         password,
         options: {
           data: {
@@ -345,32 +372,67 @@ export const authService = {
       }
 
       // El trigger de Supabase crea el perfil y consume la invitación atómicamente si existe.
-      const profile = await this.fetchProfile(data.user.id, email);
+      const profile = await this.fetchProfile(data.user.id, cleanEmail);
 
       const user: User = {
         id: data.user.id,
-        email,
+        email: cleanEmail,
         displayName,
         isAuthenticated: Boolean(data.session),
         profile,
       };
 
-      await auditService.log('REGISTRO_USUARIO', 'auth', user.id, { id: user.id, email });
+      await auditService.log('REGISTRO_USUARIO', 'auth', user.id, { id: user.id, email: cleanEmail });
       return user;
     }
 
     // Modo local / sin backend configurado aún
-    const roleInfo = institutionalRoles.find((r) => r.id === assignedRoleId)!;
+    const roleInfo = institutionalRoles.find((r) => r.id === assignedRoleId) || institutionalRoles.find((r) => r.id === 'apr')!;
+    const newMemberId = `m-${Date.now()}`;
+    
     const profile: UserProfile = {
-      id: `u-${Date.now()}`,
-      email,
+      id: newMemberId,
+      email: cleanEmail,
+      memberId: newMemberId,
       displayName,
       roleId: assignedRoleId,
       technicalRole: roleInfo?.technicalRole || 'member',
-      identityVerified: true,
-      identityStatus: 'verified',
+      identityVerified: false,
+      identityStatus: 'pending',
       createdAt: new Date().toISOString(),
     };
+
+    // Registrarlo en la base de datos local de miembros
+    try {
+      const rawMembers = localStorage.getItem('logia_members_data');
+      let currentMembers = rawMembers ? JSON.parse(rawMembers) : [];
+      if (!Array.isArray(currentMembers)) currentMembers = [];
+      
+      const existingIdx = currentMembers.findIndex((m: any) => m.email && m.email.toLowerCase() === cleanEmail);
+      const newMemberObj = {
+        id: newMemberId,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: cleanEmail,
+        roleId: assignedRoleId,
+        degree: 'aprendiz',
+        condition: 'activo',
+        motherLodge: 'Resp.·. Log.·. Unión Fraternal No. 21',
+        joinedAt: new Date().toISOString().split('T')[0],
+        isActive: true,
+        identityVerified: false,
+        identityStatus: 'pending',
+      };
+
+      if (existingIdx >= 0) {
+        currentMembers[existingIdx] = { ...currentMembers[existingIdx], ...newMemberObj };
+      } else {
+        currentMembers.push(newMemberObj);
+      }
+      localStorage.setItem('logia_members_data', JSON.stringify(currentMembers));
+    } catch {
+      // ignore
+    }
 
     if (invitationCode) {
       await this.markInvitationUsed(invitationCode, profile.id);
@@ -378,14 +440,15 @@ export const authService = {
 
     const user: User = {
       id: profile.id,
-      email,
+      email: cleanEmail,
+      memberId: newMemberId,
       displayName,
       isAuthenticated: true,
       profile,
     };
 
     localStorage.setItem('logia_session_backup', JSON.stringify(user));
-    await auditService.log('REGISTRO_USUARIO', 'auth', user.id, { id: user.id, email });
+    await auditService.log('REGISTRO_USUARIO', 'auth', user.id, { id: user.id, email: cleanEmail });
     return user;
   },
 
@@ -480,12 +543,35 @@ export const authService = {
       }
     }
 
+    let fallbackName = defaultEmail ? defaultEmail.split('@')[0] : 'Hermano';
+    fallbackName = fallbackName.charAt(0).toUpperCase() + fallbackName.slice(1);
+    let fallbackRoleId: InstitutionalRoleCode = 'apr';
+    let fallbackMemberId: string | undefined;
+
+    try {
+      const raw = localStorage.getItem('logia_members_data');
+      if (raw) {
+        const list = JSON.parse(raw);
+        const m = list.find((x: any) => x.email && x.email.toLowerCase() === defaultEmail.toLowerCase());
+        if (m) {
+          fallbackName = `${m.firstName} ${m.lastName}`.trim();
+          fallbackRoleId = m.roleId || 'apr';
+          fallbackMemberId = m.id;
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    const roleInfo = institutionalRoles.find((r) => r.id === fallbackRoleId) || institutionalRoles.find((r) => r.id === 'apr')!;
+
     return {
-      id: userId,
+      id: userId || fallbackMemberId || 'u-local',
       email: defaultEmail,
-      displayName: defaultEmail.split('@')[0],
-      roleId: 'her',
-      technicalRole: 'member',
+      memberId: fallbackMemberId,
+      displayName: fallbackName,
+      roleId: fallbackRoleId,
+      technicalRole: roleInfo.technicalRole || 'member',
       identityVerified: true,
       identityStatus: 'verified',
       createdAt: new Date().toISOString(),

@@ -12,15 +12,17 @@ import { supabase } from '@/lib/supabase';
 import type { LodgeEvent, Minute, Member, AttendanceRecord, OfficialVisitChecklistItem } from '@/types';
 
 describe('1. Roles Institucionales y Permisos', () => {
-  it('debe contener los 16 roles institucionales (8 dignatarios, 7 oficiales, 1 general)', () => {
-    expect(institutionalRoles.length).toBe(16);
-    const dignatarios = institutionalRoles.filter((r) => r.category === 'dignatario');
-    const oficiales = institutionalRoles.filter((r) => r.category === 'oficial');
-    const general = institutionalRoles.filter((r) => r.category === 'general');
-
-    expect(dignatarios.length).toBe(8);
-    expect(oficiales.length).toBe(7);
-    expect(general.length).toBe(1);
+  it('debe contener los 8 roles institucionales requeridos', () => {
+    expect(institutionalRoles.length).toBe(8);
+    const roleIds = institutionalRoles.map((r) => r.id);
+    expect(roleIds).toContain('apr');
+    expect(roleIds).toContain('comp');
+    expect(roleIds).toContain('mae');
+    expect(roleIds).toContain('vm');
+    expect(roleIds).toContain('sec');
+    expect(roleIds).toContain('tes');
+    expect(roleIds).toContain('vig');
+    expect(roleIds).toContain('pm');
   });
 
   it('el Secretario debe tener permisos amplios de administración', () => {
@@ -411,14 +413,14 @@ describe('9. Registro de Usuario Directo y Validación', () => {
       },
       error: null,
     });
-    vi.spyOn(authService, 'createProfile').mockResolvedValueOnce({
+    vi.spyOn(authService, 'fetchProfile').mockResolvedValueOnce({
       id: 'mock-user-123',
       email: 'nuevohermano@logia.org',
       displayName: 'Carlos Mendoza',
-      roleId: 'her',
+      roleId: 'apr',
       technicalRole: 'member',
-      identityVerified: true,
-      identityStatus: 'verified',
+      identityVerified: false,
+      identityStatus: 'pending',
       createdAt: new Date().toISOString(),
     });
 
@@ -431,9 +433,9 @@ describe('9. Registro de Usuario Directo y Validación', () => {
     expect(user).toBeDefined();
     expect(user.displayName).toBe('Carlos Mendoza');
     expect(user.email).toBe('nuevohermano@logia.org');
-    expect(user.profile?.roleId).toBe('her');
-    expect(user.profile?.identityVerified).toBe(true);
-    expect(user.profile?.identityStatus).toBe('verified');
+    expect(user.profile?.roleId).toBe('apr');
+    expect(user.profile?.identityVerified).toBe(false);
+    expect(user.profile?.identityStatus).toBe('pending');
   });
 });
 

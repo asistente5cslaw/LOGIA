@@ -5,22 +5,27 @@ export type MasonicDegree = 'aprendiz' | 'companero' | 'maestro';
 export type MemberStatusCondition = 'activo' | 'ad_vitam' | 'dual' | 'inactivo';
 
 export type InstitutionalRoleCode =
-  | 'vm'
-  | 'pv'
-  | 'sv'
-  | 'sec'
-  | 'tes'
-  | 'ora'
-  | 'mc'
-  | 'vmi'
+  | 'vm'   // Venerable
+  | 'sec'  // Secretario
+  | 'tes'  // Tesorero
+  | 'vig'  // Vigilantes
+  | 'pm'   // Past Master
+  | 'mae'  // Maestro
+  | 'comp' // Compañero
+  | 'apr'  // Aprendiz
+  | 'her'  // Hermano (alias)
+  | 'pv'   // Primer Vigilante (alias)
+  | 'sv'   // Segundo Vigilante (alias)
+  | 'vmi'  // VMI (alias)
+  | 'ora'  // Orador (alias)
+  | 'mc'   // Maestro de Ceremonia (alias)
   | 'pe'
   | 'se'
   | 'pd'
   | 'sd'
   | 'gt'
   | 'hos'
-  | 'arm'
-  | 'her';
+  | 'arm';
 
 export type TechnicalRole = 'admin' | 'secretary' | 'dignitary' | 'treasurer' | 'member';
 

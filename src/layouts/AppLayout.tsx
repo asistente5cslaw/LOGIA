@@ -9,12 +9,14 @@ import {
   LogOut,
   Shield,
   Menu,
+  Smartphone,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { LodgeLogo } from '@/components/shared/LodgeLogo';
 import { NotificationButton } from '@/components/shared/NotificationButton';
 import { useAppleDialog } from '@/components/shared/AppleDialog';
+import { AppIconSelectorModal } from '@/components/shared/AppIconSelectorModal';
 
 const desktopNavItems = [
   { to: '/app', label: 'Inicio', icon: Home, end: true },
@@ -37,6 +39,7 @@ export function AppLayout() {
   const { showConfirm } = useAppleDialog();
   const navigate = useNavigate();
 
+  const [isIconModalOpen, setIsIconModalOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(() => {
     return localStorage.getItem('sidebar_collapsed') === 'true';
   });
@@ -65,7 +68,13 @@ export function AppLayout() {
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-canvas text-ink">
-      {/* Barra lateral escritorio fija - NUNCA hace scroll */}
+      {/* Modal de selección de ícono / instalación PWA */}
+      <AppIconSelectorModal
+        isOpen={isIconModalOpen}
+        onClose={() => setIsIconModalOpen(false)}
+      />
+
+      {/* Barra lateral escritorio fija */}
       <aside
         className={cn(
           'hidden border-r border-border bg-surface md:flex md:flex-col h-screen shrink-0 select-none shadow-sm transition-all duration-300 ease-in-out',
@@ -88,15 +97,21 @@ export function AppLayout() {
               <LodgeLogo className="h-10 w-10 shrink-0" />
             </button>
           ) : (
-            <div className="flex items-center gap-3 overflow-hidden">
-              <LodgeLogo className="h-10 w-10 shrink-0" />
+            <button
+              onClick={() => setIsIconModalOpen(true)}
+              title="Cambiar ícono de la app / Instalar"
+              className="flex items-center gap-3 overflow-hidden text-left hover:opacity-80 transition-opacity cursor-pointer group"
+            >
+              <LodgeLogo className="h-10 w-10 shrink-0 shadow-sm" />
               <div className="flex flex-col truncate">
-                <span className="font-serif text-base font-bold text-ink leading-tight truncate">
+                <span className="font-serif text-base font-bold text-ink leading-tight truncate group-hover:text-primary transition-colors">
                   Logia UF No. 21
                 </span>
-                <span className="text-[11px] text-ink-muted truncate">Valle de Panamá</span>
+                <span className="text-[11px] text-ink-muted truncate flex items-center gap-1">
+                  Valle de Panamá <span className="text-[9px] text-primary">● Elegir Logo</span>
+                </span>
               </div>
-            </div>
+            </button>
           )}
         </div>
 
@@ -122,6 +137,19 @@ export function AppLayout() {
               {!isCollapsed && <span className="truncate">{label}</span>}
             </NavLink>
           ))}
+
+          {/* Botón directo de Ícono App / Instalar en la barra lateral */}
+          <button
+            onClick={() => setIsIconModalOpen(true)}
+            title="Personalizar Ícono de la App"
+            className={cn(
+              'mt-auto flex min-h-[40px] items-center rounded-xl text-xs font-semibold text-ink-muted hover:text-primary hover:bg-surface-container transition-colors cursor-pointer',
+              isCollapsed ? 'justify-center px-0' : 'gap-3 px-3'
+            )}
+          >
+            <Smartphone className="h-4 w-4 shrink-0 text-gold-600" />
+            {!isCollapsed && <span>Ícono de la App</span>}
+          </button>
         </nav>
 
         {/* Perfil del usuario abajo */}
@@ -172,16 +200,26 @@ export function AppLayout() {
 
       {/* Contenido principal móvil + escritorio */}
       <div className="flex flex-1 flex-col h-screen min-w-0 overflow-hidden">
-        {/* Barra superior móvil con logo oficial */}
+        {/* Barra superior móvil */}
         <header className="shrink-0 flex h-14 items-center justify-between border-b border-border bg-surface px-4 md:hidden">
-          <div className="flex items-center gap-2.5">
-            <LodgeLogo className="h-9 w-9 shrink-0" />
+          <button
+            onClick={() => setIsIconModalOpen(true)}
+            className="flex items-center gap-2.5 text-left cursor-pointer active:opacity-75"
+          >
+            <LodgeLogo className="h-9 w-9 shrink-0 shadow-xs" />
             <div className="flex flex-col">
               <span className="font-serif text-sm font-bold text-ink leading-tight">Logia UF No. 21</span>
               <span className="text-[10px] text-ink-muted">Valle de Panamá</span>
             </div>
-          </div>
+          </button>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsIconModalOpen(true)}
+              title="Ícono e Instalación"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-gold-600 hover:bg-surface-container transition-colors cursor-pointer"
+            >
+              <Smartphone className="h-4 w-4" />
+            </button>
             <NotificationButton />
             <button
               onClick={handleLogout}
@@ -212,6 +250,13 @@ export function AppLayout() {
           </div>
 
           <div className="flex items-center gap-4 text-xs text-ink-muted">
+            <button
+              onClick={() => setIsIconModalOpen(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gold-500/30 text-gold-700 bg-gold-500/5 hover:bg-gold-500/10 transition-colors font-medium cursor-pointer"
+            >
+              <Smartphone className="h-3.5 w-3.5" />
+              <span>Personalizar Ícono App</span>
+            </button>
             <span className="font-serif text-xs text-ink-muted italic hidden lg:inline">
               Valle de Panamá • Rito Escocés Antiguo y Aceptado
             </span>
