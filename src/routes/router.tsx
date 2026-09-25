@@ -18,24 +18,14 @@ import { ErrorPage } from '@/pages/ErrorPage';
 export const router = createBrowserRouter([
   { path: '/', element: <LandingPage />, errorElement: <ErrorPage /> },
   {
-    path: '/login',
-    element: <AuthLayout backTo="/"><LoginPage /></AuthLayout>,
+    element: <AuthLayout />,
     errorElement: <ErrorPage />,
-  },
-  {
-    path: '/registro',
-    element: <AuthLayout backTo="/"><RegisterPage /></AuthLayout>,
-    errorElement: <ErrorPage />,
-  },
-  {
-    path: '/registro/identidad',
-    element: <AuthLayout backTo="/registro"><RegisterIdentityPage /></AuthLayout>,
-    errorElement: <ErrorPage />,
-  },
-  {
-    path: '/registro/confirmacion',
-    element: <AuthLayout showBack={false}><RegisterConfirmationPage /></AuthLayout>,
-    errorElement: <ErrorPage />,
+    children: [
+      { path: '/login', element: <LoginPage /> },
+      { path: '/registro', element: <RegisterPage /> },
+      { path: '/registro/identidad', element: <RegisterIdentityPage /> },
+      { path: '/registro/confirmacion', element: <RegisterConfirmationPage /> },
+    ],
   },
   {
     path: '/app',
