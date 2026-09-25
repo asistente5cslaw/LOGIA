@@ -1,0 +1,16 @@
+{
+  "name": "Logia — Gestión",
+  "short_name": "Logia",
+  "description": "Gestión de logia masónica",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FBF9F5",
+  "theme_color": "#78292A",
+  "icons": [
+    {
+      "src": "/logo-uf21.png",
+      "sizes": "any",
+      "type": "image/png"
+    }
+  ]
+}

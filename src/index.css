@@ -1,0 +1,101 @@
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Canvas & Surfaces */
+    --canvas: 43 33% 98%;        /* #FBF9F5 warm ivory */
+    --surface: 0 0% 100%;        /* #FFFFFF */
+    --surface-dim: 40 33% 96%;
+    --surface-container-low: 42 25% 97%;
+    --surface-container: 40 20% 94%;
+    --surface-container-high: 40 18% 92%;
+
+    /* Borders & Outlines */
+    --border: 36 18% 89%;        /* #EAE6DF */
+    --input-border: 36 18% 89%;
+    --ring: 359 49% 32%;
+
+    /* Brand Accents */
+    --primary: 359 49% 32%;      /* #78292A rojo oscuro del emblema */
+    --primary-pressed: 359 51% 24%; /* #5D1E21 estado presionado */
+    --gold: 39 53% 56%;          /* #C5A059 champagne gold */
+
+    /* Text */
+    --ink: 240 6% 14%;           /* #1E1E24 charcoal */
+    --ink-secondary: 0 0% 39%;   /* #636366 slate */
+    --ink-muted: 240 4% 62%;     /* #99999F */
+
+    /* Status */
+    --success: 135 40% 36%;      /* #2E6F40 pine green */
+    --warning: 22 66% 44%;       /* #C05621 terracotta */
+    --destructive: 11 61% 44%;   /* #B83A28 crimson */
+    --info: 205 52% 34%;         /* #2B5B84 cerulean */
+
+    --radius: 0.5rem;
+  }
+
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  html,
+  body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background-color: hsl(var(--canvas));
+    color: hsl(var(--ink));
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Newsreader', Georgia, serif;
+  }
+
+  /* Fixed app root viewport */
+  #root {
+    height: 100%;
+    overflow: hidden;
+  }
+}
+
+@layer utilities {
+  .font-serif {
+    font-family: 'Newsreader', Georgia, serif;
+  }
+  .font-sans {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  /* Subtle card shadow */
+  .shadow-card {
+    box-shadow: 0 1px 3px rgba(30, 30, 36, 0.03), 0 4px 12px rgba(30, 30, 36, 0.02);
+  }
+  .shadow-popover {
+    box-shadow: 0 8px 24px rgba(74, 18, 29, 0.06), 0 2px 6px rgba(30, 30, 36, 0.04);
+  }
+
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Ocultar barra inferior de Google Maps (Términos, accesos, copyright) */
+  .gm-style-cc,
+  .gmnoprint a,
+  .gmnoprint span,
+  .gm-bundled-control,
+  a[href^="http://maps.google.com/maps"],
+  a[href^="https://maps.google.com/maps"],
+  a[href^="https://www.google.com/maps"],
+  .gm-style a[target="_blank"],
+  .gm-style a[href*="google"] {
+    display: none !important;
+  }
+}
