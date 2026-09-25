@@ -97,21 +97,15 @@ export function AppLayout() {
               <LodgeLogo className="h-10 w-10 shrink-0" />
             </button>
           ) : (
-            <button
-              onClick={() => setIsIconModalOpen(true)}
-              title="Cambiar ícono de la app / Instalar"
-              className="flex items-center gap-3 overflow-hidden text-left hover:opacity-80 transition-opacity cursor-pointer group"
-            >
-              <LodgeLogo className="h-10 w-10 shrink-0 shadow-sm" />
+            <div className="flex items-center gap-3 overflow-hidden">
+              <LodgeLogo className="h-10 w-10 shrink-0" />
               <div className="flex flex-col truncate">
-                <span className="font-serif text-base font-bold text-ink leading-tight truncate group-hover:text-primary transition-colors">
+                <span className="font-serif text-base font-bold text-ink leading-tight truncate">
                   Logia UF No. 21
                 </span>
-                <span className="text-[11px] text-ink-muted truncate flex items-center gap-1">
-                  Valle de Panamá <span className="text-[9px] text-primary">● Elegir Logo</span>
-                </span>
+                <span className="text-[11px] text-ink-muted truncate">Valle de Panamá</span>
               </div>
-            </button>
+            </div>
           )}
         </div>
 
@@ -202,16 +196,13 @@ export function AppLayout() {
       <div className="flex flex-1 flex-col h-screen min-w-0 overflow-hidden">
         {/* Barra superior móvil */}
         <header className="shrink-0 flex h-14 items-center justify-between border-b border-border bg-surface px-4 md:hidden">
-          <button
-            onClick={() => setIsIconModalOpen(true)}
-            className="flex items-center gap-2.5 text-left cursor-pointer active:opacity-75"
-          >
-            <LodgeLogo className="h-9 w-9 shrink-0 shadow-xs" />
+          <div className="flex items-center gap-2.5">
+            <LodgeLogo className="h-9 w-9 shrink-0" />
             <div className="flex flex-col">
               <span className="font-serif text-sm font-bold text-ink leading-tight">Logia UF No. 21</span>
               <span className="text-[10px] text-ink-muted">Valle de Panamá</span>
             </div>
-          </button>
+          </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsIconModalOpen(true)}
