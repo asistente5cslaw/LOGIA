@@ -82,7 +82,7 @@ export function RegisterPage() {
               id="firstName"
               {...register('firstName')}
               placeholder="Ej. Juan Carlos"
-              className="min-h-[44px] rounded-lg border border-border bg-surface px-3 text-sm text-ink shadow-card outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+              className="min-h-[46px] rounded-xl border border-border bg-surface px-3.5 text-base sm:text-sm text-ink shadow-2xs outline-none focus:border-primary focus:ring-3 focus:ring-primary/15 transition-all"
             />
             {errors.firstName && (
               <p className="text-xs text-destructive">{errors.firstName.message}</p>
@@ -90,14 +90,14 @@ export function RegisterPage() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="lastName" className="text-sm font-medium text-ink flex items-center gap-1.5">
+            <label htmlFor="lastName" className="text-xs sm:text-sm font-medium text-ink flex items-center gap-1.5">
               <User className="h-3.5 w-3.5 text-ink-muted" /> Apellidos
             </label>
             <input
               id="lastName"
               {...register('lastName')}
               placeholder="Ej. Pérez González"
-              className="min-h-[44px] rounded-lg border border-border bg-surface px-3 text-sm text-ink shadow-card outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+              className="min-h-[46px] rounded-xl border border-border bg-surface px-3.5 text-base sm:text-sm text-ink shadow-2xs outline-none focus:border-primary focus:ring-3 focus:ring-primary/15 transition-all"
             />
             {errors.lastName && (
               <p className="text-xs text-destructive">{errors.lastName.message}</p>
@@ -106,7 +106,7 @@ export function RegisterPage() {
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="email" className="text-sm font-medium text-ink flex items-center gap-1.5">
+          <label htmlFor="email" className="text-xs sm:text-sm font-medium text-ink flex items-center gap-1.5">
             <Mail className="h-3.5 w-3.5 text-ink-muted" /> Correo electrónico
           </label>
           <input
@@ -115,7 +115,7 @@ export function RegisterPage() {
             autoComplete="email"
             {...register('email')}
             placeholder="hermano@correo.org"
-            className="min-h-[44px] rounded-lg border border-border bg-surface px-3 text-sm text-ink shadow-card outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+            className="min-h-[46px] rounded-xl border border-border bg-surface px-3.5 text-base sm:text-sm text-ink shadow-2xs outline-none focus:border-primary focus:ring-3 focus:ring-primary/15 transition-all"
           />
           {errors.email && (
             <p className="text-xs text-destructive">{errors.email.message}</p>
@@ -126,7 +126,7 @@ export function RegisterPage() {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {/* Campo Contraseña */}
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="password" className="text-sm font-medium text-ink flex items-center gap-1.5">
+              <label htmlFor="password" className="text-xs sm:text-sm font-medium text-ink flex items-center gap-1.5">
                 <Lock className="h-3.5 w-3.5 text-ink-muted" /> Contraseña
               </label>
               <input
@@ -135,7 +135,7 @@ export function RegisterPage() {
                 autoComplete="new-password"
                 {...register('password')}
                 placeholder="••••••••"
-                className="min-h-[44px] w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink shadow-card outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+                className="min-h-[46px] w-full rounded-xl border border-border bg-surface px-3.5 text-base sm:text-sm text-ink shadow-2xs outline-none focus:border-primary focus:ring-3 focus:ring-primary/15 transition-all"
               />
               {errors.password && (
                 <p className="text-xs text-destructive">{errors.password.message}</p>
@@ -144,7 +144,7 @@ export function RegisterPage() {
 
             {/* Campo Confirmar Contraseña */}
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="confirmPassword" className="text-sm font-medium text-ink flex items-center gap-1.5">
+              <label htmlFor="confirmPassword" className="text-xs sm:text-sm font-medium text-ink flex items-center gap-1.5">
                 <Lock className="h-3.5 w-3.5 text-ink-muted" /> Confirmar
               </label>
               <input
@@ -153,7 +153,7 @@ export function RegisterPage() {
                 autoComplete="new-password"
                 {...register('confirmPassword')}
                 placeholder="••••••••"
-                className="min-h-[44px] w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink shadow-card outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+                className="min-h-[46px] w-full rounded-xl border border-border bg-surface px-3.5 text-base sm:text-sm text-ink shadow-2xs outline-none focus:border-primary focus:ring-3 focus:ring-primary/15 transition-all"
               />
               {errors.confirmPassword && (
                 <p className="text-xs text-destructive">{errors.confirmPassword.message}</p>
@@ -166,7 +166,7 @@ export function RegisterPage() {
             <button
               type="button"
               onClick={() => setShowPasswords(!showPasswords)}
-              className="inline-flex items-center gap-1.5 text-xs text-primary hover:text-primary-pressed transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 text-xs text-primary hover:text-primary-pressed transition-colors cursor-pointer py-1"
             >
               {showPasswords ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
               <span>{showPasswords ? 'Ocultar contraseñas' : 'Mostrar contraseñas'}</span>
@@ -177,7 +177,7 @@ export function RegisterPage() {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="mt-4 flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary-pressed disabled:opacity-60 cursor-pointer"
+          className="mt-2 flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary-pressed active:scale-98 disabled:opacity-60 cursor-pointer"
         >
           Continuar a Validación Facial (Selfie)
           <ArrowRight className="h-4 w-4" />

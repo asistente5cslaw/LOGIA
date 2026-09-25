@@ -44,25 +44,38 @@
 
   html,
   body {
-    height: 100%;
+    min-height: 100%;
     margin: 0;
     padding: 0;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     background-color: hsl(var(--canvas));
     color: hsl(var(--ink));
     font-family: 'Inter', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* Prevenir zoom automático al hacer focus en inputs en iOS */
+  @media screen and (max-width: 767px) {
+    input, select, textarea {
+      font-size: 16px !important;
+    }
   }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Newsreader', Georgia, serif;
   }
 
-  /* Fixed app root viewport */
+  /* App root container con scroll fluido */
   #root {
-    height: 100%;
-    overflow: hidden;
+    min-height: 100%;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
   }
 }
 

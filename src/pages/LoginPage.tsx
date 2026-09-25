@@ -81,7 +81,7 @@ export function LoginPage() {
 
       <form onSubmit={handleSubmit} noValidate className="mt-8 flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="email" className="text-sm font-medium text-ink flex items-center gap-1.5">
+          <label htmlFor="email" className="text-xs sm:text-sm font-medium text-ink flex items-center gap-1.5">
             <Mail className="h-3.5 w-3.5 text-ink-muted" /> Correo electrónico
           </label>
           <input
@@ -91,14 +91,14 @@ export function LoginPage() {
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="min-h-[44px] rounded-lg border border-border bg-surface px-3 text-sm text-ink shadow-card outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+            className="min-h-[46px] rounded-xl border border-border bg-surface px-3.5 text-base sm:text-sm text-ink shadow-2xs outline-none focus:border-primary focus:ring-3 focus:ring-primary/15 transition-all"
             placeholder="hermano@logia.org"
           />
         </div>
 
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between">
-            <label htmlFor="password" className="text-sm font-medium text-ink flex items-center gap-1.5">
+            <label htmlFor="password" className="text-xs sm:text-sm font-medium text-ink flex items-center gap-1.5">
               <Lock className="h-3.5 w-3.5 text-ink-muted" /> Contraseña
             </label>
             <button
@@ -107,7 +107,7 @@ export function LoginPage() {
                 setForgotEmail(email);
                 setShowForgotModal(true);
               }}
-              className="text-xs text-primary hover:underline"
+              className="text-xs text-primary hover:underline py-0.5"
             >
               ¿Olvidaste tu contraseña?
             </button>
@@ -120,14 +120,14 @@ export function LoginPage() {
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="min-h-[44px] w-full rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink shadow-card outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+              className="min-h-[46px] w-full rounded-xl border border-border bg-surface pl-3.5 pr-11 text-base sm:text-sm text-ink shadow-2xs outline-none focus:border-primary focus:ring-3 focus:ring-primary/15 transition-all"
               placeholder="••••••••"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
               aria-label={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
-              className="absolute right-2 flex h-9 w-9 items-center justify-center rounded-md text-ink-muted hover:bg-surface-container hover:text-ink transition-colors cursor-pointer"
+              className="absolute right-2 flex h-9 w-9 items-center justify-center rounded-lg text-ink-muted hover:bg-surface-container hover:text-ink transition-colors cursor-pointer"
             >
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
@@ -135,7 +135,7 @@ export function LoginPage() {
         </div>
 
         {error && (
-          <div className="rounded-lg bg-destructive/10 p-3 text-xs text-destructive">
+          <div className="rounded-xl bg-destructive/10 p-3 text-xs text-destructive">
             {error}
           </div>
         )}
@@ -143,7 +143,7 @@ export function LoginPage() {
         <button
           type="submit"
           disabled={loading}
-          className="mt-2 flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary-pressed disabled:opacity-60"
+          className="mt-2 flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary-pressed active:scale-98 disabled:opacity-60 cursor-pointer"
         >
           {loading ? (
             <>

@@ -27,14 +27,14 @@ export function AuthLayout({ children, showBack = true, backTo = '/', onBack }: 
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-canvas">
-      <header className="flex h-16 items-center px-4">
+    <div className="min-h-screen w-full flex flex-col bg-canvas overflow-y-auto">
+      <header className="flex h-16 shrink-0 items-center px-4">
         {showBack ? (
           <button
             type="button"
             onClick={handleBack}
             aria-label="Regresar"
-            className="flex h-11 w-11 items-center justify-center rounded-full text-ink-secondary hover:bg-surface-container transition-colors cursor-pointer"
+            className="flex h-11 w-11 items-center justify-center rounded-full text-ink-secondary hover:bg-surface-container transition-colors cursor-pointer active:scale-95"
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
@@ -42,7 +42,7 @@ export function AuthLayout({ children, showBack = true, backTo = '/', onBack }: 
           <span className="w-11" />
         )}
       </header>
-      <main className="flex flex-1 flex-col px-6 pb-12 sm:mx-auto sm:w-full sm:max-w-md sm:px-0">
+      <main className="flex-1 w-full max-w-md mx-auto px-5 sm:px-6 pb-20 pt-1 flex flex-col justify-start">
         {children}
       </main>
     </div>
