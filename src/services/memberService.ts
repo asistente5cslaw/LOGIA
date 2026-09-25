@@ -10,26 +10,14 @@ function loadLocalMembers(): Member[] {
     const raw = localStorage.getItem(LOCAL_MEMBERS_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.map((m: Member) => {
-          const mockMatch = mockMembers.find((mock) => mock.id === m.id);
-          return {
-            ...m,
-            identityStatus: m.identityStatus || mockMatch?.identityStatus || (m.isActive ? 'verified' : 'pending'),
-            identityVerified: m.identityVerified ?? (mockMatch?.identityVerified ?? (m.isActive ? true : false)),
-            selfieUrl: m.selfieUrl || mockMatch?.selfieUrl,
-            identityValidatedAt: m.identityValidatedAt || mockMatch?.identityValidatedAt,
-            identityValidatedBy: m.identityValidatedBy || mockMatch?.identityValidatedBy,
-            identityNotes: m.identityNotes || mockMatch?.identityNotes,
-          };
-        });
+      if (Array.isArray(parsed)) {
+        return parsed;
       }
     }
   } catch {
     // fallback
   }
-  saveLocalMembers(mockMembers);
-  return mockMembers;
+  return [];
 }
 
 function saveLocalMembers(list: Member[]) {
