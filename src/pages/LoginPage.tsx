@@ -86,7 +86,12 @@ export function LoginPage() {
           </label>
           <input
             id="email"
+            name="email"
             type="email"
+            inputMode="email"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             required
             autoComplete="email"
             value={email}
@@ -115,7 +120,11 @@ export function LoginPage() {
           <div className="relative flex items-center">
             <input
               id="password"
+              name="password"
               type={showPassword ? 'text' : 'password'}
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               required
               autoComplete="current-password"
               value={password}

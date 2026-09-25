@@ -112,6 +112,10 @@ export function RegisterPage() {
           <input
             id="email"
             type="email"
+            inputMode="email"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             autoComplete="email"
             {...register('email')}
             placeholder="hermano@correo.org"
@@ -132,6 +136,9 @@ export function RegisterPage() {
               <input
                 id="password"
                 type={showPasswords ? 'text' : 'password'}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 autoComplete="new-password"
                 {...register('password')}
                 placeholder="••••••••"
@@ -150,6 +157,9 @@ export function RegisterPage() {
               <input
                 id="confirmPassword"
                 type={showPasswords ? 'text' : 'password'}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 autoComplete="new-password"
                 {...register('confirmPassword')}
                 placeholder="••••••••"
