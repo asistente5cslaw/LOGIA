@@ -10,14 +10,25 @@ function loadLocalMembers(): Member[] {
     const raw = localStorage.getItem(LOCAL_MEMBERS_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        return parsed;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const cleaned = parsed.filter(
+          (m: any) =>
+            m.email !== 'carlos.mendoza@logia.org' &&
+            m.email !== 'andres.rojas@logia.org' &&
+            m.email !== 'felipe.castro@logia.org' &&
+            m.email !== 'diego.salazar@logia.org' &&
+            m.email !== 'javier.lopez@logia.org'
+        );
+        if (cleaned.length > 0) {
+          return cleaned;
+        }
       }
     }
   } catch {
     // fallback
   }
-  return [];
+  saveLocalMembers(mockMembers);
+  return mockMembers;
 }
 
 function saveLocalMembers(list: Member[]) {

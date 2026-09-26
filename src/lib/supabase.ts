@@ -1,7 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const DEFAULT_SUPABASE_URL = 'https://sqtltrxwbwugnksnvgyh.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_zC1SMVHCXnPC_LBB8gFb-Q_hW7M9QPd';
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
 
 export const isSupabaseConfigured = (): boolean => {
   return Boolean(
@@ -12,11 +15,9 @@ export const isSupabaseConfigured = (): boolean => {
   );
 };
 
-// Create a Supabase client. If keys are missing, we initialize with fallback url/key so the app doesn't crash on import,
-// while `isSupabaseConfigured()` allows the UI and services to display genuine configuration guidance.
 export const supabase = createClient(
-  supabaseUrl || 'https://placeholder-logia.supabase.co',
-  supabaseAnonKey || 'placeholder-anon-key',
+  supabaseUrl,
+  supabaseAnonKey,
   {
     auth: {
       persistSession: true,
