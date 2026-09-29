@@ -206,8 +206,10 @@ export const eventService = {
     justification?: string
   ): Promise<{ savedEvent: LodgeEvent; conflicts: LodgeEvent[] }> {
     const existingEvents = await this.getAllEvents();
-    const isNew = !event.id;
-    const eventId = event.id || `ev-${Date.now()}`;
+    // La UI puede enviar un ID visual provisional (ev-...). Solo es edición
+    // si ese ID ya existe en la fuente actual; las altas usan UUID de Supabase.
+    const isNew = !event.id || !existingEvents.some((existing) => existing.id === event.id);
+    const eventId = isNew ? crypto.randomUUID() : event.id!;
     const now = new Date().toISOString();
 
     const fullEvent: LodgeEvent = {
@@ -228,7 +230,6 @@ export const eventService = {
     if (isSupabaseConfigured()) {
       try {
         const payload = {
-          id: fullEvent.id,
           title: fullEvent.title,
           body_id: fullEvent.bodyId,
           degree_required: fullEvent.degreeRequired,
@@ -247,14 +248,17 @@ export const eventService = {
         };
 
         if (isNew) {
-          await supabase.from('events').insert(payload);
+          const { data, error } = await supabase.from('events').insert(payload).select().single();
+          if (error) throw error;
+          if (data?.id) fullEvent.id = data.id;
         } else {
-          await supabase.from('events').update(payload).eq('id', fullEvent.id);
+          const { error } = await supabase.from('events').update(payload).eq('id', fullEvent.id);
+          if (error) throw error;
         }
 
         // Registrar conflictos en event_conflicts
         for (const c of conflicts) {
-          await supabase.from('event_conflicts').insert({
+          const { error } = await supabase.from('event_conflicts').insert({
             event_id_1: fullEvent.id,
             event_id_2: c.id,
             reason: `Conflicto de horario entre '${fullEvent.title}' y '${c.title}'`,
@@ -262,9 +266,11 @@ export const eventService = {
             resolved_by: user.id,
             justification,
           });
+          if (error) throw error;
         }
       } catch (e) {
-        console.warn('Error guardando en Supabase events:', e);
+        console.error('Error guardando en Supabase events:', e);
+        throw new Error(e instanceof Error ? e.message : 'No se pudo guardar la tenida en Supabase.');
       }
     }
 
