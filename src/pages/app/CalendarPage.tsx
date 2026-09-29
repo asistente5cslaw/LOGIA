@@ -32,6 +32,7 @@ import { AppleTimePicker } from '@/components/shared/AppleTimePicker';
 import { AppleInput, AppleTextarea } from '@/components/shared/AppleInput';
 import { GoogleMapsLocationPicker } from '@/components/shared/GoogleMapsLocationPicker';
 import { pushNotificationService } from '@/services/pushNotificationService';
+import { officialVisitService } from '@/services/officialVisitService';
 import { useAppleDialog } from '@/components/shared/AppleDialog';
 import { Modal } from '@/components/shared/Modal';
 import { cn } from '@/lib/utils';
@@ -43,6 +44,7 @@ export function CalendarPage() {
   const { showConfirm } = useAppleDialog();
   const [events, setEvents] = useState<LodgeEvent[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
+  const [configuredTempleAddress, setConfiguredTempleAddress] = useState('');
   const [selectedBodyFilter, setSelectedBodyFilter] = useState<MasonicBodyId | 'all'>('all');
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
@@ -90,7 +92,7 @@ export function CalendarPage() {
   const [formEndTime, setFormEndTime] = useState('21:30');
   const [formIsAllDay, setFormIsAllDay] = useState(false);
   const [formIsMeeting, setFormIsMeeting] = useState(true);
-  const [formLocation, setFormLocation] = useState('Gran Templo Masónico, Calle 43 Bella Vista');
+  const [formLocation, setFormLocation] = useState('');
   const [formNotes, setFormNotes] = useState('');
   const [formStatus, setFormStatus] = useState<EventStatus>('programada');
 
@@ -104,6 +106,11 @@ export function CalendarPage() {
       ]);
       setEvents(evList);
       setMembers(memList);
+
+      const settings = await officialVisitService.getLodgeSettings();
+      const configuredAddress = settings.templeAddress?.trim() || '';
+      const isDemoAddress = /gran templo mas[oó]nico,? calle 43 bella vista/i.test(configuredAddress);
+      setConfiguredTempleAddress(isDemoAddress ? '' : configuredAddress);
     } catch (e) {
       console.error(e);
       toast.error('Error al cargar calendario');
@@ -161,7 +168,7 @@ export function CalendarPage() {
     setFormEndTime('21:30');
     setFormIsAllDay(false);
     setFormIsMeeting(true);
-    setFormLocation('Gran Templo Masónico, Calle 43 Bella Vista');
+    setFormLocation(configuredTempleAddress);
     setFormNotes('');
     setFormStatus('programada');
     setShowEventModal(true);
@@ -186,6 +193,11 @@ export function CalendarPage() {
 
   const handleSaveEvent = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!formLocation.trim()) {
+      toast.error('Selecciona o escribe el lugar real de la tenida antes de guardar.');
+      return;
+    }
 
     const candidate: LodgeEvent = {
       id: editingEvent ? editingEvent.id : `ev-${Date.now()}`,

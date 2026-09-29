@@ -295,7 +295,7 @@ CREATE TABLE lodge_settings (
     rite TEXT NOT NULL DEFAULT 'Rito Escocés Antiguo y Aceptado',
     charter_date DATE NOT NULL DEFAULT '1921-06-24',
     regular_meeting_days TEXT NOT NULL DEFAULT 'Todos los 2do y 4to miércoles de cada mes',
-    temple_address TEXT NOT NULL DEFAULT 'Gran Templo Masónico, Calle 43 Bella Vista, Ciudad de Panamá',
+    temple_address TEXT NOT NULL DEFAULT '',
     contact_email TEXT NOT NULL DEFAULT 'secretaria@unionfraternal21.org',
     current_venerable_master TEXT,
     current_secretary TEXT,
@@ -416,7 +416,7 @@ VALUES (
     'Rito Escocés Antiguo y Aceptado',
     '1921-06-24',
     'Todos los 2do y 4to miércoles de cada mes a las 7:30 p.m.',
-    'Gran Templo Masónico, Calle 43 Bella Vista, Ciudad de Panamá',
+    '',
     'secretaria@unionfraternal21.org'
 );
 

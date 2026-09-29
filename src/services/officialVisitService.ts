@@ -98,7 +98,7 @@ const defaultSettings: LodgeSettings = {
   rite: 'Rito Escocés Antiguo y Aceptado',
   charterDate: '1921-06-24',
   regularMeetingDays: 'Todos los 2do y 4to miércoles de cada mes a las 7:30 p.m.',
-  templeAddress: 'Gran Templo Masónico, Calle 43 Bella Vista, Ciudad de Panamá',
+  templeAddress: '',
   contactEmail: 'secretaria@unionfraternal21.org',
   currentVenerableMaster: 'Denzel Coronado',
   currentSecretary: '',
