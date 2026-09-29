@@ -87,8 +87,8 @@ export const AppIconSelectorModal: React.FC<AppIconSelectorModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-      <div className="relative w-full max-w-lg bg-navy-900 border border-gold-500/40 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/80 p-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-md animate-fade-in">
+      <div className="relative my-auto flex min-h-0 w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-gold-500/40 bg-navy-900 shadow-2xl max-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-1.5rem)]">
         {/* Header */}
         <div className="relative px-6 py-5 border-b border-gold-500/20 bg-gradient-to-r from-crimson-950/60 via-navy-900 to-navy-950 flex items-center justify-between">
           <div className="flex items-center space-x-3">
@@ -113,7 +113,7 @@ export const AppIconSelectorModal: React.FC<AppIconSelectorModalProps> = ({
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto space-y-6">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-6 space-y-6">
           <p className="text-sm text-cream-300 leading-relaxed">
             Puedes elegir con cuál de los dos emblemas oficiales deseas guardar o instalar la plataforma en tu teléfono móvil o computadora:
           </p>
@@ -209,7 +209,7 @@ export const AppIconSelectorModal: React.FC<AppIconSelectorModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 bg-navy-950/80 border-t border-white/5 flex items-center justify-between gap-3">
+        <div className="shrink-0 px-6 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] bg-navy-950/80 border-t border-white/5 flex items-center justify-between gap-3">
           <button
             type="button"
             onClick={onClose}
