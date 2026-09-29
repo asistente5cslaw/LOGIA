@@ -99,6 +99,12 @@
     padding-bottom: env(safe-area-inset-bottom);
   }
 
+  /* La barra móvil es fixed y también incluye el home indicator de iOS. */
+  .mobile-scroll-content {
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+    scroll-padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+  }
+
   /* Ocultar barra inferior de Google Maps (Términos, accesos, copyright) */
   .gm-style-cc,
   .gmnoprint a,

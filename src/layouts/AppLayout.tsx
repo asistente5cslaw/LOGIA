@@ -67,7 +67,7 @@ export function AppLayout() {
   };
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-canvas text-ink">
+    <div className="flex h-[100dvh] min-h-[100dvh] w-full overflow-hidden bg-canvas text-ink">
       {/* Modal de selección de ícono / instalación PWA */}
       <AppIconSelectorModal
         isOpen={isIconModalOpen}
@@ -193,7 +193,7 @@ export function AppLayout() {
       </aside>
 
       {/* Contenido principal móvil + escritorio */}
-      <div className="flex flex-1 flex-col h-screen min-w-0 overflow-hidden">
+      <div className="flex flex-1 flex-col h-[100dvh] min-w-0 overflow-hidden">
         {/* Barra superior móvil */}
         <header className="shrink-0 flex h-14 items-center justify-between border-b border-border bg-surface px-4 md:hidden">
           <div className="flex items-center gap-2.5">
@@ -256,7 +256,7 @@ export function AppLayout() {
         </header>
 
         {/* Contenido de página con scroll */}
-        <main className="flex-1 overflow-y-auto pb-20 md:pb-6">
+        <main className="mobile-scroll-content flex-1 overflow-y-auto md:pb-6">
           <Outlet />
         </main>
       </div>
