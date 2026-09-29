@@ -531,7 +531,7 @@ export const authService = {
             email: data.email || defaultEmail,
             memberId: data.member_id,
             displayName: data.display_name || defaultEmail.split('@')[0],
-            roleId: data.role_id || 'her',
+            roleId: data.role_id || 'apr',
             technicalRole: data.technical_role || 'member',
             identityVerified: data.identity_verified ?? true,
             identityStatus: data.identity_status || 'verified',
@@ -612,14 +612,14 @@ export const authService = {
     if (isSupabaseConfigured()) {
       try {
         await supabase
-          .from('user_profiles')
+          .from('profiles')
           .update({
             role_id: roleId,
             technical_role: technicalRole,
           })
           .eq('email', email.trim().toLowerCase());
       } catch (e) {
-        console.warn('Error actualizando rol en Supabase user_profiles:', e);
+        console.warn('Error actualizando rol en Supabase profiles:', e);
       }
     }
 

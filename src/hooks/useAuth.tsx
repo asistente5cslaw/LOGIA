@@ -100,7 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const hasPermission = useCallback(
     (permission: Permission): boolean => {
       if (!user) return false;
-      const roleId = (user.profile?.roleId || 'her') as InstitutionalRoleCode;
+      const roleId = (user.profile?.roleId || 'apr') as InstitutionalRoleCode;
       // El Administrador o Secretario tiene acceso completo
       if (user.profile?.technicalRole === 'admin' || roleId === 'sec' || roleId === 'vm') {
         return true;
@@ -110,10 +110,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user]
   );
 
-  const roleId = (user?.profile?.roleId || 'her') as InstitutionalRoleCode;
+  const roleId = (user?.profile?.roleId || 'apr') as InstitutionalRoleCode;
   const isSecretaryOrVM = roleId === 'sec' || roleId === 'vm' || user?.profile?.technicalRole === 'admin';
   const roleObj = institutionalRoles.find((r) => r.id === roleId);
-  const userRoleName = roleObj ? roleObj.name : 'Hermano';
+  const userRoleName = roleObj ? roleObj.name : 'Aprendiz';
 
   return (
     <AuthContext.Provider

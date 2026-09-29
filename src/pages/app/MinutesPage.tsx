@@ -97,7 +97,7 @@ export function MinutesPage() {
       const memberContext = {
         id: currentMember?.id || 'guest',
         degree: currentMember?.degree || 'aprendiz',
-        roleId: user?.profile?.roleId || 'her',
+        roleId: user?.profile?.roleId || 'apr',
       };
 
       const hasAccess = minuteService.canMemberAccessMinute(m, memberContext);
