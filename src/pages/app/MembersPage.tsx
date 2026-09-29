@@ -64,7 +64,7 @@ export function MembersPage() {
 
   // Modal Rápido de Asignar / Cambiar Cargo o Rol
   const [roleModalMember, setRoleModalMember] = useState<Member | null>(null);
-  const [roleModalSelectedId, setRoleModalSelectedId] = useState<InstitutionalRoleCode>('her');
+  const [roleModalSelectedId, setRoleModalSelectedId] = useState<InstitutionalRoleCode>('apr');
   const [isSavingRole, setIsSavingRole] = useState(false);
 
   // Modal de Validación de Identidad (Secretaría / Venerable Maestro)
@@ -77,7 +77,7 @@ export function MembersPage() {
   const [formLastName, setFormLastName] = useState('');
   const [formEmail, setFormEmail] = useState('');
   const [formPhone, setFormPhone] = useState('');
-  const [formRoleId, setFormRoleId] = useState<InstitutionalRoleCode>('her');
+  const [formRoleId, setFormRoleId] = useState<InstitutionalRoleCode>('apr');
   const [formDegree, setFormDegree] = useState<MasonicDegree>('aprendiz');
   const [formCondition, setFormCondition] = useState<MemberStatusCondition>('activo');
   const [formMotherLodge, setFormMotherLodge] = useState('Resp.·. Log.·. Unión Fraternal No. 21');
@@ -108,7 +108,7 @@ export function MembersPage() {
 
   const handleOpenRoleModal = (m: Member) => {
     setRoleModalMember(m);
-    setRoleModalSelectedId(m.roleId || 'her');
+    setRoleModalSelectedId(m.roleId || 'apr');
   };
 
   const handleSaveRoleOnly = async (e: React.FormEvent) => {

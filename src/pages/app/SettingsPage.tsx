@@ -48,7 +48,7 @@ export function SettingsPage() {
   // Invitaciones
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [newInvDegree, setNewInvDegree] = useState<MasonicDegree>('aprendiz');
-  const [newInvRole, setNewInvRole] = useState<InstitutionalRoleCode>('her');
+  const [newInvRole, setNewInvRole] = useState<InstitutionalRoleCode>('apr');
   const [newInvEmail, setNewInvEmail] = useState('');
 
   // Auditoría

@@ -60,7 +60,7 @@ export function RegisterIdentityPage() {
             firstName: pendingData.firstName,
             lastName: pendingData.lastName,
             email: pendingData.email,
-            roleId: 'her',
+            roleId: 'apr',
             degree: 'aprendiz',
             condition: 'activo',
             motherLodge: 'Resp.·. Log.·. Unión Fraternal No. 21',
