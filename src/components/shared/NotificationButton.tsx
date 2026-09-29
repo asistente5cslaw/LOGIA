@@ -36,7 +36,7 @@ export function NotificationButton() {
       if (registered) {
         toast.success('Notificaciones activadas y dispositivo registrado.');
       } else {
-        toast.warning('Permiso activado, pero este dispositivo aún no pudo registrarse para recibir difusiones globales.');
+        toast.warning(`Permiso activado, pero no se pudo registrar el dispositivo: ${pushNotificationService.getLastRegistrationError()}`);
       }
     } else if (res === 'denied') {
       toast.error('Permiso de notificaciones denegado en tu navegador');

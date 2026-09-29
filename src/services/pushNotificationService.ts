@@ -36,6 +36,7 @@ function urlBase64ToUint8Array(value: string): Uint8Array {
 
 class PushNotificationService {
   private swRegistration: ServiceWorkerRegistration | null = null;
+  private lastRegistrationError = '';
   private readonly LOGO_PATH = '/logo-uf21.png';
   private listeners: (() => void)[] = [];
 
@@ -52,6 +53,10 @@ class PushNotificationService {
   public getPermission(): NotificationPermission {
     if (!this.isSupported()) return 'denied';
     return Notification.permission;
+  }
+
+  public getLastRegistrationError(): string {
+    return this.lastRegistrationError;
   }
 
   /**
@@ -231,16 +236,46 @@ class PushNotificationService {
   }
 
   public async registerCurrentDevice(): Promise<boolean> {
+    this.lastRegistrationError = '';
     const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
-    if (!vapidKey || !('serviceWorker' in navigator) || !('PushManager' in window)) return false;
+    if (!vapidKey) {
+      this.lastRegistrationError = 'Falta VITE_VAPID_PUBLIC_KEY en el deployment de Vercel.';
+      return false;
+    }
+    if (!('serviceWorker' in navigator)) {
+      this.lastRegistrationError = 'Este navegador no admite Service Worker.';
+      return false;
+    }
+    if (!('PushManager' in window)) {
+      this.lastRegistrationError = 'Este navegador o modo de navegación no admite Web Push.';
+      return false;
+    }
+
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (/macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone);
+    if (isIOS && !isStandalone) {
+      this.lastRegistrationError = 'En iPhone debes abrir la aplicación desde “Añadir a la pantalla de inicio” para recibir push.';
+      return false;
+    }
+
     try {
       const registration = this.swRegistration || await this.initServiceWorker();
-      if (!registration) return false;
+      if (!registration) {
+        this.lastRegistrationError = 'No se pudo registrar el Service Worker.';
+        return false;
+      }
       let subscription = await registration.pushManager.getSubscription();
       if (!subscription) subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidKey) });
       const json = subscription.toJSON() as PushSubscriptionRow;
       const { supabase, isSupabaseConfigured } = await import('@/lib/supabase');
-      if (!isSupabaseConfigured() || !json.endpoint || !json.keys?.p256dh || !json.keys?.auth) return false;
+      if (!isSupabaseConfigured()) {
+        this.lastRegistrationError = 'Supabase no está configurado en este deployment.';
+        return false;
+      }
+      if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) {
+        this.lastRegistrationError = 'El navegador no devolvió una suscripción push válida.';
+        return false;
+      }
       const { error } = await supabase.from('push_subscriptions').upsert({
         endpoint: json.endpoint,
         expiration_time: json.expirationTime ?? null,
@@ -249,9 +284,14 @@ class PushNotificationService {
         user_agent: navigator.userAgent,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'endpoint' });
-      return !error;
+      if (error) {
+        this.lastRegistrationError = `Supabase rechazó el registro: ${error.message}`;
+        return false;
+      }
+      return true;
     } catch (error) {
       console.warn('No se pudo registrar este dispositivo para push:', error);
+      this.lastRegistrationError = error instanceof Error ? error.message : 'Error desconocido al registrar el dispositivo.';
       return false;
     }
   }
