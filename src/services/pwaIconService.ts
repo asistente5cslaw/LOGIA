@@ -87,8 +87,11 @@ export function applyLodgeIcon(iconId: LodgeIconOption) {
   }
   favicon.href = iconPath;
 
-  // El manifiesto debe conservar una URL HTTP estable para que Chrome/Android
-  // pueda validar la PWA e invocar beforeinstallprompt. El ícono elegido se
-  // aplica al favicon y al Apple Touch Icon; el manifiesto usa el ícono oficial.
+  // Chrome/Edge leen el icono de instalación desde el manifiesto, no desde el
+  // favicon. Cada opción tiene un manifiesto HTTP estable (nunca blob:), para
+  // que Windows/Android instalen exactamente el emblema elegido.
+  const manifestLink = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
+  if (manifestLink) manifestLink.href = `/manifest-${iconId}.webmanifest`;
+
   window.dispatchEvent(new CustomEvent('lodge-icon-changed', { detail: iconId }));
 }

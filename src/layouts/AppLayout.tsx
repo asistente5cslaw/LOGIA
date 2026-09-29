@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   Home,
@@ -43,6 +43,13 @@ export function AppLayout() {
   const [isCollapsed, setIsCollapsed] = useState(() => {
     return localStorage.getItem('sidebar_collapsed') === 'true';
   });
+
+  useEffect(() => {
+    if (sessionStorage.getItem('reopen_icon_selector') === 'true') {
+      sessionStorage.removeItem('reopen_icon_selector');
+      setIsIconModalOpen(true);
+    }
+  }, []);
 
   const toggleSidebar = () => {
     setIsCollapsed((prev) => {

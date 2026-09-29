@@ -74,11 +74,9 @@ La Secretaría del Taller`;
     return `https://wa.me/?text=${encoded}`;
   },
 
-  /**
-   * Prepara el enlace mailto usando CCO (BCC) obligatorio para nunca exponer la lista de correos
-   */
+  /** Prepara el enlace mailto usando CCO/BCC para proteger los correos. */
   generateMailtoUrl(subject: string, bodyText: string, recipientEmails: string[]): string {
-    const bccList = recipientEmails.join(',');
+    const bccList = [...new Set(recipientEmails.map((email) => email.trim().toLowerCase()).filter(Boolean))].join(',');
     const encodedSubject = encodeURIComponent(subject);
     const encodedBody = encodeURIComponent(bodyText);
     return `mailto:?bcc=${encodeURIComponent(bccList)}&subject=${encodedSubject}&body=${encodedBody}`;

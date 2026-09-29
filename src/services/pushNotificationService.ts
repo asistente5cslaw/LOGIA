@@ -22,6 +22,18 @@ export interface LodgeNotificationItem {
 
 const STORAGE_KEY = 'lodge_notifications_list';
 
+interface PushSubscriptionRow {
+  endpoint: string;
+  expirationTime?: number | null;
+  keys?: { p256dh: string; auth: string };
+}
+
+function urlBase64ToUint8Array(value: string): Uint8Array {
+  const padding = '='.repeat((4 - (value.length % 4)) % 4);
+  const raw = atob((value + padding).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from([...raw].map((char) => char.charCodeAt(0)));
+}
+
 class PushNotificationService {
   private swRegistration: ServiceWorkerRegistration | null = null;
   private readonly LOGO_PATH = '/logo-uf21.png';
@@ -235,12 +247,47 @@ class PushNotificationService {
     try {
       const permission = await Notification.requestPermission();
       localStorage.setItem('lodge_notifications_enabled', permission === 'granted' ? 'true' : 'false');
+      if (permission === 'granted') await this.registerCurrentDevice();
       this.notifyListeners();
       return permission;
     } catch (err) {
       console.error('Error solicitando permisos de notificación:', err);
       return 'denied';
     }
+  }
+
+  public async registerCurrentDevice(): Promise<boolean> {
+    const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
+    if (!vapidKey || !('serviceWorker' in navigator) || !('PushManager' in window)) return false;
+    try {
+      const registration = this.swRegistration || await this.initServiceWorker();
+      if (!registration) return false;
+      let subscription = await registration.pushManager.getSubscription();
+      if (!subscription) subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidKey) });
+      const json = subscription.toJSON() as PushSubscriptionRow;
+      const { supabase, isSupabaseConfigured } = await import('@/lib/supabase');
+      if (!isSupabaseConfigured() || !json.endpoint || !json.keys?.p256dh || !json.keys?.auth) return false;
+      const { error } = await supabase.from('push_subscriptions').upsert({
+        endpoint: json.endpoint,
+        expiration_time: json.expirationTime ?? null,
+        p256dh: json.keys.p256dh,
+        auth: json.keys.auth,
+        user_agent: navigator.userAgent,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'endpoint' });
+      return !error;
+    } catch (error) {
+      console.warn('No se pudo registrar este dispositivo para push:', error);
+      return false;
+    }
+  }
+
+  public async sendPushToAll(payload: PushNotificationPayload): Promise<{ sent: number; removed: number }> {
+    const { supabase, isSupabaseConfigured } = await import('@/lib/supabase');
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    const { data, error } = await supabase.functions.invoke('send-push-notification', { body: payload });
+    if (error) throw error;
+    return { sent: Number(data?.sent || 0), removed: Number(data?.removed || 0) };
   }
 
   /**

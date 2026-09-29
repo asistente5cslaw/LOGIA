@@ -78,6 +78,7 @@ export function CalendarPage() {
   const [convocationEvent, setConvocationEvent] = useState<LodgeEvent | null>(null);
   const [convocationText, setConvocationText] = useState('');
   const [copied, setCopied] = useState(false);
+  const [isSendingPush, setIsSendingPush] = useState(false);
 
   // Formulario nuevo evento
   const [formTitle, setFormTitle] = useState('');
@@ -316,6 +317,25 @@ export function CalendarPage() {
       loadData();
     } catch {
       toast.error('Error al actualizar estado');
+    }
+  };
+
+  const handleSendPushToAll = async () => {
+    if (!convocationEvent) return;
+    setIsSendingPush(true);
+    try {
+      const result = await pushNotificationService.sendPushToAll({
+        title: `Convocatoria: ${convocationEvent.title}`,
+        body: `Tenida programada para el ${convocationEvent.startDate} a las ${convocationEvent.startTime || '19:30'} en ${convocationEvent.location}.`,
+        url: '/app/calendario',
+        tag: `convocatoria-${convocationEvent.id}`,
+        type: 'convocatoria',
+      });
+      toast.success(`Push enviado a ${result.sent} dispositivo${result.sent === 1 ? '' : 's'}.`);
+    } catch {
+      toast.error('No se pudo enviar el push global. Verifica las claves VAPID y la Edge Function.');
+    } finally {
+      setIsSendingPush(false);
     }
   };
 
@@ -1094,6 +1114,17 @@ export function CalendarPage() {
                   <Mail className="h-4 w-4" />
                   Correo
                 </a>
+
+                <button
+                  type="button"
+                  onClick={handleSendPushToAll}
+                  disabled={isSendingPush}
+                  title="Enviar notificación push a todos los dispositivos registrados"
+                  className="flex min-h-[40px] items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/5 px-3 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors disabled:cursor-wait disabled:opacity-60"
+                >
+                  <Send className="h-4 w-4" />
+                  {isSendingPush ? 'Enviando…' : 'Push a todos'}
+                </button>
               </div>
 
               <button

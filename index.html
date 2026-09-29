@@ -10,7 +10,12 @@
     <meta name="apple-mobile-web-app-title" content="UF21" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <link rel="manifest" href="/manifest.webmanifest" />
+    <script>
+      (function () {
+        var icon = localStorage.getItem('selected_lodge_icon') === 'monogram' ? 'monogram' : 'emblem';
+        document.write('<link rel="manifest" href="/manifest-' + icon + '.webmanifest" />');
+      })();
+    </script>
     <title>Unión Fraternal No. 21 — Gestión</title>
     <meta property="og:image" content="https://bolt.new/static/og_default.png">
     <meta name="twitter:card" content="summary_large_image">

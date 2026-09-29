@@ -1,0 +1,15 @@
+{
+  "id": "/?icon=monogram",
+  "name": "Logia Unión Fraternal No. 21",
+  "short_name": "UF21",
+  "description": "Sistema oficial de gestión de la Logia Unión Fraternal No. 21",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#FBF9F5",
+  "theme_color": "#78292A",
+  "icons": [
+    { "src": "/icons/logo-uf21-monogram.jpg", "sizes": "1024x1024", "type": "image/jpeg", "purpose": "any maskable" }
+  ]
+}
