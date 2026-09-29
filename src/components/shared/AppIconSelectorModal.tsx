@@ -11,28 +11,22 @@ import {
   Check,
   Download,
   Smartphone,
-  Sparkles,
   X,
   Share2,
   PlusSquare,
-  Shield,
-  Layers,
 } from 'lucide-react';
 
 interface AppIconSelectorModalProps {
   isOpen: boolean;
   onClose: () => void;
-  autoInstallOnSelect?: boolean;
 }
 
 export const AppIconSelectorModal: React.FC<AppIconSelectorModalProps> = ({
   isOpen,
   onClose,
-  autoInstallOnSelect = false,
 }) => {
   const [selectedIcon, setSelectedIcon] = useState<LodgeIconOption>(getSelectedLodgeIcon());
   const [installPrompt, setInstallPrompt] = useState<any>(getDeferredInstallPrompt());
-  const [installedSuccess, setInstalledSuccess] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
   const [installMessage, setInstallMessage] = useState('');
@@ -55,6 +49,17 @@ export const AppIconSelectorModal: React.FC<AppIconSelectorModalProps> = ({
     return () => window.removeEventListener('pwa-installable', handleInstallable);
   }, []);
 
+  useEffect(() => {
+    const handleInstalled = () => {
+      setIsInstalled(true);
+      setInstallMessage('La aplicación fue instalada correctamente.');
+      clearDeferredInstallPrompt();
+      setInstallPrompt(null);
+    };
+    window.addEventListener('appinstalled', handleInstalled);
+    return () => window.removeEventListener('appinstalled', handleInstalled);
+  }, []);
+
   if (!isOpen) return null;
 
   const handleSelectIcon = (iconId: LodgeIconOption) => {
@@ -67,7 +72,6 @@ export const AppIconSelectorModal: React.FC<AppIconSelectorModalProps> = ({
 
     if (isInstalled) {
       setInstallMessage('La plataforma ya está instalada como aplicación en este dispositivo.');
-      setInstalledSuccess(true);
       return;
     }
 
@@ -76,7 +80,6 @@ export const AppIconSelectorModal: React.FC<AppIconSelectorModalProps> = ({
         installPrompt.prompt();
         const choiceResult = await installPrompt.userChoice;
         if (choiceResult.outcome === 'accepted') {
-          setInstalledSuccess(true);
           setInstallMessage('Aplicación instalada correctamente. Puedes abrirla desde la pantalla de inicio.');
           clearDeferredInstallPrompt();
           setInstallPrompt(null);
@@ -88,7 +91,6 @@ export const AppIconSelectorModal: React.FC<AppIconSelectorModalProps> = ({
         console.warn('Error launching install prompt:', err);
       }
     } else {
-      setInstalledSuccess(true);
       setInstallMessage(
         isIOS
           ? 'Ícono guardado. En Safari toca Compartir y luego “Añadir a la pantalla de inicio”.'
@@ -211,16 +213,17 @@ export const AppIconSelectorModal: React.FC<AppIconSelectorModalProps> = ({
             </div>
           )}
 
-          {installedSuccess && (
-            <div className="p-3 bg-emerald-950/60 border border-emerald-500/40 rounded-xl text-center text-xs text-emerald-300 flex items-center justify-center space-x-2">
-              <Check className="w-4 h-4 text-emerald-400" />
-              <span>{installMessage || 'Ícono aplicado exitosamente a la configuración de la App.'}</span>
-            </div>
-          )}
         </div>
 
         {/* Footer */}
-        <div className="shrink-0 px-6 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] bg-navy-950/80 border-t border-white/5 flex items-center justify-between gap-3">
+        <div className="shrink-0 px-6 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] bg-navy-950/80 border-t border-white/5">
+          {installMessage && (
+            <div className="mb-3 flex items-start gap-2 rounded-xl border border-emerald-500/40 bg-emerald-950/80 p-3 text-xs leading-relaxed text-emerald-100" role="status" aria-live="polite">
+              <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
+              <span>{installMessage}</span>
+            </div>
+          )}
+          <div className="flex items-center justify-between gap-3">
           <button
             type="button"
             onClick={onClose}
@@ -251,6 +254,7 @@ export const AppIconSelectorModal: React.FC<AppIconSelectorModalProps> = ({
               </>
             )}
           </button>
+          </div>
         </div>
       </div>
     </div>

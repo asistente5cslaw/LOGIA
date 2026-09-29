@@ -87,43 +87,8 @@ export function applyLodgeIcon(iconId: LodgeIconOption) {
   }
   favicon.href = iconPath;
 
-  // 3. Dynamically update Web App Manifest with chosen icon
-  const manifestData = {
-    name: 'Logia Unión Fraternal No. 21',
-    short_name: 'UF No. 21',
-    description: 'Sistema Oficial de Gestión y Archivo Masónico - Unión Fraternal No. 21',
-    start_url: '/',
-    display: 'standalone',
-    background_color: '#0d1117',
-    theme_color: '#990000',
-    icons: [
-      {
-        src: iconPath,
-        sizes: '192x192',
-        type: 'image/jpeg',
-        purpose: 'any maskable',
-      },
-      {
-        src: iconPath,
-        sizes: '512x512',
-        type: 'image/jpeg',
-        purpose: 'any maskable',
-      },
-    ],
-  };
-
-  const stringManifest = JSON.stringify(manifestData);
-  const blob = new Blob([stringManifest], { type: 'application/json' });
-  const manifestURL = URL.createObjectURL(blob);
-
-  let manifestLink = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
-  if (!manifestLink) {
-    manifestLink = document.createElement('link');
-    manifestLink.rel = 'manifest';
-    document.head.appendChild(manifestLink);
-  }
-  manifestLink.href = manifestURL;
-
-  // Dispatch custom event so UI components can re-render if needed
+  // El manifiesto debe conservar una URL HTTP estable para que Chrome/Android
+  // pueda validar la PWA e invocar beforeinstallprompt. El ícono elegido se
+  // aplica al favicon y al Apple Touch Icon; el manifiesto usa el ícono oficial.
   window.dispatchEvent(new CustomEvent('lodge-icon-changed', { detail: iconId }));
 }
