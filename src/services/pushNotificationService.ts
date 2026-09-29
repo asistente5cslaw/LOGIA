@@ -22,6 +22,30 @@ export interface LodgeNotificationItem {
 
 const STORAGE_KEY = 'lodge_notifications_list';
 
+const WEEKDAYS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
+/** Formato corto y legible para las notificaciones: Miércoles 30 de septiembre · 7:30 p. m. */
+export function formatPushDateTime(dateValue: string, timeValue?: string): string {
+  const dateMatch = dateValue.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!dateMatch) return `${dateValue}${timeValue ? ` · ${formatPushTime(timeValue)}` : ''}`;
+
+  const [, year, month, day] = dateMatch;
+  const date = new Date(Number(year), Number(month) - 1, Number(day));
+  const dateText = `${WEEKDAYS[date.getDay()][0].toUpperCase()}${WEEKDAYS[date.getDay()].slice(1)} ${Number(day)} de ${MONTHS[Number(month) - 1]}`;
+  return `${dateText}${timeValue ? ` · ${formatPushTime(timeValue)}` : ''}`;
+}
+
+function formatPushTime(timeValue: string): string {
+  const match = timeValue.match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return timeValue;
+  const hour24 = Number(match[1]);
+  const minutes = match[2];
+  const suffix = hour24 >= 12 ? 'p. m.' : 'a. m.';
+  const hour12 = hour24 % 12 || 12;
+  return `${hour12}:${minutes} ${suffix}`;
+}
+
 interface PushSubscriptionRow {
   endpoint: string;
   expirationTime?: number | null;
@@ -372,7 +396,7 @@ class PushNotificationService {
   public async notifyConvocation(title: string, date: string, time: string, location: string): Promise<boolean> {
     return this.sendNotification({
       title: `Convocatoria: ${title}`,
-      body: `Tenida programada para el ${date} a las ${time || '19:30'} en ${location}. Haz clic para ver detalles.`,
+      body: `Tenida programada para el ${formatPushDateTime(date, time || '19:30')} en ${location}.`,
       url: '/app/calendario',
       tag: `convocatoria-${Date.now()}`,
       type: 'convocatoria',

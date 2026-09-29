@@ -1,5 +1,5 @@
 // Service Worker para Notificaciones Push de Logia Unión Fraternal No. 21
-const CACHE_NAME = 'logia-uf21-v2';
+const CACHE_NAME = 'logia-uf21-v3';
 const APP_SHELL = ['/', '/manifest.webmanifest', '/logo-uf21.png', '/apple-touch-icon.png'];
 
 self.addEventListener('install', (event) => {
@@ -57,7 +57,15 @@ self.addEventListener('push', (event) => {
   };
 
   event.waitUntil(
-    self.registration.showNotification(title, options)
+    (async () => {
+      // Evita mostrar dos veces el mismo aviso si el envío se repite o quedan
+      // dos eventos pendientes en el sistema operativo.
+      const dedupeKey = `https://logia-uf21.local/push/${options.tag}`;
+      const dedupeCache = await caches.open('logia-push-dedupe-v1');
+      if (await dedupeCache.match(dedupeKey)) return;
+      await dedupeCache.put(dedupeKey, new Response(String(Date.now())));
+      return self.registration.showNotification(title, options);
+    })()
   );
 });
 

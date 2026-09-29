@@ -31,7 +31,7 @@ import { AppleDatePicker } from '@/components/shared/AppleDatePicker';
 import { AppleTimePicker } from '@/components/shared/AppleTimePicker';
 import { AppleInput, AppleTextarea } from '@/components/shared/AppleInput';
 import { GoogleMapsLocationPicker } from '@/components/shared/GoogleMapsLocationPicker';
-import { pushNotificationService } from '@/services/pushNotificationService';
+import { formatPushDateTime, pushNotificationService } from '@/services/pushNotificationService';
 import { officialVisitService } from '@/services/officialVisitService';
 import { useAppleDialog } from '@/components/shared/AppleDialog';
 import { Modal } from '@/components/shared/Modal';
@@ -316,14 +316,6 @@ export function CalendarPage() {
         email: user?.email,
       });
 
-      // Enviar notificación push con el escudo oficial
-      pushNotificationService.notifyConvocation(
-        convocationEvent.title,
-        convocationEvent.startDate,
-        convocationEvent.startTime || '',
-        convocationEvent.location
-      ).catch(() => {});
-
       toast.success("Estado de la tenida actualizado a 'Convocada'");
       setShowConvocationModal(false);
       loadData();
@@ -338,7 +330,7 @@ export function CalendarPage() {
     try {
       const result = await pushNotificationService.sendPushToAll({
         title: `Convocatoria: ${convocationEvent.title}`,
-        body: `Tenida programada para el ${convocationEvent.startDate} a las ${convocationEvent.startTime || '19:30'} en ${convocationEvent.location}.`,
+        body: `Tenida programada para el ${formatPushDateTime(convocationEvent.startDate, convocationEvent.startTime || '19:30')} en ${convocationEvent.location}.`,
         url: '/app/calendario',
         tag: `convocatoria-${convocationEvent.id}`,
         type: 'convocatoria',
