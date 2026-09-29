@@ -34,13 +34,16 @@ export const AppIconSelectorModal: React.FC<AppIconSelectorModalProps> = ({
   const [installPrompt, setInstallPrompt] = useState<any>(getDeferredInstallPrompt());
   const [installedSuccess, setInstalledSuccess] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
+  const [installMessage, setInstallMessage] = useState('');
 
   useEffect(() => {
     if (isOpen) {
       setSelectedIcon(getSelectedLodgeIcon());
       setInstallPrompt(getDeferredInstallPrompt());
       const userAgent = window.navigator.userAgent.toLowerCase();
-      setIsIOS(/iphone|ipad|ipod/.test(userAgent));
+      setIsIOS(/iphone|ipad|ipod/.test(userAgent) || (userAgent.includes('macintosh') && navigator.maxTouchPoints > 1));
+      setIsInstalled(window.matchMedia('(display-mode: standalone)').matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone));
     }
   }, [isOpen]);
 
@@ -62,12 +65,19 @@ export const AppIconSelectorModal: React.FC<AppIconSelectorModalProps> = ({
   const handleSaveAndInstall = async () => {
     applyLodgeIcon(selectedIcon);
 
+    if (isInstalled) {
+      setInstallMessage('La plataforma ya está instalada como aplicación en este dispositivo.');
+      setInstalledSuccess(true);
+      return;
+    }
+
     if (installPrompt) {
       try {
         installPrompt.prompt();
         const choiceResult = await installPrompt.userChoice;
         if (choiceResult.outcome === 'accepted') {
           setInstalledSuccess(true);
+          setInstallMessage('Aplicación instalada correctamente. Puedes abrirla desde la pantalla de inicio.');
           clearDeferredInstallPrompt();
           setInstallPrompt(null);
           setTimeout(() => {
@@ -79,10 +89,11 @@ export const AppIconSelectorModal: React.FC<AppIconSelectorModalProps> = ({
       }
     } else {
       setInstalledSuccess(true);
-      setTimeout(() => {
-        setInstalledSuccess(false);
-        onClose();
-      }, 1500);
+      setInstallMessage(
+        isIOS
+          ? 'Ícono guardado. En Safari toca Compartir y luego “Añadir a la pantalla de inicio”.'
+          : 'Ícono guardado. Abre el menú del navegador y elige “Instalar aplicación” o “Añadir a pantalla de inicio”.'
+      );
     }
   };
 
@@ -203,7 +214,7 @@ export const AppIconSelectorModal: React.FC<AppIconSelectorModalProps> = ({
           {installedSuccess && (
             <div className="p-3 bg-emerald-950/60 border border-emerald-500/40 rounded-xl text-center text-xs text-emerald-300 flex items-center justify-center space-x-2">
               <Check className="w-4 h-4 text-emerald-400" />
-              <span>Ícono aplicado exitosamente a la configuración de la App.</span>
+              <span>{installMessage || 'Ícono aplicado exitosamente a la configuración de la App.'}</span>
             </div>
           )}
         </div>
@@ -223,7 +234,12 @@ export const AppIconSelectorModal: React.FC<AppIconSelectorModalProps> = ({
             onClick={handleSaveAndInstall}
             className="flex-1 flex items-center justify-center space-x-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-gold-500 to-gold-400 text-navy-950 font-bold text-xs shadow-lg shadow-gold-500/20 hover:from-gold-400 hover:to-gold-300 transition-all"
           >
-            {installPrompt ? (
+            {isInstalled ? (
+              <>
+                <Check className="w-4 h-4" />
+                <span>Aplicación ya instalada</span>
+              </>
+            ) : installPrompt ? (
               <>
                 <Download className="w-4 h-4" />
                 <span>Instalar con este Ícono</span>
@@ -231,7 +247,7 @@ export const AppIconSelectorModal: React.FC<AppIconSelectorModalProps> = ({
             ) : (
               <>
                 <Check className="w-4 h-4" />
-                <span>Guardar Ícono Seleccionado</span>
+                <span>{isIOS ? 'Guardar y ver instrucciones' : 'Guardar y ver instalación'}</span>
               </>
             )}
           </button>

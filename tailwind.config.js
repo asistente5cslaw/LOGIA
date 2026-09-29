@@ -12,6 +12,19 @@ export default {
         sans: ['Inter', 'system-ui', 'sans-serif'],
       },
       colors: {
+        navy: {
+          800: '#2b2029',
+          900: '#1d1720',
+          950: '#120e14',
+        },
+        cream: {
+          100: '#fffaf0',
+          300: '#e8dfd2',
+          400: '#c8bcae',
+        },
+        crimson: {
+          950: '#3b1018',
+        },
         canvas: 'hsl(var(--canvas))',
         surface: {
           DEFAULT: 'hsl(var(--surface))',
@@ -30,6 +43,9 @@ export default {
         },
         gold: {
           DEFAULT: 'hsl(var(--gold))',
+          300: '#e6c987',
+          400: '#d8b96b',
+          500: '#c5a059',
           foreground: '#1E1E24',
         },
         ink: {
