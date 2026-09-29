@@ -81,44 +81,18 @@ class PushNotificationService {
     if (typeof window === 'undefined') return [];
     try {
       const data = localStorage.getItem(STORAGE_KEY);
-      if (!data) {
-        // Semilla inicial de convocatorias y avisos de la logia
-        const initialList: LodgeNotificationItem[] = [
-          {
-            id: 'notif-1',
-            title: 'Convocatoria: Tenida Ordinaria de 1° Grado',
-            body: 'Martes a las 19:30 en el Gran Templo Masónico de Ancón. Se requiere mandil reglamentario.',
-            time: 'Hace 15 min',
-            timestamp: Date.now() - 15 * 60 * 1000,
-            read: false,
-            type: 'convocatoria',
-            url: '/app/calendario',
-          },
-          {
-            id: 'notif-2',
-            title: 'Trazado Aprobado: Acta de Tenida Ordinaria',
-            body: 'El trazado de la sesión anterior ha sido sancionado y firmado por el Venerable Maestro.',
-            time: 'Hace 2 horas',
-            timestamp: Date.now() - 2 * 60 * 60 * 1000,
-            read: false,
-            type: 'trazado',
-            url: '/app/actas',
-          },
-          {
-            id: 'notif-3',
-            title: 'Aviso de Secretaría: Protocolo de Tenida',
-            body: 'Recordatorio protocolar: vestir traje formal oscuro para la recepción de visitantes.',
-            time: 'Hoy',
-            timestamp: Date.now() - 4 * 60 * 60 * 1000,
-            read: false,
-            type: 'aviso',
-            url: '/app/calendario',
-          },
-        ];
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(initialList));
-        return initialList;
+      if (!data) return [];
+      const parsed = JSON.parse(data);
+      if (!Array.isArray(parsed)) return [];
+
+      // Elimina las tres semillas antiguas de demostración sin borrar
+      // notificaciones reales que el usuario ya haya recibido.
+      const demoIds = new Set(['notif-1', 'notif-2', 'notif-3']);
+      const cleaned = parsed.filter((item) => !demoIds.has(item?.id));
+      if (cleaned.length !== parsed.length) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
       }
-      return JSON.parse(data);
+      return cleaned;
     } catch {
       return [];
     }

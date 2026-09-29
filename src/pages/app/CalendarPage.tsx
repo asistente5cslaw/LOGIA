@@ -343,7 +343,11 @@ export function CalendarPage() {
         tag: `convocatoria-${convocationEvent.id}`,
         type: 'convocatoria',
       });
-      toast.success(`Push enviado a ${result.sent} dispositivo${result.sent === 1 ? '' : 's'}.`);
+      if (result.sent === 0) {
+        toast.warning('No hay dispositivos push registrados. Cada usuario debe activar las notificaciones desde su dispositivo.');
+      } else {
+        toast.success(`Push enviado a ${result.sent} dispositivo${result.sent === 1 ? '' : 's'}.`);
+      }
     } catch {
       toast.error('No se pudo enviar el push global. Verifica las claves VAPID y la Edge Function.');
     } finally {

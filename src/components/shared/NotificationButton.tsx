@@ -32,11 +32,22 @@ export function NotificationButton() {
     const res = await pushNotificationService.requestPermission();
     setPermission(res);
     if (res === 'granted') {
-      toast.success('¡Notificaciones push activadas!');
+      const registered = await pushNotificationService.registerCurrentDevice();
+      if (registered) {
+        toast.success('Notificaciones activadas y dispositivo registrado.');
+      } else {
+        toast.warning('Permiso activado, pero este dispositivo aún no pudo registrarse para recibir difusiones globales.');
+      }
     } else if (res === 'denied') {
       toast.error('Permiso de notificaciones denegado en tu navegador');
     }
   };
+
+  useEffect(() => {
+    if (permission === 'granted') {
+      pushNotificationService.registerCurrentDevice().catch(() => undefined);
+    }
+  }, [permission]);
 
   const handleMarkAllAsRead = () => {
     pushNotificationService.markAllAsReadAndClear();
