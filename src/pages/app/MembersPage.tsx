@@ -376,6 +376,27 @@ export function MembersPage() {
     }
   };
 
+  const handlePermanentDelete = async (id: string, name: string) => {
+    const confirmed = await showConfirm({
+      title: 'Eliminar definitivamente',
+      message: `Esta acción eliminará permanentemente a ${name}, su perfil y sus credenciales de Supabase. No podrá restaurarse. ¿Deseas continuar?`,
+      confirmText: 'Eliminar definitivamente',
+      cancelText: 'Cancelar',
+      type: 'error',
+    });
+    if (!confirmed) return;
+    try {
+      await memberService.permanentlyDeleteMember(id);
+      toast.success(`${name} fue eliminado definitivamente`);
+      await loadMembers();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      toast.error(message.includes('actas')
+        ? 'No se puede eliminar porque tiene actas históricas asociadas.'
+        : 'No se pudo eliminar definitivamente el usuario.');
+    }
+  };
+
   return (
     <div className="space-y-4 sm:space-y-5 px-4 pt-2.5 pb-8 sm:py-6 md:px-8 max-w-6xl mx-auto">
       {/* Cabecera limpia y despejada */}
@@ -658,14 +679,24 @@ export function MembersPage() {
                       )}
 
                       {isVenerableMaestro && isDeleted && (
-                        <button
-                          type="button"
-                          onClick={() => void handleRestore(m.id, `${m.firstName} ${m.lastName}`)}
-                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors cursor-pointer active:scale-95 shadow-2xs"
-                          title="Restaurar acceso"
-                        >
-                          <RotateCcw className="h-3.5 w-3.5" />
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => void handleRestore(m.id, `${m.firstName} ${m.lastName}`)}
+                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors cursor-pointer active:scale-95 shadow-2xs"
+                            title="Restaurar acceso"
+                          >
+                            <RotateCcw className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void handlePermanentDelete(m.id, `${m.firstName} ${m.lastName}`)}
+                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors cursor-pointer active:scale-95 shadow-2xs"
+                            title="Eliminar definitivamente"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </>
                       )}
                     </div>
                   </div>

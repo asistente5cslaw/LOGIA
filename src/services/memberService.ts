@@ -272,6 +272,14 @@ export const memberService = {
     });
   },
 
+  async permanentlyDeleteMember(id: string): Promise<void> {
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    const { error } = await supabase.rpc('permanently_delete_member', {
+      target_member_id: id,
+    });
+    if (error) throw error;
+  },
+
   async updateIdentityStatus(
     memberId: string,
     status: 'verified' | 'rejected' | 'pending',
