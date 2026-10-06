@@ -84,7 +84,7 @@ export function AttendancePage() {
       const [records, visList] = await Promise.all([
         attendanceService.getAttendanceForEvent(eventId, {
           canViewExcuseReasons,
-          memberId: user?.memberId,
+          memberId: currentMembers.find((member) => isOwnMember(member))?.id,
         }),
         attendanceService.getVisitorsForEvent(eventId),
       ]);

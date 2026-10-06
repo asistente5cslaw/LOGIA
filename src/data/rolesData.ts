@@ -78,7 +78,7 @@ export const institutionalRoles: Role[] = [
     category: 'dignatario',
     order: 4,
     technicalRole: 'dignitary',
-    defaultPermissions: ['view', 'create', 'edit', 'manage_events', 'manage_attendance', 'view_sensitive_info'],
+    defaultPermissions: ['view', 'create', 'edit', 'manage_events', 'view_sensitive_info'],
   },
   {
     id: 'pm',
