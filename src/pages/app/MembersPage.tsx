@@ -391,8 +391,8 @@ export function MembersPage() {
       await loadMembers();
     } catch (error) {
       const message = error instanceof Error ? error.message : '';
-      toast.error(message.includes('actas')
-        ? 'No se puede eliminar porque tiene actas históricas asociadas.'
+      toast.error(message.includes('actas') || message.includes('correcciones')
+        ? 'No se puede eliminar porque tiene historial de actas asociado.'
         : 'No se pudo eliminar definitivamente el usuario.');
     }
   };

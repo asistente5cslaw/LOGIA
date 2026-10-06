@@ -1,4 +1,4 @@
--- Completa la limpieza de referencias antes de eliminar definitivamente Auth.
+-- Corrige la función para el esquema real: minutes no tiene author_id.
 
 CREATE OR REPLACE FUNCTION public.permanently_delete_member(target_member_id UUID)
 RETURNS VOID
@@ -27,7 +27,7 @@ BEGIN
   IF auth_user_id IS NOT NULL AND EXISTS (
     SELECT 1 FROM public.minute_corrections WHERE author_id = auth_user_id
   ) THEN
-    RAISE EXCEPTION 'No se puede eliminar porque existen actas o correcciones históricas asociadas a este usuario.' USING ERRCODE = '23503';
+    RAISE EXCEPTION 'No se puede eliminar porque existen correcciones históricas asociadas a este usuario.' USING ERRCODE = '23503';
   END IF;
 
   INSERT INTO public.audit_logs (action, entity, entity_id, user_id, user_email, details)
