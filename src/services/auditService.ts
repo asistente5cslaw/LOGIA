@@ -60,4 +60,31 @@ export const auditService = {
       }
     return [];
   },
+
+  async getRoleChangeLogs(page = 1, pageSize = 10): Promise<{ logs: AuditLog[]; hasNext: boolean }> {
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize;
+    const { data, error, count } = await supabase
+      .from('audit_logs')
+      .select('*', { count: 'exact' })
+      .eq('action', 'CAMBIAR_ROL_MIEMBRO')
+      .eq('entity', 'members')
+      .order('created_at', { ascending: false })
+      .range(from, to - 1);
+
+    if (error) throw error;
+    const logs = (data || []).map((d) => ({
+      id: d.id,
+      action: d.action,
+      entity: d.entity,
+      entityId: d.entity_id,
+      userId: d.user_id,
+      userEmail: d.user_email,
+      details: d.details,
+      createdAt: d.created_at,
+    }));
+
+    return { logs, hasNext: (count ?? 0) > to };
+  },
 };

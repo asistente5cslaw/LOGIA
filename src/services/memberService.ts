@@ -123,7 +123,7 @@ export const memberService = {
 
   async saveMember(
     member: Omit<Member, 'id' | 'joinedAt'> & { id?: string },
-    user: { id?: string; email?: string }
+    user: { id?: string; email?: string; name?: string }
   ): Promise<Member> {
     if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
     const now = new Date().toISOString();
@@ -203,7 +203,7 @@ export const memberService = {
   async updateMemberRole(
     memberId: string,
     roleId: InstitutionalRoleCode,
-    user: { id?: string; email?: string }
+    user: { id?: string; email?: string; name?: string }
   ): Promise<Member> {
     const now = new Date().toISOString();
     const previousMember = await this.getMemberById(memberId);
@@ -233,7 +233,7 @@ export const memberService = {
     await auditService.log('CAMBIAR_ROL_MIEMBRO', 'members', memberId, user, {
       targetMemberId: memberId,
       targetName: `${previousMember.firstName} ${previousMember.lastName}`,
-      targetEmail: previousMember.email,
+      actorName: user.name,
       previousRoleId: previousMember.roleId,
       newRoleId: roleId,
     });

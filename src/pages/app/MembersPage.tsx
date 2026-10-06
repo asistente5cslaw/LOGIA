@@ -71,6 +71,8 @@ export function MembersPage() {
   const [isRoleHistoryOpen, setIsRoleHistoryOpen] = useState(false);
   const [roleHistory, setRoleHistory] = useState<AuditLog[]>([]);
   const [isLoadingRoleHistory, setIsLoadingRoleHistory] = useState(false);
+  const [roleHistoryPage, setRoleHistoryPage] = useState(1);
+  const [hasNextRoleHistory, setHasNextRoleHistory] = useState(false);
 
   // Formulario de Miembro
   const [formFirstName, setFormFirstName] = useState('');
@@ -145,7 +147,7 @@ export function MembersPage() {
       const updatedMember = await memberService.updateMemberRole(
         roleModalMember.id,
         roleModalSelectedId,
-        { id: user?.id, email: user?.email }
+        { id: user?.id, email: user?.email, name: user?.displayName }
       );
       setMembers((current) => current.map((member) => (
         member.id === updatedMember.id ? updatedMember : member
@@ -208,17 +210,23 @@ export function MembersPage() {
     setValidatingMember(m);
   };
 
-  const handleOpenRoleHistory = async () => {
+  const loadRoleHistory = async (page: number) => {
     setIsRoleHistoryOpen(true);
     setIsLoadingRoleHistory(true);
     try {
-      const logs = await auditService.getLogs(100);
-      setRoleHistory(logs.filter((log) => log.action === 'CAMBIAR_ROL_MIEMBRO' && log.entity === 'members'));
+      const result = await auditService.getRoleChangeLogs(page, 10);
+      setRoleHistory(result.logs);
+      setHasNextRoleHistory(result.hasNext);
+      setRoleHistoryPage(page);
     } catch {
       toast.error('No se pudo cargar el historial de roles.');
     } finally {
       setIsLoadingRoleHistory(false);
     }
+  };
+
+  const handleOpenRoleHistory = () => {
+    void loadRoleHistory(1);
   };
 
   const formatHistoryDate = (createdAt: string): string => {
@@ -769,37 +777,56 @@ export function MembersPage() {
         ) : roleHistory.length === 0 ? (
           <div className="py-8 text-center text-sm text-ink-muted">Todavía no hay cambios de roles registrados.</div>
         ) : (
-          <div className="max-h-[60vh] space-y-2 overflow-y-auto pr-1">
+          <div className="space-y-3">
+            <div className="max-h-[52vh] space-y-2 overflow-y-auto pr-1">
             {roleHistory.map((log) => {
               const details = log.details || {};
-              const targetName = String(details.targetName || log.entityId || 'Miembro');
-              const targetEmail = details.targetEmail ? String(details.targetEmail) : '';
-              const previousRole = String(details.previousRoleId || '—');
+              const targetMember = members.find((member) => member.id === log.entityId);
+              const targetName = String(
+                details.targetName || (targetMember ? `${targetMember.firstName} ${targetMember.lastName}` : 'Miembro')
+              );
               const newRole = String(details.newRoleId || details.roleId || '—');
-              const previousRoleLabel = institutionalRoles.find((role) => role.id === previousRole)?.name || previousRole;
               const newRoleLabel = institutionalRoles.find((role) => role.id === newRole)?.name || newRole;
-              const actor = log.userEmail || 'Sistema';
+              const actor = String(details.actorName || log.userEmail || 'Sistema');
 
               return (
-                <div key={log.id} className="rounded-xl border border-border bg-surface-container-low p-3 text-sm">
-                  <div className="flex items-start justify-between gap-3">
+                <div key={log.id} className="rounded-xl border border-border bg-surface-container-low p-3 text-sm break-words">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <p className="font-semibold text-ink">{targetName}</p>
-                      {targetEmail && <p className="text-xs text-ink-muted">{targetEmail}</p>}
                     </div>
-                    <span className="inline-flex shrink-0 items-center gap-1 text-xs text-ink-muted">
+                    <span className="inline-flex items-center gap-1 text-xs text-ink-muted sm:shrink-0 sm:text-right">
                       <Clock className="h-3.5 w-3.5" />
                       {formatHistoryDate(log.createdAt)}
                     </span>
                   </div>
                   <p className="mt-2 text-xs text-ink-secondary">
-                    <span className="font-semibold">{actor}</span> cambió el rol de{' '}
-                    <span className="font-semibold">{previousRoleLabel}</span> a{' '}
-                    <span className="font-semibold text-primary">{newRoleLabel}</span>.
+                    <span className="font-semibold">{actor}</span> asignó el rol de{' '}
+                    <span className="font-semibold text-primary">{newRoleLabel}</span> a {targetName}.
                   </p>
                 </div>
               );
             })}
+            </div>
+            <div className="flex items-center justify-between gap-2 border-t border-border pt-3">
+              <button
+                type="button"
+                disabled={roleHistoryPage === 1 || isLoadingRoleHistory}
+                onClick={() => void loadRoleHistory(roleHistoryPage - 1)}
+                className="h-9 rounded-xl border border-border px-3 text-xs font-semibold text-ink-secondary disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Anterior
+              </button>
+              <span className="text-xs text-ink-muted">Página {roleHistoryPage}</span>
+              <button
+                type="button"
+                disabled={!hasNextRoleHistory || isLoadingRoleHistory}
+                onClick={() => void loadRoleHistory(roleHistoryPage + 1)}
+                className="h-9 rounded-xl border border-border px-3 text-xs font-semibold text-ink-secondary disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Siguiente
+              </button>
+            </div>
           </div>
         )}
       </Modal>
