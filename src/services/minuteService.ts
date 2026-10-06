@@ -122,7 +122,7 @@ export const minuteService = {
 
     const fullMinute: Minute = {
       ...minute,
-      id: minute.id || `min-${Date.now()}`,
+      id: minute.id || crypto.randomUUID(),
       number: num,
       formatNumber: fmt,
       createdBy: minute.createdBy || user.id || 'sec',

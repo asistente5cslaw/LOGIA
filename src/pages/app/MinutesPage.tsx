@@ -24,18 +24,6 @@ import { formatDateSpanish } from '@/lib/dateUtils';
 import { toast } from 'sonner';
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 
-const minuteDegreeOptions: AppleSelectOption<MasonicDegree>[] = [
-  { value: 'aprendiz', label: 'Primer Grado — Aprendiz', icon: <AppleEmoji name="ruler" size={16} /> },
-  { value: 'companero', label: 'Segundo Grado — Compañero', icon: <AppleEmoji name="cross" size={16} /> },
-  { value: 'maestro', label: 'Tercer Grado — Maestro', icon: <AppleEmoji name="temple" size={16} /> },
-];
-
-const minuteStatusOptions: AppleSelectOption<MinuteStatus>[] = [
-  { value: 'borrador', label: 'Borrador', description: 'En redacción por Secretaría', color: '#F59E0B' },
-  { value: 'circulada', label: 'Circulada', description: 'Compartida con los hermanos para observaciones', color: '#3B82F6' },
-  { value: 'aprobada', label: 'Aprobada', description: 'Leída y sancionada en Tenida', color: '#10B981' },
-];
-
 export function MinutesPage() {
   const { user, hasPermission } = useAuth();
   const { showConfirm } = useAppleDialog();
@@ -141,7 +129,7 @@ export function MinutesPage() {
     ...events.map((ev) => ({
       value: ev.id,
       label: `${ev.title} (${formatDateSpanish(ev.startDate)})`,
-      description: `Cámara: ${ev.degreeRequired.toUpperCase()} • ${ev.location || 'Gran Templo Masónico'}`,
+      description: ev.location || 'Gran Templo Masónico',
       icon: <AppleEmoji name="temple" size={16} />,
     })),
   ], [events]);
@@ -553,7 +541,7 @@ export function MinutesPage() {
             searchable={true}
           />
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-1 gap-3.5">
             <AppleDatePicker
               label="Fecha de Tenida *"
               required
@@ -561,19 +549,6 @@ export function MinutesPage() {
               onChange={(val) => setFormMeetingDate(val)}
             />
 
-            <AppleSelect<MasonicDegree>
-              label="Cámara de Grado *"
-              value={formDegree}
-              onChange={setFormDegree}
-              options={minuteDegreeOptions}
-            />
-
-            <AppleSelect<MinuteStatus>
-              label="Estado Inicial del Trazado *"
-              value={formStatus}
-              onChange={setFormStatus}
-              options={minuteStatusOptions}
-            />
           </div>
 
           <AppleInput
