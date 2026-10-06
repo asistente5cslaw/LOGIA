@@ -37,6 +37,7 @@ import { Modal } from '@/components/shared/Modal';
 import { cn } from '@/lib/utils';
 import { formatDateSpanish, formatTime12, formatTimeRange12 } from '@/lib/dateUtils';
 import { toast } from 'sonner';
+import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 
 export function CalendarPage() {
   const { user, hasPermission } = useAuth();
@@ -119,6 +120,10 @@ export function CalendarPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  useRealtimeRefresh(() => {
+    void loadData();
+  });
 
   // Filtrado de eventos
   const filteredEvents = useMemo(() => {

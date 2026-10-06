@@ -18,6 +18,8 @@ import { NotificationButton } from '@/components/shared/NotificationButton';
 import { useAppleDialog } from '@/components/shared/AppleDialog';
 import { AppIconSelectorModal } from '@/components/shared/AppIconSelectorModal';
 import { IdentityRevalidationModal } from '@/components/shared/IdentityRevalidationModal';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { DATA_CHANGED_EVENT } from '@/hooks/useRealtimeRefresh';
 
 const desktopNavItems = [
   { to: '/app', label: 'Inicio', icon: Home, end: true },
@@ -50,6 +52,31 @@ export function AppLayout() {
       sessionStorage.removeItem('reopen_icon_selector');
       setIsIconModalOpen(true);
     }
+  }, []);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+
+    const tables = [
+      'profiles', 'members', 'events', 'event_conflicts', 'minutes',
+      'minute_access', 'minute_corrections', 'minute_reads', 'attendance',
+      'attendance_visitors', 'official_visit_checklist', 'lodge_settings',
+      'invitations', 'push_subscriptions',
+    ];
+    const channel = supabase.channel('logia-system-realtime');
+
+    tables.forEach((table) => {
+      channel.on('postgres_changes', { event: '*', schema: 'public', table }, (payload) => {
+        window.dispatchEvent(new CustomEvent(DATA_CHANGED_EVENT, {
+          detail: { table, event: payload.eventType },
+        }));
+      });
+    });
+
+    channel.subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
   }, []);
 
   const toggleSidebar = () => {
@@ -112,7 +139,7 @@ export function AppLayout() {
                 <span className="font-serif text-base font-bold text-ink leading-tight truncate">
                   Logia UF No. 21
                 </span>
-                <span className="text-[11px] text-ink-muted truncate">Valle de Panamá</span>
+                <span className="text-[11px] text-ink-muted truncate">Oriente de Panamá</span>
               </div>
             </div>
           )}
@@ -209,7 +236,7 @@ export function AppLayout() {
             <LodgeLogo className="h-9 w-9 shrink-0" />
             <div className="flex flex-col">
               <span className="font-serif text-sm font-bold text-ink leading-tight">Logia UF No. 21</span>
-              <span className="text-[10px] text-ink-muted">Valle de Panamá</span>
+              <span className="text-[10px] text-ink-muted">Oriente de Panamá</span>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -258,7 +285,7 @@ export function AppLayout() {
               <span>Personalizar Ícono App</span>
             </button>
             <span className="font-serif text-xs text-ink-muted italic hidden lg:inline">
-              Valle de Panamá • Rito Escocés Antiguo y Aceptado
+              Oriente de Panamá • Rito Escocés Antiguo y Aceptado
             </span>
             <NotificationButton />
           </div>

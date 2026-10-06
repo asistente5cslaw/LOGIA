@@ -29,12 +29,7 @@ import { AppleEmoji } from '@/components/shared/AppleEmoji';
 import { useAppleDialog } from '@/components/shared/AppleDialog';
 import { formatDateSpanish } from '@/lib/dateUtils';
 import { toast } from 'sonner';
-
-const degreeOptions: AppleSelectOption<MasonicDegree>[] = [
-  { value: 'aprendiz', label: 'Primer Grado — Aprendiz', icon: <AppleEmoji name="ruler" size={16} /> },
-  { value: 'companero', label: 'Segundo Grado — Compañero', icon: <AppleEmoji name="cross" size={16} /> },
-  { value: 'maestro', label: 'Tercer Grado — Maestro', icon: <AppleEmoji name="temple" size={16} /> },
-];
+import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 
 const conditionOptions: AppleSelectOption<MemberStatusCondition>[] = [
   { value: 'activo', label: 'Activo', color: '#10B981', description: 'Plenos derechos en el taller' },
@@ -48,7 +43,7 @@ const roleOptions: AppleSelectOption<InstitutionalRoleCode>[] = institutionalRol
   label: r.name,
 }));
 
-type FilterTab = 'todos' | 'pendientes' | 'aprendiz' | 'companero' | 'maestro';
+type FilterTab = 'todos' | 'pendientes';
 
 export function MembersPage() {
   const { user, hasPermission, refreshUser } = useAuth();
@@ -68,7 +63,6 @@ export function MembersPage() {
 
   // Modal de Validación de Identidad (Secretaría / Venerable Maestro)
   const [validatingMember, setValidatingMember] = useState<Member | null>(null);
-  const [validationNotes, setValidationNotes] = useState('');
   const [isProcessingValidation, setIsProcessingValidation] = useState(false);
 
   // Formulario de Miembro
@@ -105,6 +99,10 @@ export function MembersPage() {
     loadMembers();
   }, []);
 
+  useRealtimeRefresh(() => {
+    void loadMembers();
+  });
+
   const handleOpenRoleModal = (m: Member) => {
     setRoleModalMember(m);
     setRoleModalSelectedId(m.roleId || 'apr');
@@ -115,11 +113,14 @@ export function MembersPage() {
     if (!roleModalMember) return;
     setIsSavingRole(true);
     try {
-      await memberService.updateMemberRole(
+      const updatedMember = await memberService.updateMemberRole(
         roleModalMember.id,
         roleModalSelectedId,
         { id: user?.id, email: user?.email }
       );
+      setMembers((current) => current.map((member) => (
+        member.id === updatedMember.id ? updatedMember : member
+      )));
       toast.success(`Cargo asignado a ${roleModalMember.firstName} ${roleModalMember.lastName}`);
       setRoleModalMember(null);
       await loadMembers();
@@ -140,8 +141,6 @@ export function MembersPage() {
       // Filtro por pestaña rápida
       if (activeTab === 'pendientes') {
         if (m.identityStatus !== 'pending') return false;
-      } else if (activeTab === 'aprendiz' || activeTab === 'companero' || activeTab === 'maestro') {
-        if (m.degree !== activeTab) return false;
       }
 
       // Filtro por búsqueda de texto
@@ -176,8 +175,8 @@ export function MembersPage() {
   };
 
   const handleOpenValidationModal = (m: Member) => {
+    if (!canValidateIdentity) return;
     setValidatingMember(m);
-    setValidationNotes(m.identityNotes || '');
   };
 
   const handleApproveIdentity = async () => {
@@ -192,8 +191,7 @@ export function MembersPage() {
       await memberService.updateIdentityStatus(
         validatingMember.id,
         'verified',
-        validatorUser,
-        validationNotes
+        validatorUser
       );
       toast.success(`Identidad de ${validatingMember.firstName} ${validatingMember.lastName} aprobada exitosamente.`);
       setValidatingMember(null);
@@ -217,8 +215,7 @@ export function MembersPage() {
       await memberService.updateIdentityStatus(
         validatingMember.id,
         'rejected',
-        validatorUser,
-        validationNotes
+        validatorUser
       );
       toast.info(`Validación rechazada. Se solicitará nueva selfie al hermano.`);
       setValidatingMember(null);
@@ -233,7 +230,7 @@ export function MembersPage() {
   const handleSaveMember = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await memberService.saveMember(
+      const savedMember = await memberService.saveMember(
         {
           id: editingMember ? editingMember.id : undefined,
           firstName: formFirstName.trim(),
@@ -255,6 +252,13 @@ export function MembersPage() {
         },
         { id: user?.id, email: user?.email }
       );
+
+      setMembers((current) => {
+        const exists = current.some((member) => member.id === savedMember.id);
+        return exists
+          ? current.map((member) => member.id === savedMember.id ? savedMember : member)
+          : [...current, savedMember];
+      });
 
       await authService.updateUserRole(formEmail.trim(), formRoleId);
 
@@ -329,64 +333,31 @@ export function MembersPage() {
             Todos ({members.length})
           </button>
 
-          <button
-            onClick={() => setActiveTab('pendientes')}
-            className={`h-7 px-2.5 rounded-lg font-medium whitespace-nowrap flex items-center gap-1.5 transition-colors ${
-              activeTab === 'pendientes'
-                ? 'bg-amber-600 text-white font-semibold shadow-xs'
-                : pendingValidationsCount > 0
-                ? 'bg-amber-50 text-amber-800 border border-amber-200/80 hover:bg-amber-100 font-semibold'
-                : 'bg-surface-container/70 text-ink-secondary hover:bg-surface-container'
-            }`}
-          >
-            <ShieldAlert className="h-3.5 w-3.5" />
-            <span>Pendientes</span>
-            {pendingValidationsCount > 0 && (
-              <span
-                className={`px-1.5 py-0.2 text-[10px] font-bold rounded-full ${
-                  activeTab === 'pendientes' ? 'bg-white/20 text-white' : 'bg-amber-200 text-amber-900'
-                }`}
-              >
-                {pendingValidationsCount}
-              </span>
-            )}
-          </button>
+          {canValidateIdentity && (
+            <button
+              onClick={() => setActiveTab('pendientes')}
+              className={`h-7 px-2.5 rounded-lg font-medium whitespace-nowrap flex items-center gap-1.5 transition-colors ${
+                activeTab === 'pendientes'
+                  ? 'bg-amber-600 text-white font-semibold shadow-xs'
+                  : pendingValidationsCount > 0
+                  ? 'bg-amber-50 text-amber-800 border border-amber-200/80 hover:bg-amber-100 font-semibold'
+                  : 'bg-surface-container/70 text-ink-secondary hover:bg-surface-container'
+              }`}
+            >
+              <ShieldAlert className="h-3.5 w-3.5" />
+              <span>Pendientes</span>
+              {pendingValidationsCount > 0 && (
+                <span
+                  className={`px-1.5 py-0.2 text-[10px] font-bold rounded-full ${
+                    activeTab === 'pendientes' ? 'bg-white/20 text-white' : 'bg-amber-200 text-amber-900'
+                  }`}
+                >
+                  {pendingValidationsCount}
+                </span>
+              )}
+            </button>
+          )}
 
-          <button
-            onClick={() => setActiveTab('aprendiz')}
-            className={`h-7 px-2.5 rounded-lg font-medium whitespace-nowrap flex items-center gap-1 transition-colors ${
-              activeTab === 'aprendiz'
-                ? 'bg-ink text-white font-semibold shadow-xs'
-                : 'bg-surface-container/70 text-ink-secondary hover:bg-surface-container'
-            }`}
-          >
-            <AppleEmoji name="ruler" size={12} />
-            <span>Aprendices</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('companero')}
-            className={`h-7 px-2.5 rounded-lg font-medium whitespace-nowrap flex items-center gap-1 transition-colors ${
-              activeTab === 'companero'
-                ? 'bg-ink text-white font-semibold shadow-xs'
-                : 'bg-surface-container/70 text-ink-secondary hover:bg-surface-container'
-            }`}
-          >
-            <AppleEmoji name="cross" size={12} />
-            <span>Compañeros</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('maestro')}
-            className={`h-7 px-2.5 rounded-lg font-medium whitespace-nowrap flex items-center gap-1 transition-colors ${
-              activeTab === 'maestro'
-                ? 'bg-ink text-white font-semibold shadow-xs'
-                : 'bg-surface-container/70 text-ink-secondary hover:bg-surface-container'
-            }`}
-          >
-            <AppleEmoji name="temple" size={12} />
-            <span>Maestros</span>
-          </button>
         </div>
       </div>
 
@@ -410,13 +381,6 @@ export function MembersPage() {
           <div className="divide-y divide-border">
             {filteredMembers.map((m) => {
               const role = institutionalRoles.find((r) => r.id === m.roleId);
-
-              const degreeBadge =
-                m.degree === 'aprendiz'
-                  ? { label: '1° Aprendiz', emoji: 'ruler' }
-                  : m.degree === 'companero'
-                  ? { label: '2° Compañero', emoji: 'cross' }
-                  : { label: '3° Maestro', emoji: 'temple' };
 
               const isPendingValidation = m.identityStatus === 'pending';
               const isVerified = m.identityStatus === 'verified';
@@ -491,12 +455,6 @@ export function MembersPage() {
                             {role.name}
                           </button>
                         )}
-
-                        {/* Grado Masónico */}
-                        <span className="inline-flex items-center gap-1 rounded-md bg-surface-container px-1.5 py-0.5 text-[11px] font-medium text-ink-secondary">
-                          <AppleEmoji name={degreeBadge.emoji} size={11} />
-                          <span>{degreeBadge.label}</span>
-                        </span>
 
                         {/* Condición de membresía discreta */}
                         {!m.isActive ? (
@@ -698,22 +656,6 @@ export function MembersPage() {
               )}
             </div>
 
-            {/* Campo opcional de observaciones para el Secretario / VM */}
-            {canValidateIdentity && (
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-ink-secondary">
-                  Notas de verificación fraternal (opcional):
-                </label>
-                <input
-                  type="text"
-                  value={validationNotes}
-                  onChange={(e) => setValidationNotes(e.target.value)}
-                  placeholder="Ej. Reconocido personalmente en tenida anterior..."
-                  className="w-full h-9 rounded-xl border border-border bg-white px-3 text-xs text-ink placeholder:text-ink-muted outline-none focus:border-primary shadow-xs"
-                />
-              </div>
-            )}
-
             {/* Botones de Decisión para Secretario / Venerable Maestro */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-3 border-t border-border">
               <button
@@ -797,14 +739,7 @@ export function MembersPage() {
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            <AppleSelect<MasonicDegree>
-              label="Grado Masónico *"
-              value={formDegree}
-              onChange={setFormDegree}
-              options={degreeOptions}
-            />
-
+          <div className="grid grid-cols-1 gap-3.5">
             <AppleSelect<MemberStatusCondition>
               label="Condición Masónica *"
               value={formCondition}

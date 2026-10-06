@@ -22,6 +22,7 @@ import { AppleEmoji } from '@/components/shared/AppleEmoji';
 import { useAppleDialog } from '@/components/shared/AppleDialog';
 import { formatDateSpanish } from '@/lib/dateUtils';
 import { toast } from 'sonner';
+import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 
 const minuteDegreeOptions: AppleSelectOption<MasonicDegree>[] = [
   { value: 'aprendiz', label: 'Primer Grado — Aprendiz', icon: <AppleEmoji name="ruler" size={16} /> },
@@ -86,6 +87,10 @@ export function MinutesPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  useRealtimeRefresh(() => {
+    void loadData();
+  });
 
   // Filtrado y permisos de visualización
   const visibleMinutes = useMemo(() => {

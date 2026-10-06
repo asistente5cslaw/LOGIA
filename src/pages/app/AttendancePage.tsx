@@ -22,6 +22,7 @@ import { AppleInput } from '@/components/shared/AppleInput';
 import { AppleEmoji } from '@/components/shared/AppleEmoji';
 import { formatDateSpanish, formatTime12 } from '@/lib/dateUtils';
 import { toast } from 'sonner';
+import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 
 const visitorDegreeOptions: AppleSelectOption<MasonicDegree>[] = [
   { value: 'aprendiz', label: 'Primer Grado — Aprendiz', icon: <AppleEmoji name="ruler" size={16} /> },
@@ -49,24 +50,46 @@ export function AttendancePage() {
 
   const canManageAttendance = hasPermission('manage_attendance');
 
-  useEffect(() => {
-    async function loadInitial() {
-      try {
-        const [evList, memList] = await Promise.all([
-          eventService.getAllEvents(),
-          memberService.getAllMembers(false), // Solo activos
-        ]);
-
-        // Filtrar SOLO eventos que sean tenidas rituales
-        const meetingEvents = evList.filter((e) => e.isMeeting && e.status !== 'cancelada');
-        setMeetings(meetingEvents);
-        setMembers(memList);
-      } catch {
-        toast.error('Error al cargar datos de asistencia');
-      }
+  const loadInitial = async () => {
+    try {
+      const [evList, memList] = await Promise.all([
+        eventService.getAllEvents(),
+        memberService.getAllMembers(false),
+      ]);
+      const meetingEvents = evList.filter((e) => e.isMeeting && e.status !== 'cancelada');
+      setMeetings(meetingEvents);
+      setMembers(memList);
+    } catch {
+      toast.error('Error al cargar datos de asistencia');
     }
-    loadInitial();
+  };
+
+  const loadAttendanceForSelected = async (eventId: string, currentMembers: Member[]) => {
+    try {
+      const [records, visList] = await Promise.all([
+        attendanceService.getAttendanceForEvent(eventId),
+        attendanceService.getVisitorsForEvent(eventId),
+      ]);
+      const map: Record<string, AttendanceStatus> = {};
+      currentMembers.forEach((m) => {
+        const rec = records.find((r) => r.memberId === m.id);
+        map[m.id] = rec ? rec.status : 'ausente';
+      });
+      setAttendanceMap(map);
+      setVisitors(visList);
+    } catch {
+      console.error('Error cargando asistencia del evento');
+    }
+  };
+
+  useEffect(() => {
+    void loadInitial();
   }, []);
+
+  useRealtimeRefresh(() => {
+    void loadInitial();
+    if (selectedEventId) void loadAttendanceForSelected(selectedEventId, members);
+  });
 
   // Cargar asistencia del evento seleccionado
   useEffect(() => {
@@ -76,27 +99,7 @@ export function AttendancePage() {
       return;
     }
 
-    async function loadAttendanceForSelected() {
-      try {
-        const [records, visList] = await Promise.all([
-          attendanceService.getAttendanceForEvent(selectedEventId),
-          attendanceService.getVisitorsForEvent(selectedEventId),
-        ]);
-
-        const map: Record<string, AttendanceStatus> = {};
-        members.forEach((m) => {
-          const rec = records.find((r) => r.memberId === m.id);
-          map[m.id] = rec ? rec.status : 'ausente';
-        });
-
-        setAttendanceMap(map);
-        setVisitors(visList);
-      } catch {
-        console.error('Error cargando asistencia del evento');
-      }
-    }
-
-    loadAttendanceForSelected();
+    void loadAttendanceForSelected(selectedEventId, members);
   }, [selectedEventId, members]);
 
   const selectedEvent = useMemo(() => {
