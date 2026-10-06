@@ -3,7 +3,10 @@ import type { AttendanceRecord, VisitorAttendance, AttendanceStatus, LodgeEvent 
 import { auditService } from './auditService';
 
 export const attendanceService = {
-  async getAttendanceForEvent(eventId: string): Promise<AttendanceRecord[]> {
+  async getAttendanceForEvent(
+    eventId: string,
+    viewer?: { canViewExcuseReasons?: boolean; memberId?: string }
+  ): Promise<AttendanceRecord[]> {
     if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
     {
         const { data, error } = await supabase.from('attendance').select('*').eq('event_id', eventId);
@@ -16,12 +19,30 @@ export const attendanceService = {
             status: d.status,
             updatedBy: d.updated_by,
             updatedAt: d.updated_at,
-            excuseReason: d.excuse_reason || undefined,
+            excuseReason:
+              viewer?.canViewExcuseReasons || d.member_id === viewer?.memberId
+                ? (d.excuse_reason || undefined)
+                : undefined,
             excuseSubmittedAt: d.excuse_submitted_at || undefined,
           }));
         }
       }
     return [];
+  },
+
+  async getPendingExcusesForMember(memberId: string): Promise<{ eventId: string }[]> {
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+
+    const { data, error } = await supabase
+      .from('attendance')
+      .select('event_id, excuse_reason')
+      .eq('member_id', memberId)
+      .eq('status', 'excusa');
+    if (error) throw error;
+
+    return (data || [])
+      .filter((record) => !record.excuse_reason?.trim())
+      .map((record) => ({ eventId: record.event_id }));
   },
 
   async getVisitorsForEvent(eventId: string): Promise<VisitorAttendance[]> {
@@ -65,7 +86,11 @@ export const attendanceService = {
           event_id: r.eventId,
           member_id: r.memberId,
           status: r.status,
-          excuse_reason: r.status === 'excusa' ? (r.excuseReason || null) : null,
+          ...(r.status === 'excusa' && r.excuseReason?.trim()
+            ? { excuse_reason: r.excuseReason.trim() }
+            : r.status !== 'excusa'
+              ? { excuse_reason: null }
+              : {}),
           updated_by: r.updatedBy,
           updated_at: r.updatedAt,
         }));

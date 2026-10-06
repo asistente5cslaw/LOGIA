@@ -21,6 +21,7 @@ export function DashboardPage() {
   const { user, userRoleName } = useAuth();
   const [events, setEvents] = useState<LodgeEvent[]>([]);
   const [conflicts, setConflicts] = useState<EventConflict[]>([]);
+  const [pendingExcuseEvents, setPendingExcuseEvents] = useState<LodgeEvent[]>([]);
   const [stats, setStats] = useState({
     activeCount: 0,
     upcomingMeetingsCount: 0,
@@ -39,6 +40,19 @@ export function DashboardPage() {
 
       setEvents(evList);
       setConflicts(conflictList);
+
+      const ownMemberId = user?.memberId || memList.find(
+        (member) => member.email.toLowerCase() === user?.email?.toLowerCase()
+      )?.id;
+      if (ownMemberId) {
+        const pendingExcuses = await attendanceService.getPendingExcusesForMember(ownMemberId);
+        const pendingIds = new Set(pendingExcuses.map((item) => item.eventId));
+        setPendingExcuseEvents(evList.filter(
+          (event) => event.status !== 'cancelada' && pendingIds.has(event.id)
+        ));
+      } else {
+        setPendingExcuseEvents([]);
+      }
 
       const activeCount = memList.filter((m) => m.isActive).length;
       const upcomingMeetingsCount = evList.filter(
@@ -111,6 +125,25 @@ export function DashboardPage() {
                 </Link>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {pendingExcuseEvents.length > 0 && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-xs">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-amber-900">Tienes una excusa pendiente</h3>
+              <p className="mt-1 text-xs text-amber-800">
+                Debes explicar tu excusa para: {pendingExcuseEvents.map((event) => event.title).join(', ')}.
+              </p>
+            </div>
+            <Link
+              to="/app/asistencia"
+              className="inline-flex min-h-[38px] items-center justify-center rounded-xl bg-amber-700 px-4 text-xs font-semibold text-white hover:bg-amber-800"
+            >
+              Escribir mi excusa
+            </Link>
           </div>
         </div>
       )}

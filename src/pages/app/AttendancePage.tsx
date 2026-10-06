@@ -32,7 +32,7 @@ const visitorDegreeOptions: AppleSelectOption<MasonicDegree>[] = [
 
 export function AttendancePage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const [meetings, setMeetings] = useState<LodgeEvent[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<string>('');
   const [members, setMembers] = useState<Member[]>([]);
@@ -44,6 +44,7 @@ export function AttendancePage() {
   const [visitors, setVisitors] = useState<VisitorAttendance[]>([]);
   const [searchMember, setSearchMember] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // Modal para agregar visitante
   const [showVisitorModal, setShowVisitorModal] = useState(false);
@@ -52,9 +53,8 @@ export function AttendancePage() {
   const [visDegree, setVisDegree] = useState<MasonicDegree>('maestro');
   const [visNotes, setVisNotes] = useState('');
 
-  const canManageAttendance = Boolean(
-    user?.profile?.roleId === 'sec' || user?.profile?.technicalRole === 'admin'
-  );
+  const canManageAttendance = hasPermission('manage_attendance');
+  const canViewExcuseReasons = user?.profile?.roleId === 'sec';
 
   const isOwnMember = (member: Member): boolean => (
     Boolean(user?.memberId && user.memberId === member.id) ||
@@ -82,7 +82,10 @@ export function AttendancePage() {
   const loadAttendanceForSelected = async (eventId: string, currentMembers: Member[]) => {
     try {
       const [records, visList] = await Promise.all([
-        attendanceService.getAttendanceForEvent(eventId),
+        attendanceService.getAttendanceForEvent(eventId, {
+          canViewExcuseReasons,
+          memberId: user?.memberId,
+        }),
         attendanceService.getVisitorsForEvent(eventId),
       ]);
       const map: Record<string, AttendanceStatus> = {};
@@ -111,11 +114,14 @@ export function AttendancePage() {
 
   useRealtimeRefresh(() => {
     void loadInitial();
-    if (selectedEventId) void loadAttendanceForSelected(selectedEventId, members);
+    if (selectedEventId && !hasUnsavedChanges) {
+      void loadAttendanceForSelected(selectedEventId, members);
+    }
   });
 
   // Cargar asistencia del evento seleccionado
   useEffect(() => {
+    if (hasUnsavedChanges) return;
     if (!selectedEventId) {
       setAttendanceMap({});
       setVisitors([]);
@@ -123,17 +129,17 @@ export function AttendancePage() {
     }
 
     void loadAttendanceForSelected(selectedEventId, members);
-  }, [selectedEventId, members]);
+  }, [selectedEventId, members, hasUnsavedChanges]);
 
   // Mantiene los contadores y estados sincronizados entre dispositivos aunque
   // el canal realtime tarde o no esté disponible en el navegador.
   useEffect(() => {
-    if (!selectedEventId || members.length === 0) return undefined;
+    if (!selectedEventId || members.length === 0 || hasUnsavedChanges) return undefined;
     const intervalId = window.setInterval(() => {
       void loadAttendanceForSelected(selectedEventId, members);
     }, 5000);
     return () => window.clearInterval(intervalId);
-  }, [selectedEventId, members]);
+  }, [selectedEventId, members, hasUnsavedChanges]);
 
   const selectedEvent = useMemo(() => {
     return meetings.find((m) => m.id === selectedEventId);
@@ -156,6 +162,7 @@ export function AttendancePage() {
       ...prev,
       [memberId]: status,
     }));
+    setHasUnsavedChanges(true);
     if (status !== 'excusa') {
       setExcuseReasons((prev) => {
         const next = { ...prev };
@@ -171,6 +178,7 @@ export function AttendancePage() {
       updated[m.id] = 'presente';
     });
     setAttendanceMap(updated);
+    setHasUnsavedChanges(true);
     toast.info('Se han marcado todos los hermanos presentes.');
   };
 
@@ -189,6 +197,7 @@ export function AttendancePage() {
         email: user?.email,
       });
 
+      setHasUnsavedChanges(false);
       toast.success('Lista de asistencia guardada correctamente.');
     } catch {
       toast.error('Error al guardar la asistencia');
@@ -323,7 +332,10 @@ export function AttendancePage() {
           </label>
           <AppleSelect
             value={selectedEventId}
-            onChange={(val) => setSelectedEventId(val)}
+            onChange={(val) => {
+              setHasUnsavedChanges(false);
+              setSelectedEventId(val);
+            }}
             placeholder="Elige una tenida para registrar asistencia..."
             options={meetings.map((m) => ({
               value: m.id,
@@ -464,7 +476,7 @@ export function AttendancePage() {
                     </button>
                     </div>
                     {isOwnMember(m) && currentStatus === 'excusa' && (
-                      excuseReasons[m.id] ? (
+                      excuseSubmittedAt[m.id] ? (
                         excuseSubmittedAt[m.id] && Date.now() < new Date(excuseSubmittedAt[m.id]).getTime() + 24 * 60 * 60 * 1000 ? (
                           <button
                             type="button"
@@ -487,9 +499,17 @@ export function AttendancePage() {
                       )
                     )}
                     {!isOwnMember(m) && currentStatus === 'excusa' && (
-                      <span className="text-[11px] font-medium text-amber-700">
-                        Excusa pendiente de explicación por el hermano
-                      </span>
+                      canViewExcuseReasons ? (
+                        excuseReasons[m.id] ? (
+                          <p className="max-w-xs text-left text-[11px] text-amber-800">
+                            <span className="font-semibold">Excusa:</span> {excuseReasons[m.id]}
+                          </p>
+                        ) : (
+                          <span className="text-[11px] font-medium text-amber-700">Excusa pendiente de explicación por el hermano</span>
+                        )
+                      ) : (
+                        <span className="text-[11px] font-medium text-amber-700">Excusa registrada</span>
+                      )
                     )}
                     {editingExcuseMemberId === m.id && isOwnMember(m) && (
                       <div className="w-full max-w-xs space-y-1.5 rounded-xl border border-amber-200 bg-amber-50 p-2.5 sm:w-80">
