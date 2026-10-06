@@ -32,11 +32,15 @@ const visitorDegreeOptions: AppleSelectOption<MasonicDegree>[] = [
 
 export function AttendancePage() {
   const navigate = useNavigate();
-  const { user, hasPermission } = useAuth();
+  const { user } = useAuth();
   const [meetings, setMeetings] = useState<LodgeEvent[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<string>('');
   const [members, setMembers] = useState<Member[]>([]);
   const [attendanceMap, setAttendanceMap] = useState<Record<string, AttendanceStatus>>({});
+  const [excuseReasons, setExcuseReasons] = useState<Record<string, string>>({});
+  const [excuseSubmittedAt, setExcuseSubmittedAt] = useState<Record<string, string>>({});
+  const [editingExcuseMemberId, setEditingExcuseMemberId] = useState<string | null>(null);
+  const [excuseDraft, setExcuseDraft] = useState('');
   const [visitors, setVisitors] = useState<VisitorAttendance[]>([]);
   const [searchMember, setSearchMember] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -48,7 +52,7 @@ export function AttendancePage() {
   const [visDegree, setVisDegree] = useState<MasonicDegree>('maestro');
   const [visNotes, setVisNotes] = useState('');
 
-  const canManageAttendance = hasPermission('manage_attendance');
+  const canManageAttendance = user?.profile?.roleId === 'sec';
 
   const loadInitial = async () => {
     try {
@@ -71,11 +75,19 @@ export function AttendancePage() {
         attendanceService.getVisitorsForEvent(eventId),
       ]);
       const map: Record<string, AttendanceStatus> = {};
+      const reasons: Record<string, string> = {};
+      const submitted: Record<string, string> = {};
       currentMembers.forEach((m) => {
         const rec = records.find((r) => r.memberId === m.id);
         map[m.id] = rec ? rec.status : 'ausente';
+        if (rec?.excuseReason) reasons[m.id] = rec.excuseReason;
+        if (rec?.excuseSubmittedAt) submitted[m.id] = rec.excuseSubmittedAt;
       });
       setAttendanceMap(map);
+      setExcuseReasons(reasons);
+      setExcuseSubmittedAt(submitted);
+      setEditingExcuseMemberId(null);
+      setExcuseDraft('');
       setVisitors(visList);
     } catch {
       console.error('Error cargando asistencia del evento');
@@ -118,10 +130,18 @@ export function AttendancePage() {
   }, [members, searchMember]);
 
   const handleStatusToggle = (memberId: string, status: AttendanceStatus) => {
+    if (!canManageAttendance) return;
     setAttendanceMap((prev) => ({
       ...prev,
       [memberId]: status,
     }));
+    if (status !== 'excusa') {
+      setExcuseReasons((prev) => {
+        const next = { ...prev };
+        delete next[memberId];
+        return next;
+      });
+    }
   };
 
   const handleMarkAllPresent = () => {
@@ -140,6 +160,7 @@ export function AttendancePage() {
       const records = Object.entries(attendanceMap).map(([memberId, status]) => ({
         memberId,
         status,
+        excuseReason: excuseReasons[memberId],
       }));
 
       await attendanceService.saveAttendanceBatch(selectedEventId, records, {
@@ -152,6 +173,37 @@ export function AttendancePage() {
       toast.error('Error al guardar la asistencia');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleOpenExcuseEditor = (memberId: string) => {
+    if (user?.memberId !== memberId || attendanceMap[memberId] !== 'excusa') return;
+    const submittedAt = excuseSubmittedAt[memberId];
+    if (submittedAt && Date.now() >= new Date(submittedAt).getTime() + 24 * 60 * 60 * 1000) {
+      toast.info('El plazo de 24 horas para editar esta excusa ya venció.');
+      return;
+    }
+    setEditingExcuseMemberId(memberId);
+    setExcuseDraft(excuseReasons[memberId] || '');
+  };
+
+  const handleSaveExcuse = async (memberId: string) => {
+    if (!selectedEventId || user?.memberId !== memberId || !excuseDraft.trim()) return;
+    try {
+      await attendanceService.saveMemberExcuse(selectedEventId, memberId, excuseDraft, {
+        id: user.id,
+        email: user.email,
+      });
+      setExcuseReasons((prev) => ({ ...prev, [memberId]: excuseDraft.trim() }));
+      setExcuseSubmittedAt((prev) => ({
+        ...prev,
+        [memberId]: prev[memberId] || new Date().toISOString(),
+      }));
+      setEditingExcuseMemberId(null);
+      setExcuseDraft('');
+      toast.success('Excusa guardada correctamente.');
+    } catch {
+      toast.error('No se pudo guardar la excusa.');
     }
   };
 
@@ -347,7 +399,8 @@ export function AttendancePage() {
                   </div>
 
                   {/* Botones de estado: Presente, Excusa, Ausente */}
-                  <div className="flex items-center gap-1.5 self-end sm:self-auto">
+                  <div className="flex flex-col items-end gap-1.5 self-end sm:self-auto">
+                    <div className="flex items-center gap-1.5">
                     <button
                       type="button"
                       disabled={!canManageAttendance}
@@ -386,6 +439,47 @@ export function AttendancePage() {
                     >
                       <X className="h-3.5 w-3.5" /> Ausente
                     </button>
+                    </div>
+                    {user?.memberId === m.id && currentStatus === 'excusa' && (
+                      excuseReasons[m.id] ? (
+                        excuseSubmittedAt[m.id] && Date.now() < new Date(excuseSubmittedAt[m.id]).getTime() + 24 * 60 * 60 * 1000 ? (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenExcuseEditor(m.id)}
+                            className="text-[11px] font-semibold text-primary hover:underline"
+                          >
+                            Editar mi excusa
+                          </button>
+                        ) : (
+                          <span className="text-[11px] font-medium text-ink-muted">Edición de excusa cerrada después de 24 horas</span>
+                        )
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenExcuseEditor(m.id)}
+                          className="text-[11px] font-semibold text-primary hover:underline"
+                        >
+                          Escribir mi excusa
+                        </button>
+                      )
+                    )}
+                    {editingExcuseMemberId === m.id && user?.memberId === m.id && (
+                      <div className="w-full max-w-xs space-y-1.5 rounded-xl border border-amber-200 bg-amber-50 p-2.5 sm:w-80">
+                        <label className="text-[11px] font-semibold text-amber-900">Explica tu excusa</label>
+                        <textarea
+                          value={excuseDraft}
+                          onChange={(e) => setExcuseDraft(e.target.value)}
+                          rows={3}
+                          maxLength={500}
+                          placeholder="Escribe el motivo de tu ausencia..."
+                          className="w-full resize-none rounded-lg border border-amber-200 bg-white px-2.5 py-2 text-xs text-ink outline-none focus:border-primary"
+                        />
+                        <div className="flex justify-end gap-2">
+                          <button type="button" onClick={() => setEditingExcuseMemberId(null)} className="rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-ink-secondary hover:bg-white">Cancelar</button>
+                          <button type="button" disabled={!excuseDraft.trim()} onClick={() => void handleSaveExcuse(m.id)} className="rounded-lg bg-primary px-2.5 py-1.5 text-[11px] font-semibold text-white disabled:opacity-50">Guardar excusa</button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               );

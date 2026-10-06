@@ -212,7 +212,7 @@ export function AppleSelect<T extends string = string>({
             )}
 
             {/* Lista de opciones scrolleable */}
-            <div className="flex-1 overflow-y-auto space-y-0.5 overscroll-contain pr-0.5">
+            <div className="flex-1 overflow-y-auto scrollbar-none space-y-0.5 overscroll-contain pr-0.5">
               {filteredOptions.length === 0 ? (
                 <div className="py-6 text-center text-xs text-ink-muted">
                   No se encontraron resultados

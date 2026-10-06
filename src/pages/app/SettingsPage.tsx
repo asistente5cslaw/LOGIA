@@ -33,6 +33,12 @@ import { AppleSelect } from '@/components/shared/AppleSelect';
 import { AppleDatePicker } from '@/components/shared/AppleDatePicker';
 import { toast } from 'sonner';
 
+function roleCategoryLabel(category: 'dignatario' | 'oficial' | 'general'): string {
+  if (category === 'dignatario') return 'Dignatario';
+  if (category === 'oficial') return 'Oficial';
+  return 'Miembro';
+}
+
 export function SettingsPage() {
   const { user, hasPermission, isSecretaryOrVM } = useAuth();
 
@@ -516,7 +522,7 @@ export function SettingsPage() {
                     <span
                       className={`rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${catStyle}`}
                     >
-                      {r.category}
+                      {roleCategoryLabel(r.category)}
                     </span>
                   </div>
 
@@ -565,7 +571,7 @@ export function SettingsPage() {
                     <td className="py-3.5 px-4 font-semibold text-ink">{r.name}</td>
                     <td className="py-3.5 px-4 capitalize text-ink-secondary">
                       <span className="rounded-full bg-surface-container border border-border px-2 py-0.5 text-[10px] font-medium">
-                        {r.category}
+                        {roleCategoryLabel(r.category)}
                       </span>
                     </td>
                     <td className="py-3.5 px-4">

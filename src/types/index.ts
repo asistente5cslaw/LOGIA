@@ -5,6 +5,7 @@ export type MasonicDegree = 'aprendiz' | 'companero' | 'maestro';
 export type MemberStatusCondition = 'activo' | 'ad_vitam' | 'dual' | 'inactivo';
 
 export type InstitutionalRoleCode =
+  | 'adm'  // Administrador del sistema
   | 'vm'   // Venerable
   | 'sec'  // Secretario
   | 'tes'  // Tesorero
@@ -209,6 +210,8 @@ export interface AttendanceRecord {
   status: AttendanceStatus;
   updatedBy: string;
   updatedAt: string;
+  excuseReason?: string;
+  excuseSubmittedAt?: string;
 }
 
 export interface VisitorAttendance {

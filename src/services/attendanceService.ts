@@ -16,6 +16,8 @@ export const attendanceService = {
             status: d.status,
             updatedBy: d.updated_by,
             updatedAt: d.updated_at,
+            excuseReason: d.excuse_reason || undefined,
+            excuseSubmittedAt: d.excuse_submitted_at || undefined,
           }));
         }
       }
@@ -44,7 +46,7 @@ export const attendanceService = {
 
   async saveAttendanceBatch(
     eventId: string,
-    records: { memberId: string; status: AttendanceStatus }[],
+    records: { memberId: string; status: AttendanceStatus; excuseReason?: string }[],
     user: { id?: string; email?: string }
   ): Promise<void> {
     const now = new Date().toISOString();
@@ -63,6 +65,7 @@ export const attendanceService = {
           event_id: r.eventId,
           member_id: r.memberId,
           status: r.status,
+          excuse_reason: r.status === 'excusa' ? (r.excuseReason || null) : null,
           updated_by: r.updatedBy,
           updated_at: r.updatedAt,
         }));
@@ -73,6 +76,46 @@ export const attendanceService = {
     await auditService.log('REGISTRO_ASISTENCIA', 'attendance', eventId, user, {
       total: records.length,
       presentes: records.filter((r) => r.status === 'presente').length,
+    });
+  },
+
+  async saveMemberExcuse(
+    eventId: string,
+    memberId: string,
+    reason: string,
+    user: { id?: string; email?: string }
+  ): Promise<void> {
+    const cleanReason = reason.trim();
+    if (!cleanReason) throw new Error('La explicación de la excusa es obligatoria.');
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+
+    const { data: current, error: currentError } = await supabase
+      .from('attendance')
+      .select('excuse_submitted_at')
+      .eq('event_id', eventId)
+      .eq('member_id', memberId)
+      .maybeSingle();
+    if (currentError) throw currentError;
+
+    const submittedAt = current?.excuse_submitted_at as string | null | undefined;
+    if (submittedAt && Date.now() >= new Date(submittedAt).getTime() + 24 * 60 * 60 * 1000) {
+      throw new Error('El plazo de 24 horas para editar esta excusa ya venció.');
+    }
+
+    const { error } = await supabase.from('attendance').upsert({
+      event_id: eventId,
+      member_id: memberId,
+      status: 'excusa',
+      excuse_reason: cleanReason,
+      excuse_submitted_at: submittedAt || new Date().toISOString(),
+      updated_by: user.id || null,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'event_id,member_id' });
+    if (error) throw error;
+
+    await auditService.log('REGISTRO_EXCUSA', 'attendance', eventId, user, {
+      memberId,
+      reason: cleanReason,
     });
   },
 

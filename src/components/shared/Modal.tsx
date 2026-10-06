@@ -89,7 +89,7 @@ export function Modal({
         </div>
 
         {/* Cuerpo scrolleable del modal */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-5 overscroll-contain">
+        <div className="flex-1 overflow-y-auto scrollbar-none p-4 sm:p-5 overscroll-contain">
           {children}
         </div>
 

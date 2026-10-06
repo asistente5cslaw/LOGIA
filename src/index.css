@@ -105,6 +105,17 @@
     scroll-padding-bottom: calc(5rem + env(safe-area-inset-bottom));
   }
 
+  /* Mantiene el desplazamiento táctil/rueda, pero evita barras visibles en
+     modales y selectores compactos. */
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
   /* Ocultar barra inferior de Google Maps (Términos, accesos, copyright) */
   .gm-style-cc,
   .gmnoprint a,

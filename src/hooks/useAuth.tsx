@@ -140,8 +140,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (permission: Permission): boolean => {
       if (!user) return false;
       const roleId = (user.profile?.roleId || 'apr') as InstitutionalRoleCode;
-      // El Administrador o Secretario tiene acceso completo
-      if (user.profile?.technicalRole === 'admin' || roleId === 'sec' || roleId === 'vm') {
+      // Solo Administrador y Secretario tienen acceso completo. Venerable
+      // conserva únicamente los permisos definidos para su cargo.
+      if (user.profile?.technicalRole === 'admin' && roleId !== 'vm' || roleId === 'sec') {
         return true;
       }
       return hasRolePermission(roleId, permission);

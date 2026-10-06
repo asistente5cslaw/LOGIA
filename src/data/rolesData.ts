@@ -2,11 +2,33 @@ import type { Role, InstitutionalRoleCode, Permission } from '@/types';
 
 export const institutionalRoles: Role[] = [
   {
+    id: 'adm',
+    name: 'Administrador',
+    category: 'dignatario',
+    order: 0,
+    technicalRole: 'admin',
+    defaultPermissions: [
+      'view',
+      'create',
+      'edit',
+      'approve',
+      'archive',
+      'manage_users',
+      'manage_members',
+      'manage_events',
+      'manage_minutes',
+      'manage_attendance',
+      'view_sensitive_info',
+      'export_data',
+      'configure_lodge',
+    ],
+  },
+  {
     id: 'vm',
-    name: 'Venerable',
+    name: 'Venerable Maestro',
     category: 'dignatario',
     order: 1,
-    technicalRole: 'admin',
+    technicalRole: 'dignitary',
     defaultPermissions: [
       'view',
       'create',
@@ -61,7 +83,7 @@ export const institutionalRoles: Role[] = [
   {
     id: 'pm',
     name: 'Past Master',
-    category: 'dignatario',
+    category: 'general',
     order: 5,
     technicalRole: 'dignitary',
     defaultPermissions: ['view', 'view_sensitive_info'],

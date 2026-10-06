@@ -13,9 +13,10 @@ import { supabase } from '@/lib/supabase';
 import type { LodgeEvent, Minute, Member, AttendanceRecord, OfficialVisitChecklistItem } from '@/types';
 
 describe('1. Roles Institucionales y Permisos', () => {
-  it('debe contener los 8 roles institucionales requeridos', () => {
-    expect(institutionalRoles.length).toBe(8);
+  it('debe contener los roles institucionales requeridos', () => {
+    expect(institutionalRoles.length).toBe(9);
     const roleIds = institutionalRoles.map((r) => r.id);
+    expect(roleIds).toContain('adm');
     expect(roleIds).toContain('apr');
     expect(roleIds).toContain('comp');
     expect(roleIds).toContain('mae');
@@ -32,6 +33,13 @@ describe('1. Roles Institucionales y Permisos', () => {
     expect(hasRolePermission('sec', 'manage_events')).toBe(true);
     expect(hasRolePermission('sec', 'manage_minutes')).toBe(true);
     expect(hasRolePermission('sec', 'export_data')).toBe(true);
+  });
+
+  it('Administrador tiene acceso completo y Venerable conserva permisos propios', () => {
+    expect(hasRolePermission('adm', 'configure_lodge')).toBe(true);
+    expect(hasRolePermission('adm', 'manage_users')).toBe(true);
+    expect(hasRolePermission('vm', 'manage_users')).toBe(false);
+    expect(hasRolePermission('vm', 'manage_members')).toBe(false);
   });
 
   it('el Venerable Maestro debe tener permisos para aprobar actas y configurar logia', () => {
