@@ -146,7 +146,7 @@ class PushNotificationService {
     const updated = [newItem, ...list];
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    } catch {}
+    } catch (error) { console.warn('No se pudo limpiar notificaciones antiguas:', error); }
 
     this.notifyListeners();
     return newItem;
@@ -160,7 +160,7 @@ class PushNotificationService {
       const list = this.getNotifications();
       const updated = list.map((item) => ({ ...item, read: true }));
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    } catch {}
+    } catch (error) { console.warn('No se pudo guardar la notificación:', error); }
     this.notifyListeners();
   }
 
@@ -172,7 +172,7 @@ class PushNotificationService {
       const list = this.getNotifications();
       const remaining = list.filter((item) => !item.read);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(remaining));
-    } catch {}
+    } catch (error) { console.warn('No se pudieron marcar las notificaciones:', error); }
     this.notifyListeners();
   }
 
@@ -184,7 +184,7 @@ class PushNotificationService {
       const list = this.getNotifications();
       const updated = list.filter((item) => item.id !== id);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    } catch {}
+    } catch (error) { console.warn('No se pudieron limpiar las notificaciones:', error); }
     this.notifyListeners();
   }
 
@@ -194,7 +194,7 @@ class PushNotificationService {
   public markAllAsReadAndClear(): void {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
-    } catch {}
+    } catch (error) { console.warn('No se pudo eliminar la notificación:', error); }
     this.notifyListeners();
   }
 
@@ -208,7 +208,7 @@ class PushNotificationService {
         item.id === id ? { ...item, read: true } : item
       );
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    } catch {}
+    } catch (error) { console.warn('No se pudieron limpiar las notificaciones:', error); }
     this.notifyListeners();
   }
 

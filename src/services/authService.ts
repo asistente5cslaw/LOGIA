@@ -3,26 +3,21 @@ import type { User, UserProfile, Invitation, MasonicDegree, InstitutionalRoleCod
 import { institutionalRoles } from '@/data/rolesData';
 import { auditService } from './auditService';
 
-const LOCAL_INVITATIONS_KEY = 'logia_invitations_data';
-
-const defaultInvitations: Invitation[] = [];
-
-function loadLocalInvitations(): Invitation[] {
-  try {
-    const raw = localStorage.getItem(LOCAL_INVITATIONS_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {
-    // ignore
-  }
-  return defaultInvitations;
+interface AuthResponseShape {
+  data: { user: { id: string; email?: string } | null; session: unknown };
+  error: { message: string } | null;
 }
 
-function saveLocalInvitations(list: Invitation[]) {
-  try {
-    localStorage.setItem(LOCAL_INVITATIONS_KEY, JSON.stringify(list));
-  } catch {
-    // ignore
-  }
+interface ProfileRow {
+  id: string;
+  email?: string;
+  member_id?: string;
+  display_name?: string;
+  role_id?: InstitutionalRoleCode;
+  technical_role?: UserProfile['technicalRole'];
+  identity_verified?: boolean;
+  identity_status?: UserProfile['identityStatus'];
+  created_at: string;
 }
 
 /**
@@ -109,29 +104,12 @@ export const authService = {
       }
     }
 
-    const localList = loadLocalInvitations();
-    const inv = localList.find((i) => i.code.toUpperCase() === cleanCode && !i.isUsed);
-    if (!inv) {
-      return { valid: false, message: 'Código de invitación no válido o ya utilizado.' };
-    }
-    const isExpired = new Date(inv.expiresAt) < new Date();
-    if (isExpired) {
-      return { valid: false, message: 'Este código de invitación ha expirado.' };
-    }
-
-    return { valid: true, invitation: inv };
+    return { valid: false, message: 'Supabase no está configurado.' };
   },
 
   async markInvitationUsed(code: string, userId: string): Promise<void> {
-    const cleanCode = code.trim().toUpperCase();
-    if (isSupabaseConfigured()) return; // La consume el trigger al crear auth.users.
-    const local = loadLocalInvitations();
-    const inv = local.find((i) => i.code.toUpperCase() === cleanCode);
-    if (inv) {
-      inv.isUsed = true;
-      inv.usedAt = new Date().toISOString();
-      saveLocalInvitations(local);
-    }
+    void code;
+    void userId;
   },
 
   async createInvitation(
@@ -171,11 +149,7 @@ export const authService = {
       if (error || !data) throw new Error('No se pudo guardar la invitación en Supabase.');
       newInv.id = data.id;
       newInv.createdAt = data.created_at;
-    } else {
-      const local = loadLocalInvitations();
-      local.unshift(newInv);
-      saveLocalInvitations(local);
-    }
+    } else throw new Error('Supabase no está configurado.');
 
     await auditService.log('CREAR_INVITACION', 'invitations', newInv.id, user, {
       code: newInv.code,
@@ -188,12 +162,12 @@ export const authService = {
 
   async getInvitations(): Promise<Invitation[]> {
     if (isSupabaseConfigured()) {
-      try {
         const { data, error } = await supabase
           .from('invitations')
           .select('*')
           .order('created_at', { ascending: false });
-        if (!error && data) {
+        if (error) throw error;
+        if (data) {
           return data.map((d) => ({
             id: d.id,
             code: d.code,
@@ -207,11 +181,8 @@ export const authService = {
             createdAt: d.created_at,
           }));
         }
-      } catch (e) {
-        console.warn('Error listando invitaciones Supabase:', e);
       }
-    }
-    return loadLocalInvitations();
+    throw new Error('Supabase no está configurado.');
   },
 
   /**
@@ -226,14 +197,11 @@ export const authService = {
         email: cleanEmail,
         password,
       });
-      const timeoutPromise = new Promise<{ data: { user: null; session: null }; error: { message: string } }>((_, reject) =>
+      const timeoutPromise = new Promise<AuthResponseShape>((_, reject) =>
         setTimeout(() => reject(new Error('El servidor tardó demasiado en responder. Verifica tu conexión.')), 8000)
       );
 
-      const { data, error } = (await Promise.race([signInPromise, timeoutPromise])) as {
-        data: { user: any; session: any };
-        error: any;
-      };
+      const { data, error } = await Promise.race([signInPromise, timeoutPromise]);
 
       if (error) {
         throw new Error(translateAuthError(error));
@@ -253,78 +221,11 @@ export const authService = {
         profile,
       };
 
-      // Auditoría en segundo plano sin bloquear el flujo del usuario
-      auditService.log('INICIO_SESION', 'auth', user.id, { id: user.id, email: user.email }).catch(console.warn);
+      await auditService.log('INICIO_SESION', 'auth', user.id, { id: user.id, email: user.email });
       return user;
     }
 
-    // Modo demostración cuando Supabase URL no ha sido configurada en .env
-    // Validar formato estricto
-    if (!email || !password || password.length < 6) {
-      throw new Error('Ingresa un correo válido y una contraseña de al menos 6 caracteres.');
-    }
-
-    const cleanEmail = email.trim().toLowerCase();
-
-    // 1. Buscar si ya existe en la lista de miembros locales
-    let matchedName = '';
-    let matchedRole: InstitutionalRoleCode = 'apr';
-    let matchedMemberId: string | undefined;
-
-    try {
-      const rawMembers = localStorage.getItem('logia_members_data');
-      if (rawMembers) {
-        const membersList = JSON.parse(rawMembers);
-        const found = membersList.find((m: any) => m.email && m.email.toLowerCase() === cleanEmail);
-        if (found) {
-          matchedName = `${found.firstName || ''} ${found.lastName || ''}`.trim();
-          matchedRole = found.roleId || 'apr';
-          matchedMemberId = found.id;
-        }
-      }
-    } catch {
-      // ignore
-    }
-
-    // 2. Si no se encontró en miembros, verificar si es la cuenta del Venerable Maestro
-    if (!matchedName) {
-      if (cleanEmail === 'asistente4@castillosucre.com' || cleanEmail.includes('denzel') || cleanEmail.includes('castillosucre')) {
-        matchedName = 'Denzel Coronado';
-        matchedRole = 'vm';
-        matchedMemberId = 'm-denzel';
-      } else {
-        const username = cleanEmail.split('@')[0];
-        matchedName = username.charAt(0).toUpperCase() + username.slice(1);
-        matchedRole = 'apr';
-      }
-    }
-
-    const roleInfo = institutionalRoles.find((r) => r.id === matchedRole) || institutionalRoles.find((r) => r.id === 'apr')!;
-
-    const mockProfile: UserProfile = {
-      id: matchedMemberId || `u-${Date.now()}`,
-      email: cleanEmail,
-      memberId: matchedMemberId,
-      displayName: matchedName,
-      roleId: matchedRole,
-      technicalRole: roleInfo.technicalRole,
-      identityVerified: true,
-      identityStatus: 'verified',
-      createdAt: new Date().toISOString(),
-    };
-
-    const user: User = {
-      id: mockProfile.id,
-      email: cleanEmail,
-      memberId: matchedMemberId,
-      displayName: matchedName,
-      isAuthenticated: true,
-      profile: mockProfile,
-    };
-
-    localStorage.setItem('logia_session_backup', JSON.stringify(user));
-    await auditService.log('INICIO_SESION', 'auth', user.id, { id: user.id, email: user.email });
-    return user;
+    throw new Error('Supabase no está configurado.');
   },
 
   /**
@@ -377,6 +278,7 @@ export const authService = {
       const user: User = {
         id: data.user.id,
         email: cleanEmail,
+        memberId: profile.memberId,
         displayName,
         isAuthenticated: Boolean(data.session),
         profile,
@@ -386,70 +288,7 @@ export const authService = {
       return user;
     }
 
-    // Modo local / sin backend configurado aún
-    const roleInfo = institutionalRoles.find((r) => r.id === assignedRoleId) || institutionalRoles.find((r) => r.id === 'apr')!;
-    const newMemberId = `m-${Date.now()}`;
-    
-    const profile: UserProfile = {
-      id: newMemberId,
-      email: cleanEmail,
-      memberId: newMemberId,
-      displayName,
-      roleId: assignedRoleId,
-      technicalRole: roleInfo?.technicalRole || 'member',
-      identityVerified: false,
-      identityStatus: 'pending',
-      createdAt: new Date().toISOString(),
-    };
-
-    // Registrarlo en la base de datos local de miembros
-    try {
-      const rawMembers = localStorage.getItem('logia_members_data');
-      let currentMembers = rawMembers ? JSON.parse(rawMembers) : [];
-      if (!Array.isArray(currentMembers)) currentMembers = [];
-      
-      const existingIdx = currentMembers.findIndex((m: any) => m.email && m.email.toLowerCase() === cleanEmail);
-      const newMemberObj = {
-        id: newMemberId,
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        email: cleanEmail,
-        roleId: assignedRoleId,
-        degree: 'aprendiz',
-        condition: 'activo',
-        motherLodge: 'Resp.·. Log.·. Unión Fraternal No. 21',
-        joinedAt: new Date().toISOString().split('T')[0],
-        isActive: true,
-        identityVerified: false,
-        identityStatus: 'pending',
-      };
-
-      if (existingIdx >= 0) {
-        currentMembers[existingIdx] = { ...currentMembers[existingIdx], ...newMemberObj };
-      } else {
-        currentMembers.push(newMemberObj);
-      }
-      localStorage.setItem('logia_members_data', JSON.stringify(currentMembers));
-    } catch {
-      // ignore
-    }
-
-    if (invitationCode) {
-      await this.markInvitationUsed(invitationCode, profile.id);
-    }
-
-    const user: User = {
-      id: profile.id,
-      email: cleanEmail,
-      memberId: newMemberId,
-      displayName,
-      isAuthenticated: true,
-      profile,
-    };
-
-    localStorage.setItem('logia_session_backup', JSON.stringify(user));
-    await auditService.log('REGISTRO_USUARIO', 'auth', user.id, { id: user.id, email: cleanEmail });
-    return user;
+    throw new Error('Supabase no está configurado.');
   },
 
   async resetPassword(email: string): Promise<void> {
@@ -465,67 +304,39 @@ export const authService = {
       return;
     }
 
-    // Simulación auditada
-    await auditService.log('SOLICITUD_RECUPERACION_CONTRASENA', 'auth', undefined, { email });
+    throw new Error('Supabase no está configurado.');
   },
 
   async logout(): Promise<void> {
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase.auth.signOut();
-      } catch (e) {
-        console.warn('Error durante logout en Supabase:', e);
-      }
-    }
-    localStorage.removeItem('logia_session_backup');
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    const { error } = await supabase.auth.signOut();
+    if (error) throw new Error(translateAuthError(error));
   },
 
   async getCurrentSessionUser(): Promise<User | null> {
-    if (isSupabaseConfigured()) {
-      try {
-        const { data } = await supabase.auth.getSession();
-        if (data.session?.user) {
-          const u = data.session.user;
-          const profile = await this.fetchProfile(u.id, u.email || '');
-          return {
-            id: u.id,
-            email: u.email || '',
-            memberId: profile.memberId,
-            displayName: profile.displayName,
-            isAuthenticated: true,
-            profile,
-          };
-        }
-      } catch (e) {
-        console.warn('Error obteniendo sesión Supabase:', e);
-      }
-    }
-
-    const raw = localStorage.getItem('logia_session_backup');
-    if (raw) {
-      try {
-        return JSON.parse(raw) as User;
-      } catch {
-        return null;
-      }
-    }
-    return null;
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    const { data, error } = await supabase.auth.getSession();
+    if (error) throw error;
+    if (!data.session?.user) return null;
+    const u = data.session.user;
+    const profile = await this.fetchProfile(u.id, u.email || '');
+    return { id: u.id, email: u.email || '', memberId: profile.memberId, displayName: profile.displayName, isAuthenticated: true, profile };
   },
 
   async fetchProfile(userId: string, defaultEmail: string): Promise<UserProfile> {
     if (isSupabaseConfigured()) {
-      try {
         const queryPromise = supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
         const timeoutPromise = new Promise<{ data: null; error: null }>((resolve) =>
           setTimeout(() => resolve({ data: null, error: null }), 3000)
         );
 
-        const { data, error } = (await Promise.race([queryPromise, timeoutPromise])) as {
-          data: any;
-          error: any;
+        const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as {
+          data: ProfileRow | null;
+          error: { message: string } | null;
         };
 
-        if (!error && data) {
+        if (error) throw error;
+        if (data) {
           return {
             id: data.id,
             email: data.email || defaultEmail,
@@ -538,44 +349,9 @@ export const authService = {
             createdAt: data.created_at,
           };
         }
-      } catch (e) {
-        console.warn('Error leyendo profile en Supabase:', e);
-      }
+        throw new Error('No se encontró el perfil del usuario en Supabase.');
     }
-
-    let fallbackName = defaultEmail ? defaultEmail.split('@')[0] : 'Hermano';
-    fallbackName = fallbackName.charAt(0).toUpperCase() + fallbackName.slice(1);
-    let fallbackRoleId: InstitutionalRoleCode = 'apr';
-    let fallbackMemberId: string | undefined;
-
-    try {
-      const raw = localStorage.getItem('logia_members_data');
-      if (raw) {
-        const list = JSON.parse(raw);
-        const m = list.find((x: any) => x.email && x.email.toLowerCase() === defaultEmail.toLowerCase());
-        if (m) {
-          fallbackName = `${m.firstName} ${m.lastName}`.trim();
-          fallbackRoleId = m.roleId || 'apr';
-          fallbackMemberId = m.id;
-        }
-      }
-    } catch {
-      // ignore
-    }
-
-    const roleInfo = institutionalRoles.find((r) => r.id === fallbackRoleId) || institutionalRoles.find((r) => r.id === 'apr')!;
-
-    return {
-      id: userId || fallbackMemberId || 'u-local',
-      email: defaultEmail,
-      memberId: fallbackMemberId,
-      displayName: fallbackName,
-      roleId: fallbackRoleId,
-      technicalRole: roleInfo.technicalRole || 'member',
-      identityVerified: true,
-      identityStatus: 'verified',
-      createdAt: new Date().toISOString(),
-    };
+    throw new Error('Supabase no está configurado.');
   },
 
   async createProfile(
@@ -584,68 +360,27 @@ export const authService = {
     displayName: string,
     roleId: InstitutionalRoleCode
   ): Promise<UserProfile> {
-    const roleInfo = institutionalRoles.find((r) => r.id === roleId);
-    const technicalRole = roleInfo?.technicalRole || 'member';
-
-    const profile: UserProfile = {
-      id: userId,
-      email,
-      displayName,
-      roleId,
-      technicalRole,
-      identityVerified: false,
-      identityStatus: 'pending',
-      createdAt: new Date().toISOString(),
-    };
-
-    if (isSupabaseConfigured()) {
-      return this.fetchProfile(userId, email);
-    }
-
-    return profile;
+    void displayName;
+    void roleId;
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    return this.fetchProfile(userId, email);
   },
 
   async updateUserRole(email: string, roleId: InstitutionalRoleCode): Promise<void> {
     const roleInfo = institutionalRoles.find((r) => r.id === roleId);
     const technicalRole = roleInfo?.technicalRole || 'member';
 
-    if (isSupabaseConfigured()) {
-      try {
-        // Actualizar en profiles
-        await supabase
-          .from('profiles')
-          .update({
-            role_id: roleId,
-            technical_role: technicalRole,
-          })
-          .eq('email', email.trim().toLowerCase());
-      } catch (e) {
-        console.warn('Error actualizando rol en Supabase profiles:', e);
-      }
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .update({ role_id: roleId, technical_role: technicalRole })
+      .eq('email', email.trim().toLowerCase());
+    if (profileError) throw profileError;
 
-      try {
-        // También actualizar en members (si el hermano tiene registro ahí)
-        await supabase
-          .from('members')
-          .update({ role_id: roleId, updated_at: new Date().toISOString() })
-          .eq('email', email.trim().toLowerCase());
-      } catch (e) {
-        console.warn('Error actualizando rol en Supabase members:', e);
-      }
-    }
-
-    try {
-      const raw = localStorage.getItem('logia_session_backup');
-      if (raw) {
-        const user = JSON.parse(raw);
-        if (user?.email?.toLowerCase() === email.trim().toLowerCase() && user.profile) {
-          user.profile.roleId = roleId;
-          user.profile.technicalRole = technicalRole;
-          localStorage.setItem('logia_session_backup', JSON.stringify(user));
-        }
-      }
-    } catch {
-      // ignore
-    }
+    const { error: memberError } = await supabase
+      .from('members')
+      .update({ role_id: roleId, updated_at: new Date().toISOString() })
+      .eq('email', email.trim().toLowerCase());
+    if (memberError) throw memberError;
   },
 };

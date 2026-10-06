@@ -2,51 +2,13 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import type { AttendanceRecord, VisitorAttendance, AttendanceStatus, LodgeEvent } from '@/types';
 import { auditService } from './auditService';
 
-const LOCAL_ATTENDANCE_KEY = 'logia_attendance_data';
-const LOCAL_VISITORS_KEY = 'logia_visitors_data';
-
-function loadLocalAttendance(): AttendanceRecord[] {
-  try {
-    const raw = localStorage.getItem(LOCAL_ATTENDANCE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {
-    // ignore
-  }
-  return [];
-}
-
-function saveLocalAttendance(list: AttendanceRecord[]) {
-  try {
-    localStorage.setItem(LOCAL_ATTENDANCE_KEY, JSON.stringify(list));
-  } catch {
-    // ignore
-  }
-}
-
-function loadLocalVisitors(): VisitorAttendance[] {
-  try {
-    const raw = localStorage.getItem(LOCAL_VISITORS_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {
-    // ignore
-  }
-  return [];
-}
-
-function saveLocalVisitors(list: VisitorAttendance[]) {
-  try {
-    localStorage.setItem(LOCAL_VISITORS_KEY, JSON.stringify(list));
-  } catch {
-    // ignore
-  }
-}
-
 export const attendanceService = {
   async getAttendanceForEvent(eventId: string): Promise<AttendanceRecord[]> {
-    if (isSupabaseConfigured()) {
-      try {
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    {
         const { data, error } = await supabase.from('attendance').select('*').eq('event_id', eventId);
-        if (!error && data) {
+        if (error) throw error;
+        if (data) {
           return data.map((d) => ({
             id: d.id,
             eventId: d.event_id,
@@ -56,19 +18,16 @@ export const attendanceService = {
             updatedAt: d.updated_at,
           }));
         }
-      } catch (e) {
-        console.warn('Error en Supabase getAttendanceForEvent:', e);
       }
-    }
-    const local = loadLocalAttendance();
-    return local.filter((a) => a.eventId === eventId);
+    return [];
   },
 
   async getVisitorsForEvent(eventId: string): Promise<VisitorAttendance[]> {
-    if (isSupabaseConfigured()) {
-      try {
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    {
         const { data, error } = await supabase.from('attendance_visitors').select('*').eq('event_id', eventId);
-        if (!error && data) {
+        if (error) throw error;
+        if (data) {
           return data.map((d) => ({
             id: d.id,
             eventId: d.event_id,
@@ -79,12 +38,8 @@ export const attendanceService = {
             createdAt: d.created_at,
           }));
         }
-      } catch (e) {
-        console.warn('Error en Supabase getVisitorsForEvent:', e);
       }
-    }
-    const local = loadLocalVisitors();
-    return local.filter((v) => v.eventId === eventId);
+    return [];
   },
 
   async saveAttendanceBatch(
@@ -102,8 +57,8 @@ export const attendanceService = {
       updatedAt: now,
     }));
 
-    if (isSupabaseConfigured()) {
-      try {
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    {
         const upsertPayload = updatedRecords.map((r) => ({
           event_id: r.eventId,
           member_id: r.memberId,
@@ -111,15 +66,9 @@ export const attendanceService = {
           updated_by: r.updatedBy,
           updated_at: r.updatedAt,
         }));
-        await supabase.from('attendance').upsert(upsertPayload, { onConflict: 'event_id,member_id' });
-      } catch (e) {
-        console.warn('Error en Supabase saveAttendanceBatch:', e);
-      }
+        const { error } = await supabase.from('attendance').upsert(upsertPayload, { onConflict: 'event_id,member_id' });
+        if (error) throw error;
     }
-
-    const local = loadLocalAttendance();
-    const otherEvents = local.filter((a) => a.eventId !== eventId);
-    saveLocalAttendance([...otherEvents, ...updatedRecords]);
 
     await auditService.log('REGISTRO_ASISTENCIA', 'attendance', eventId, user, {
       total: records.length,
@@ -137,9 +86,9 @@ export const attendanceService = {
       createdAt: new Date().toISOString(),
     };
 
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase.from('attendance_visitors').insert({
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    {
+        const { error } = await supabase.from('attendance_visitors').insert({
           id: fullVisitor.id,
           event_id: fullVisitor.eventId,
           full_name: fullVisitor.fullName,
@@ -147,14 +96,8 @@ export const attendanceService = {
           degree: fullVisitor.degree,
           notes: fullVisitor.notes,
         });
-      } catch (e) {
-        console.warn('Error guardando visitante en Supabase:', e);
-      }
+        if (error) throw error;
     }
-
-    const local = loadLocalVisitors();
-    local.push(fullVisitor);
-    saveLocalVisitors(local);
 
     await auditService.log('VISITANTE_REGISTRADO', 'attendance_visitors', fullVisitor.id, user, {
       fullName: fullVisitor.fullName,

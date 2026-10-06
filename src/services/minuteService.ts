@@ -2,34 +2,10 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import type { Minute, MinuteCorrection, MasonicDegree } from '@/types';
 import { auditService } from './auditService';
 
-const LOCAL_MINUTES_KEY = 'logia_minutes_data';
-
-function seedInitialMinutes(): Minute[] {
-  return [];
-}
-
-function loadLocalMinutes(): Minute[] {
-  try {
-    const raw = localStorage.getItem(LOCAL_MINUTES_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {
-    // ignore
-  }
-  return [];
-}
-
-function saveLocalMinutes(list: Minute[]) {
-  try {
-    localStorage.setItem(LOCAL_MINUTES_KEY, JSON.stringify(list));
-  } catch {
-    // ignore
-  }
-}
-
 export const minuteService = {
   async getAllMinutes(): Promise<Minute[]> {
-    if (isSupabaseConfigured()) {
-      try {
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    {
         const { data, error } = await supabase
           .from('minutes')
           .select('*, minute_corrections(*)')
@@ -37,7 +13,8 @@ export const minuteService = {
           .order('year', { ascending: false })
           .order('number', { ascending: false });
 
-        if (!error && data) {
+        if (error) throw error;
+        if (data) {
           return data.map((d) => ({
             id: d.id,
             number: d.number,
@@ -70,12 +47,8 @@ export const minuteService = {
             updatedAt: d.updated_at,
           }));
         }
-      } catch (e) {
-        console.warn('Fallo consulta Supabase minutes, usando local:', e);
       }
-    }
-
-    return loadLocalMinutes();
+    return [];
   },
 
   /**
@@ -160,8 +133,8 @@ export const minuteService = {
       allowedMemberIds: minute.allowedMemberIds || [],
     };
 
-    if (isSupabaseConfigured()) {
-      try {
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    {
         const payload = {
           id: fullMinute.id,
           number: fullMinute.number,
@@ -183,23 +156,13 @@ export const minuteService = {
         };
 
         if (isNew) {
-          await supabase.from('minutes').insert(payload);
+          const { error } = await supabase.from('minutes').insert(payload);
+          if (error) throw error;
         } else {
-          await supabase.from('minutes').update(payload).eq('id', fullMinute.id);
+          const { error } = await supabase.from('minutes').update(payload).eq('id', fullMinute.id);
+          if (error) throw error;
         }
-      } catch (e) {
-        console.warn('Error guardando en Supabase minutes:', e);
       }
-    }
-
-    const local = loadLocalMinutes();
-    const idx = local.findIndex((m) => m.id === fullMinute.id);
-    if (idx >= 0) {
-      local[idx] = fullMinute;
-    } else {
-      local.unshift(fullMinute);
-    }
-    saveLocalMinutes(local);
 
     await auditService.log(
       isNew ? 'CREAR_ACTA' : 'ACTUALIZAR_ACTA',
@@ -226,26 +189,16 @@ export const minuteService = {
       createdAt: new Date().toISOString(),
     };
 
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase.from('minute_corrections').insert({
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    {
+        const { error } = await supabase.from('minute_corrections').insert({
           id: correction.id,
           minute_id: minuteId,
           author_id: user.id,
           author_name: correction.authorName,
           comment,
         });
-      } catch (e) {
-        console.warn('Error guardando corrección en Supabase:', e);
-      }
-    }
-
-    const local = loadLocalMinutes();
-    const min = local.find((m) => m.id === minuteId);
-    if (min) {
-      if (!min.corrections) min.corrections = [];
-      min.corrections.push(correction);
-      saveLocalMinutes(local);
+        if (error) throw error;
     }
 
     await auditService.log('OBSERVACION_ACTA', 'minutes', minuteId, user, { comment });
@@ -253,15 +206,13 @@ export const minuteService = {
   },
 
   async markAsRead(minuteId: string, memberId: string): Promise<void> {
-    const local = loadLocalMinutes();
-    const min = local.find((m) => m.id === minuteId);
-    if (min) {
-      if (!min.readBy) min.readBy = [];
-      if (!min.readBy.includes(memberId)) {
-        min.readBy.push(memberId);
-        saveLocalMinutes(local);
-      }
-    }
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    const { error } = await supabase.from('minute_reads').upsert({
+      minute_id: minuteId,
+      user_id: memberId,
+      read_at: new Date().toISOString(),
+    }, { onConflict: 'minute_id,user_id' });
+    if (error) throw error;
   },
 
   validatePdfFile(file: File): { valid: boolean; error?: string } {
@@ -276,28 +227,14 @@ export const minuteService = {
   },
 
   async deleteMinute(id: string, user: { id?: string; email?: string }): Promise<void> {
-    const local = loadLocalMinutes();
-    const target = local.find((m) => m.id === id);
-
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    {
+        const { error } = await supabase
           .from('minutes')
           .update({ deleted_at: new Date().toISOString() })
           .eq('id', id);
-      } catch (e) {
-        console.warn('Error eliminando acta en Supabase:', e);
-      }
+        if (error) throw error;
     }
-
-    const filtered = local.filter((m) => m.id !== id);
-    saveLocalMinutes(filtered);
-
-    if (target) {
-      await auditService.log('ELIMINAR_ACTA', 'minutes', id, user, {
-        formatNumber: target.formatNumber,
-        title: target.title,
-      });
-    }
+    await auditService.log('ELIMINAR_ACTA', 'minutes', id, user, {});
   },
 };

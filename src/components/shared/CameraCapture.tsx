@@ -25,7 +25,7 @@ export function CameraCapture({ onValidated }: CameraCaptureProps) {
 
   const [status, setStatus] = useState<CameraStatus>('idle');
   const [errorMessage, setErrorMessage] = useState<string>('');
-  const [consentGiven, setConsentGiven] = useState<boolean>(true);
+  const [consentGiven] = useState<boolean>(true);
   const [validationResult, setValidationResult] = useState<BiometricValidationResult | null>(null);
 
   const stopCamera = useCallback(() => {

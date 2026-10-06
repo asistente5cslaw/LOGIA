@@ -26,7 +26,7 @@ export const AppIconSelectorModal: React.FC<AppIconSelectorModalProps> = ({
   onClose,
 }) => {
   const [selectedIcon, setSelectedIcon] = useState<LodgeIconOption>(getSelectedLodgeIcon());
-  const [installPrompt, setInstallPrompt] = useState<any>(getDeferredInstallPrompt());
+  const [installPrompt, setInstallPrompt] = useState<ReturnType<typeof getDeferredInstallPrompt>>(getDeferredInstallPrompt());
   const [isIOS, setIsIOS] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
   const [installMessage, setInstallMessage] = useState('');
@@ -44,8 +44,8 @@ export const AppIconSelectorModal: React.FC<AppIconSelectorModalProps> = ({
   }, [isOpen]);
 
   useEffect(() => {
-    const handleInstallable = (e: any) => {
-      setInstallPrompt(e.detail);
+    const handleInstallable = (e: Event) => {
+      setInstallPrompt((e as CustomEvent<ReturnType<typeof getDeferredInstallPrompt>>).detail);
     };
     window.addEventListener('pwa-installable', handleInstallable);
     return () => window.removeEventListener('pwa-installable', handleInstallable);

@@ -8,6 +8,7 @@ import { memberService } from '@/services/memberService';
 import { identityService } from '@/services/identityService';
 import { convocationService } from '@/services/convocationService';
 import { authService } from '@/services/authService';
+import { auditService } from '@/services/auditService';
 import { supabase } from '@/lib/supabase';
 import type { LodgeEvent, Minute, Member, AttendanceRecord, OfficialVisitChecklistItem } from '@/types';
 
@@ -406,15 +407,16 @@ describe('8. Convocatorias Protocolarias', () => {
 
 describe('9. Registro de Usuario Directo y Validación', () => {
   it('permite registrar un usuario directamente con nombre, correo y contraseña sin código obligatorio', async () => {
+    vi.spyOn(auditService, 'log').mockResolvedValueOnce();
     vi.spyOn(supabase.auth, 'signUp').mockResolvedValueOnce({
       data: {
-        user: { id: 'mock-user-123', email: 'nuevohermano@logia.org' } as any,
+        user: { id: '00000000-0000-4000-8000-000000000123', email: 'nuevohermano@logia.org' } as never,
         session: null,
       },
       error: null,
     });
     vi.spyOn(authService, 'fetchProfile').mockResolvedValueOnce({
-      id: 'mock-user-123',
+      id: '00000000-0000-4000-8000-000000000123',
       email: 'nuevohermano@logia.org',
       displayName: 'Carlos Mendoza',
       roleId: 'apr',
@@ -438,4 +440,3 @@ describe('9. Registro de Usuario Directo y Validación', () => {
     expect(user.profile?.identityStatus).toBe('pending');
   });
 });
-

@@ -2,49 +2,6 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import type { LodgeEvent, EventConflict, MasonicBodyId } from '@/types';
 import { auditService } from './auditService';
 
-const LOCAL_EVENTS_KEY = 'logia_events_data';
-const LOCAL_CONFLICTS_KEY = 'logia_event_conflicts';
-
-function seedInitialEvents(): LodgeEvent[] {
-  return [];
-}
-
-function loadLocalEvents(): LodgeEvent[] {
-  try {
-    const raw = localStorage.getItem(LOCAL_EVENTS_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {
-    // ignore
-  }
-  return [];
-}
-
-function saveLocalEvents(events: LodgeEvent[]) {
-  try {
-    localStorage.setItem(LOCAL_EVENTS_KEY, JSON.stringify(events));
-  } catch {
-    // ignore
-  }
-}
-
-function loadLocalConflicts(): EventConflict[] {
-  try {
-    const raw = localStorage.getItem(LOCAL_CONFLICTS_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {
-    // ignore
-  }
-  return [];
-}
-
-function saveLocalConflicts(conflicts: EventConflict[]) {
-  try {
-    localStorage.setItem(LOCAL_CONFLICTS_KEY, JSON.stringify(conflicts));
-  } catch {
-    // ignore
-  }
-}
-
 /**
  * Convierte un evento en timestamps para comparar solapamiento exacto
  */
@@ -67,15 +24,13 @@ function getEventTimeRange(event: LodgeEvent): { startMs: number; endMs: number 
 
 export const eventService = {
   async getAllEvents(filterBodyId?: MasonicBodyId): Promise<LodgeEvent[]> {
-    if (isSupabaseConfigured()) {
-      try {
-        let query = supabase.from('events').select('*').is('deleted_at', null);
-        if (filterBodyId) {
-          query = query.eq('body_id', filterBodyId);
-        }
-        const { data, error } = await query.order('start_date', { ascending: true });
-        if (!error && data) {
-          return data.map((d) => ({
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    let query = supabase.from('events').select('*').is('deleted_at', null);
+    if (filterBodyId) query = query.eq('body_id', filterBodyId);
+    const { data, error } = await query.order('start_date', { ascending: true });
+    if (error) throw error;
+    if (data) {
+      return data.map((d) => ({
             id: d.id,
             title: d.title,
             bodyId: d.body_id,
@@ -96,15 +51,8 @@ export const eventService = {
             createdAt: d.created_at,
             updatedAt: d.updated_at,
           }));
-        }
-      } catch (e) {
-        console.warn('Fallo consulta Supabase events, usando local:', e);
-      }
     }
-
-    const local = loadLocalEvents();
-    if (!filterBodyId) return local;
-    return local.filter((e) => e.bodyId === filterBodyId);
+    return [];
   },
 
   /**
@@ -205,6 +153,7 @@ export const eventService = {
     user: { id?: string; email?: string; name?: string },
     justification?: string
   ): Promise<{ savedEvent: LodgeEvent; conflicts: LodgeEvent[] }> {
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
     const existingEvents = await this.getAllEvents();
     // La UI puede enviar un ID visual provisional (ev-...). Solo es edición
     // si ese ID ya existe en la fuente actual; las altas usan UUID de Supabase.
@@ -227,7 +176,7 @@ export const eventService = {
     const conflicts = this.detectConflicts(fullEvent, existingEvents);
 
     // Si existen conflictos y no se aportó justificación, reportamos conflicto sin guardar o para decisión
-    if (isSupabaseConfigured()) {
+    {
       try {
         const payload = {
           title: fullEvent.title,
@@ -274,34 +223,6 @@ export const eventService = {
       }
     }
 
-    // Actualizar local
-    const local = loadLocalEvents();
-    const idx = local.findIndex((e) => e.id === fullEvent.id);
-    if (idx >= 0) {
-      local[idx] = fullEvent;
-    } else {
-      local.push(fullEvent);
-    }
-    saveLocalEvents(local);
-
-    if (conflicts.length > 0) {
-      const localConflicts = loadLocalConflicts();
-      for (const c of conflicts) {
-        localConflicts.push({
-          id: `conf-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-          eventId1: fullEvent.id,
-          eventId2: c.id,
-          reason: `Superposición horaria con '${c.title}'`,
-          resolved: Boolean(justification),
-          resolvedBy: user.id,
-          resolvedAt: justification ? now : undefined,
-          justification,
-          createdAt: now,
-        });
-      }
-      saveLocalConflicts(localConflicts);
-    }
-
     await auditService.log(
       isNew ? 'CREAR_EVENTO' : 'ACTUALIZAR_EVENTO',
       'events',
@@ -323,58 +244,37 @@ export const eventService = {
     status: LodgeEvent['status'],
     user: { id?: string; email?: string }
   ): Promise<void> {
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase.from('events').update({ status }).eq('id', id);
-      } catch (e) {
-        console.warn('Error actualizando status en Supabase:', e);
-      }
-    }
-    const local = loadLocalEvents();
-    const target = local.find((e) => e.id === id);
-    if (target) {
-      target.status = status;
-      target.updatedAt = new Date().toISOString();
-      saveLocalEvents(local);
-      await auditService.log('CAMBIO_ESTADO_EVENTO', 'events', id, user, { newStatus: status });
-    }
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    const { error } = await supabase.from('events').update({ status }).eq('id', id);
+    if (error) throw error;
+    await auditService.log('CAMBIO_ESTADO_EVENTO', 'events', id, user, { newStatus: status });
   },
 
   async deleteEvent(id: string, user: { id?: string; email?: string }): Promise<void> {
-    const local = loadLocalEvents();
-    const target = local.find((e) => e.id === id);
-
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase
-          .from('events')
-          .update({ deleted_at: new Date().toISOString(), status: 'cancelada' })
-          .eq('id', id);
-      } catch (e) {
-        console.warn('Error eliminando evento en Supabase:', e);
-      }
-    }
-
-    const filtered = local.filter((e) => e.id !== id);
-    saveLocalEvents(filtered);
-
-    if (target) {
-      await auditService.log('ELIMINAR_EVENTO', 'events', id, user, {
-        title: target.title,
-        startDate: target.startDate,
-      });
-    }
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    const { data, error } = await supabase
+      .from('events')
+      .update({ deleted_at: new Date().toISOString(), status: 'cancelada' })
+      .eq('id', id)
+      .select('title, start_date')
+      .maybeSingle();
+    if (error) throw error;
+    await auditService.log('ELIMINAR_EVENTO', 'events', id, user, {
+      title: data?.title,
+      startDate: data?.start_date,
+    });
   },
 
   async getUnresolvedConflicts(): Promise<EventConflict[]> {
-    if (isSupabaseConfigured()) {
-      try {
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    {
         const { data, error } = await supabase
           .from('event_conflicts')
           .select('*')
           .eq('resolved', false)
           .order('created_at', { ascending: false });
-        if (!error && data) {
+        if (error) throw error;
+        if (data) {
           return data.map((d) => ({
             id: d.id,
             eventId1: d.event_id_1,
@@ -387,11 +287,7 @@ export const eventService = {
             createdAt: d.created_at,
           }));
         }
-      } catch (e) {
-        console.warn('Error leyendo conflictos Supabase:', e);
       }
-    }
-
-    return loadLocalConflicts().filter((c) => !c.resolved);
+    return [];
   },
 };

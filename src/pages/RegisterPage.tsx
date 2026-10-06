@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
+import { useForm, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { User, Mail, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react';
@@ -36,8 +36,8 @@ export function RegisterPage() {
     resolver: zodResolver(registerSchema),
   });
 
-  const onError = (formErrors: any) => {
-    const firstError = Object.values(formErrors)[0] as any;
+  const onError = (formErrors: FieldErrors<RegisterFormValues>) => {
+    const firstError = Object.values(formErrors)[0];
     if (firstError?.message) {
       showAlert({
         title: 'Verifica los Datos Ingresados',

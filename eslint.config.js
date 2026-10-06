@@ -19,10 +19,9 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
-      'react-refresh/only-export-components': [
-        'warn',
-        { allowConstantExport: true },
-      ],
+      // Las piezas UI comparten variantes/contexts intencionalmente; este
+      // aviso de Fast Refresh no representa un fallo de ejecución.
+      'react-refresh/only-export-components': 'off',
     },
   }
 );

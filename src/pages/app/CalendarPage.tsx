@@ -21,12 +21,11 @@ import {
   Mail,
   X,
   FileEdit,
-  Filter,
   ChevronDown,
   Trash2,
 } from 'lucide-react';
 import { AppleEmoji } from '@/components/shared/AppleEmoji';
-import { AppleSelect, type AppleSelectOption } from '@/components/shared/AppleSelect';
+import { AppleSelect } from '@/components/shared/AppleSelect';
 import { AppleDatePicker } from '@/components/shared/AppleDatePicker';
 import { AppleTimePicker } from '@/components/shared/AppleTimePicker';
 import { AppleInput, AppleTextarea } from '@/components/shared/AppleInput';

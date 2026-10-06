@@ -1,139 +1,92 @@
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import type { Member, MasonicDegree, MemberStatusCondition, InstitutionalRoleCode } from '@/types';
-import { members as mockMembers } from '@/data/mock';
 import { auditService } from './auditService';
 
-const LOCAL_MEMBERS_KEY = 'logia_members_data';
-
-function loadLocalMembers(): Member[] {
-  try {
-    const raw = localStorage.getItem(LOCAL_MEMBERS_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        const cleaned = parsed.filter(
-          (m: any) =>
-            m.email !== 'carlos.mendoza@logia.org' &&
-            m.email !== 'andres.rojas@logia.org' &&
-            m.email !== 'felipe.castro@logia.org' &&
-            m.email !== 'diego.salazar@logia.org' &&
-            m.email !== 'javier.lopez@logia.org'
-        );
-        if (cleaned.length > 0) {
-          return cleaned;
-        }
-      }
-    }
-  } catch {
-    // fallback
-  }
-  saveLocalMembers(mockMembers);
-  return mockMembers;
-}
-
-function mapSupabaseMember(d: any): Member {
+function mapSupabaseMember(d: Record<string, unknown>): Member {
+  const value = (key: string) => d[key];
   return {
-    id: d.id,
-    firstName: d.first_name,
-    lastName: d.last_name,
-    email: d.email,
-    phone: d.phone,
-    roleId: d.role_id,
-    degree: d.degree,
-    condition: d.condition,
-    motherLodge: d.mother_lodge,
-    initiationDate: d.initiation_date,
-    passingDate: d.passing_date,
-    raisingDate: d.raising_date,
-    diplomaNumber: d.diploma_number,
-    passportNumber: d.passport_number,
-    otherBodies: d.other_bodies || [],
-    avatarUrl: d.avatar_url,
-    joinedAt: d.joined_at,
-    isActive: d.is_active,
-    createdAt: d.created_at,
-    updatedAt: d.updated_at,
-    identityVerified: d.identity_verified,
-    identityStatus: d.identity_status || (d.is_active ? 'verified' : 'pending'),
-    selfieUrl: d.selfie_url,
-    identityValidatedAt: d.identity_validated_at,
-    identityValidatedBy: d.identity_validated_by,
-    identityNotes: d.identity_notes,
+    id: String(value('id')),
+    firstName: String(value('first_name') || ''),
+    lastName: String(value('last_name') || ''),
+    email: String(value('email') || ''),
+    phone: value('phone') as string | undefined,
+    roleId: value('role_id') as InstitutionalRoleCode,
+    degree: value('degree') as MasonicDegree,
+    condition: value('condition') as MemberStatusCondition,
+    motherLodge: value('mother_lodge') as string | undefined,
+    initiationDate: value('initiation_date') as string | undefined,
+    passingDate: value('passing_date') as string | undefined,
+    raisingDate: value('raising_date') as string | undefined,
+    diplomaNumber: value('diploma_number') as string | undefined,
+    passportNumber: value('passport_number') as string | undefined,
+    otherBodies: (value('other_bodies') as string[] | null) || [],
+    avatarUrl: value('avatar_url') as string | undefined,
+    joinedAt: String(value('joined_at') || ''),
+    isActive: Boolean(value('is_active')),
+    createdAt: value('created_at') as string | undefined,
+    updatedAt: value('updated_at') as string | undefined,
+    identityVerified: value('identity_verified') as boolean | undefined,
+    identityStatus: (value('identity_status') as Member['identityStatus']) || (value('is_active') ? 'verified' : 'pending'),
+    selfieUrl: value('selfie_url') as string | undefined,
+    identityValidatedAt: value('identity_validated_at') as string | undefined,
+    identityValidatedBy: value('identity_validated_by') as string | undefined,
+    identityNotes: value('identity_notes') as string | undefined,
   };
 }
 
-function mapProfileAsMember(profile: any): Member {
+function mapProfileAsMember(profile: Record<string, unknown>): Member {
   const displayName = String(profile.display_name || profile.email || 'Hermano').trim();
   const parts = displayName.split(/\s+/);
   const firstName = parts.shift() || 'Hermano';
   const lastName = parts.join(' ') || 'Sin apellido';
 
   return {
-    id: profile.member_id || profile.id,
+    id: String(profile.member_id || profile.id),
     firstName,
     lastName,
-    email: profile.email,
-    roleId: profile.role_id || 'apr',
+    email: String(profile.email || ''),
+    roleId: (profile.role_id || 'apr') as InstitutionalRoleCode,
     degree: 'aprendiz',
     condition: 'activo',
     motherLodge: 'Resp.·. Log.·. Unión Fraternal No. 21',
-    joinedAt: profile.created_at?.split('T')[0] || new Date().toISOString().split('T')[0],
+    joinedAt: String(profile.created_at || new Date().toISOString()).split('T')[0],
     isActive: true,
-    createdAt: profile.created_at,
-    identityVerified: profile.identity_verified ?? false,
-    identityStatus: profile.identity_status || 'pending',
+    createdAt: profile.created_at as string | undefined,
+    identityVerified: Boolean(profile.identity_verified),
+    identityStatus: (profile.identity_status || 'pending') as Member['identityStatus'],
   };
-}
-
-function saveLocalMembers(list: Member[]) {
-  try {
-    localStorage.setItem(LOCAL_MEMBERS_KEY, JSON.stringify(list));
-  } catch {
-    // ignore
-  }
 }
 
 export const memberService = {
   async getAllMembers(includeInactive = true): Promise<Member[]> {
-    if (isSupabaseConfigured()) {
-      let membersFromDatabase: Member[] = [];
-      try {
-        let query = supabase.from('members').select('*').is('deleted_at', null);
-        if (!includeInactive) {
-          query = query.eq('is_active', true);
-        }
-        const { data, error } = await query.order('last_name', { ascending: true });
-        if (!error && data) {
-          membersFromDatabase = data.map(mapSupabaseMember);
-        }
-      } catch (e) {
-        console.warn('Fallo consulta Supabase members:', e);
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+
+    let membersFromDatabase: Member[] = [];
+    let query = supabase.from('members').select('*').is('deleted_at', null);
+      if (!includeInactive) {
+        query = query.eq('is_active', true);
       }
+      const { data, error } = await query.order('last_name', { ascending: true });
+      if (error) throw error;
+      if (data) membersFromDatabase = data.map(mapSupabaseMember);
 
-      // Los registros creados por Auth existen primero en profiles. No se debe
-      // sustituir esta respuesta por mocks locales: eso ocultaba usuarios reales.
-      try {
-        const { data: profiles, error } = await supabase
-          .from('profiles')
-          .select('id, member_id, email, display_name, role_id, identity_verified, identity_status, created_at')
-          .order('created_at', { ascending: true });
 
-        if (!error && profiles) {
-          const knownEmails = new Set(membersFromDatabase.map((m) => m.email.toLowerCase()));
-          const profileMembers = profiles
-            .filter((profile) => profile.email && !knownEmails.has(profile.email.toLowerCase()))
-            .map(mapProfileAsMember);
-          membersFromDatabase = [...membersFromDatabase, ...profileMembers];
-        }
-      } catch (e) {
-        console.warn('Fallo consulta Supabase profiles:', e);
-      }
-
-      return includeInactive ? membersFromDatabase : membersFromDatabase.filter((m) => m.isActive);
+    // Los registros creados por Auth que todavía no estén vinculados aparecen
+    // también para que ningún usuario real quede oculto del directorio.
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, member_id, email, display_name, role_id, identity_verified, identity_status, created_at')
+      .order('created_at', { ascending: true });
+    if (profilesError) throw profilesError;
+    if (profiles) {
+      const knownEmails = new Set(membersFromDatabase.map((m) => m.email.toLowerCase()));
+      const profileMembers = profiles
+        .filter((profile) => profile.email && !knownEmails.has(String(profile.email).toLowerCase()))
+        .map(mapProfileAsMember);
+      membersFromDatabase = [...membersFromDatabase, ...profileMembers];
     }
 
-    const local = loadLocalMembers();
-    return includeInactive ? local : local.filter((m) => m.isActive);
+    return includeInactive ? membersFromDatabase : membersFromDatabase.filter((m) => m.isActive);
   },
 
   async getMemberById(id: string): Promise<Member | undefined> {
@@ -145,6 +98,7 @@ export const memberService = {
     member: Omit<Member, 'id' | 'joinedAt'> & { id?: string },
     user: { id?: string; email?: string }
   ): Promise<Member> {
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
     const now = new Date().toISOString();
     const isNew = !member.id;
     const memberId = member.id || `m-${Date.now()}`;
@@ -157,7 +111,7 @@ export const memberService = {
       updatedAt: now,
     };
 
-    if (isSupabaseConfigured()) {
+    {
       try {
         const payload = {
           id: member.id,
@@ -177,43 +131,34 @@ export const memberService = {
           other_bodies: member.otherBodies,
           avatar_url: member.avatarUrl,
           is_active: member.isActive,
+          identity_verified: member.identityVerified ?? false,
+          identity_status: member.identityStatus || 'pending',
+          selfie_url: member.selfieUrl,
+          identity_validated_at: member.identityValidatedAt,
+          identity_validated_by: member.identityValidatedBy,
+          identity_notes: member.identityNotes,
+          updated_by: user.id,
         };
 
         if (isNew) {
-          const { data } = await supabase.from('members').insert(payload).select().single();
+          const { data, error } = await supabase.from('members').insert(payload).select().single();
+          if (error) throw error;
           if (data) completeMember.id = data.id;
         } else {
-          await supabase.from('members').update(payload).eq('id', member.id);
+          const { error } = await supabase.from('members').update(payload).eq('id', member.id);
+          if (error) throw error;
+
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .update({
+              identity_verified: member.identityVerified ?? false,
+              identity_status: member.identityStatus || 'pending',
+            })
+            .eq('member_id', member.id);
+          if (profileError) throw profileError;
         }
       } catch (e) {
-        console.warn('Error guardando en Supabase members:', e);
-      }
-    }
-
-    if (!isSupabaseConfigured()) {
-      const local = loadLocalMembers();
-      const existingIdx = local.findIndex((m) => m.id === completeMember.id);
-      if (existingIdx >= 0) {
-        local[existingIdx] = completeMember;
-      } else {
-        local.push(completeMember);
-      }
-      saveLocalMembers(local);
-    }
-
-    // Sync session profile role if this member is the current session
-    if (completeMember.email && completeMember.roleId) {
-      try {
-        const raw = localStorage.getItem('logia_session_backup');
-        if (raw) {
-          const sessionUser = JSON.parse(raw);
-          if (sessionUser?.email?.toLowerCase() === completeMember.email.toLowerCase() && sessionUser.profile) {
-            sessionUser.profile.roleId = completeMember.roleId;
-            localStorage.setItem('logia_session_backup', JSON.stringify(sessionUser));
-          }
-        }
-      } catch {
-        // ignore
+        throw new Error(e instanceof Error ? e.message : 'No se pudo guardar el miembro en Supabase.');
       }
     }
 
@@ -237,54 +182,18 @@ export const memberService = {
 
     if (isSupabaseConfigured()) {
       // 1. Actualizar en la tabla members (si existe ese registro)
-      try {
-        await supabase
+      const { error: memberError } = await supabase
           .from('members')
           .update({ role_id: roleId, updated_at: now })
           .eq('id', memberId);
-      } catch (e) {
-        console.warn('Error actualizando role_id en members:', e);
-      }
+      if (memberError) throw memberError;
 
       // 2. Actualizar en la tabla profiles (por member_id o id)
-      try {
-        await supabase
+      const { error: profileError } = await supabase
           .from('profiles')
           .update({ role_id: roleId })
           .or(`member_id.eq.${memberId},id.eq.${memberId}`);
-      } catch (e) {
-        console.warn('Error actualizando role_id en profiles:', e);
-      }
-    }
-
-    // 3. Actualizar en localStorage (modo local)
-    try {
-      const raw = localStorage.getItem(LOCAL_MEMBERS_KEY);
-      if (raw) {
-        const list = JSON.parse(raw) as Member[];
-        const idx = list.findIndex((m) => m.id === memberId);
-        if (idx >= 0) {
-          list[idx].roleId = roleId;
-          list[idx].updatedAt = now;
-          localStorage.setItem(LOCAL_MEMBERS_KEY, JSON.stringify(list));
-        }
-      }
-    } catch {
-      // ignore
-    }
-
-    // 4. Sincronizar sesión activa si el miembro modificado es el usuario logueado
-    try {
-      const raw = localStorage.getItem('logia_session_backup');
-      if (raw) {
-        const sessionUser = JSON.parse(raw);
-        if (sessionUser?.memberId === memberId && sessionUser.profile) {
-          sessionUser.profile.roleId = roleId;
-          localStorage.setItem('logia_session_backup', JSON.stringify(sessionUser));
-        }
-      }
-    } catch {
-      // ignore
+      if (profileError) throw profileError;
     }
 
     await auditService.log('CAMBIAR_ROL_MIEMBRO', 'members', memberId, user, { roleId });
@@ -309,30 +218,13 @@ export const memberService = {
   },
 
   async softDeleteMember(id: string, user: { id?: string; email?: string }): Promise<void> {
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase
-          .from('members')
-          .update({ is_active: false, deleted_at: new Date().toISOString() })
-          .eq('id', id);
-      } catch (e) {
-        console.warn('Error en softDelete Supabase:', e);
-      }
-    }
-
-    if (!isSupabaseConfigured()) {
-      const local = loadLocalMembers();
-      const member = local.find((m) => m.id === id);
-      if (member) {
-        member.isActive = false;
-        saveLocalMembers(local);
-        await auditService.log('BAJA_LOGICA_MIEMBRO', 'members', id, user, {
-          name: `${member.firstName} ${member.lastName}`,
-        });
-      }
-    } else {
-      await auditService.log('BAJA_LOGICA_MIEMBRO', 'members', id, user, {});
-    }
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    const { error } = await supabase
+      .from('members')
+      .update({ is_active: false, deleted_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) throw error;
+    await auditService.log('BAJA_LOGICA_MIEMBRO', 'members', id, user, {});
   },
 
   async updateIdentityStatus(
@@ -346,8 +238,7 @@ export const memberService = {
     const validatorName = validatorUser.displayName || validatorUser.email || 'Secretaría / Venerable Maestro';
 
     if (isSupabaseConfigured()) {
-      try {
-        const payload: Record<string, unknown> = {
+      const payload: Record<string, unknown> = {
           identity_status: status,
           identity_verified: status === 'verified',
           identity_validated_at: now,
@@ -358,13 +249,11 @@ export const memberService = {
         if (newSelfieUrl) {
           payload.selfie_url = newSelfieUrl;
         }
-        await supabase
+      const { error } = await supabase
           .from('members')
           .update(payload)
           .eq('id', memberId);
-      } catch (e) {
-        console.warn('Error actualizando estado de identidad en Supabase:', e);
-      }
+      if (error) throw error;
     }
 
     const members = await this.getAllMembers(true);
@@ -384,15 +273,6 @@ export const memberService = {
       member.identityNotes = notes;
     }
     member.updatedAt = now;
-
-    if (!isSupabaseConfigured()) {
-      const local = loadLocalMembers();
-      const localMember = local.find((m) => m.id === memberId);
-      if (localMember) {
-        Object.assign(localMember, member);
-        saveLocalMembers(local);
-      }
-    }
 
     await auditService.log(
       'VALIDACION_IDENTIDAD_BIOMETRICA',

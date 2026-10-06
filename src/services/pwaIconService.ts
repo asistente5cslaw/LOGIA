@@ -31,17 +31,22 @@ export const LODGE_ICONS: Record<LodgeIconOption, LodgeIconDetails> = {
 const STORAGE_KEY = 'selected_lodge_icon';
 
 // Global reference to PWA install prompt event
-let deferredPrompt: any = null;
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+}
+
+let deferredPrompt: BeforeInstallPromptEvent | null = null;
 
 if (typeof window !== 'undefined') {
-  window.addEventListener('beforeinstallprompt', (e: any) => {
+  window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
-    deferredPrompt = e;
+    deferredPrompt = e as BeforeInstallPromptEvent;
     window.dispatchEvent(new CustomEvent('pwa-installable', { detail: e }));
   });
 }
 
-export function getDeferredInstallPrompt(): any {
+export function getDeferredInstallPrompt(): BeforeInstallPromptEvent | null {
   return deferredPrompt;
 }
 

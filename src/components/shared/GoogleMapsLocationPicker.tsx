@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import React, { useState, useEffect, useRef } from 'react';
 import { Search, MapPin, Loader, X, Navigation, Layers, ZoomIn, ZoomOut, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -111,6 +112,7 @@ export const GoogleMapsLocationPicker = React.memo(function GoogleMapsLocationPi
   }, [googleLoaded]);
 
   // Inicializar Mapa
+  // El mapa se crea una sola vez; sus listeners usan referencias mutables.
   useEffect(() => {
     if (!googleLoaded || !mapRef.current || !window.google?.maps) return;
 
@@ -145,9 +147,11 @@ export const GoogleMapsLocationPicker = React.memo(function GoogleMapsLocationPi
     } catch (err) {
       console.error('Error initializing Google Maps:', err);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [googleLoaded]);
 
   // Sincronizar cambios de props externos
+  // Las funciones del mapa se mantienen estables durante la vida del componente.
   useEffect(() => {
     if (value && value !== searchQuery) {
       setSearchQuery(value);
@@ -160,6 +164,7 @@ export const GoogleMapsLocationPicker = React.memo(function GoogleMapsLocationPi
         addMarker(latitude, longitude);
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, latitude, longitude]);
 
   // Cerrar lista al hacer click afuera

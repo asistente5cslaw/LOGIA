@@ -31,8 +31,6 @@ export function AppleDatePicker({
   placeholder = 'Seleccionar fecha...',
   required = false,
   disabled = false,
-  minDate,
-  maxDate,
   error,
   helperText,
   className,

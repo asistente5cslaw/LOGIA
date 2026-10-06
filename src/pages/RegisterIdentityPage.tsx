@@ -44,7 +44,7 @@ export function RegisterIdentityPage() {
 
     try {
       // 1. Crear el usuario en el sistema de autenticación
-      await authService.register(
+      const registeredUser = await authService.register(
         pendingData.email,
         pendingData.password,
         pendingData.firstName,
@@ -52,11 +52,16 @@ export function RegisterIdentityPage() {
         pendingData.invitationCode
       );
 
+      if (!registeredUser.memberId) {
+        throw new Error('La cuenta fue creada, pero no se encontró su ficha de miembro en Supabase.');
+      }
+
       // 2. Registrar la ficha del hermano con su selfie biométrica para revisión
       const identityStatus = result.status === 'approved' ? 'verified' : 'pending';
       try {
         await memberService.saveMember(
           {
+            id: registeredUser.memberId,
             firstName: pendingData.firstName,
             lastName: pendingData.lastName,
             email: pendingData.email,
@@ -70,10 +75,12 @@ export function RegisterIdentityPage() {
             selfieUrl: result.selfieUrl,
             identityValidatedAt: new Date().toISOString(),
           },
-          { email: pendingData.email }
+          { id: registeredUser.id, email: pendingData.email }
         );
       } catch (saveErr) {
-        console.warn('Error al guardar ficha de miembro con selfie:', saveErr);
+        throw new Error(
+          `La cuenta fue creada, pero no se pudo guardar la ficha de miembro: ${saveErr instanceof Error ? saveErr.message : 'error desconocido'}`
+        );
       }
 
       // 3. Iniciar sesión automáticamente

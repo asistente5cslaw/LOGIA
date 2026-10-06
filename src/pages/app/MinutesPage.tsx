@@ -11,9 +11,6 @@ import {
   Eye,
   MessageSquare,
   Paperclip,
-  X,
-  Calendar,
-  BookOpen,
   Trash2,
   CalendarDays,
 } from 'lucide-react';
@@ -122,8 +119,10 @@ export function MinutesPage() {
 
   const handleOpenDetail = (min: Minute) => {
     setSelectedMinute(min);
-    if (currentMember) {
-      minuteService.markAsRead(min.id, currentMember.id);
+    if (user?.id) {
+      minuteService.markAsRead(min.id, user.id).catch((error) => {
+        console.warn('No se pudo registrar la lectura del acta:', error);
+      });
     }
   };
 

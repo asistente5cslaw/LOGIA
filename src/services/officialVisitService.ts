@@ -10,129 +10,16 @@ import type {
 } from '@/types';
 import { auditService } from './auditService';
 
-const LOCAL_CHECKLIST_KEY = 'logia_official_visit_checklist';
-const LOCAL_SETTINGS_KEY = 'logia_settings_data';
-
-const defaultChecklist: OfficialVisitChecklistItem[] = [
-  {
-    id: 1,
-    title: 'Lista de Asistencia',
-    description: 'Registro formal y actualizado de asistencia a todas las tenidas celebradas del año masónico.',
-    completed: false,
-    notes: undefined,
-  },
-  {
-    id: 2,
-    title: 'Libro de Actas',
-    description: 'Libro de actas foliado, firmado y al día con actas debidamente aprobadas en los tres grados.',
-    completed: false,
-    notes: undefined,
-  },
-  {
-    id: 3,
-    title: 'Libro de Tesorería',
-    description: 'Control de cuentas, cuotas mensuales e ingresos/egresos del taller auditados.',
-    completed: false,
-    notes: undefined,
-  },
-  {
-    id: 4,
-    title: 'Carta Constitutiva',
-    description: 'Carta Patente original expedida por la Gran Logia en exhibición y resguardo en el oriente.',
-    completed: false,
-    notes: undefined,
-  },
-  {
-    id: 5,
-    title: 'Código Masónico Reformado',
-    description: 'Ejemplar vigente del Código Masónico Reformado de la Gran Logia de Panamá en el ara.',
-    completed: false,
-    notes: undefined,
-  },
-  {
-    id: 6,
-    title: 'Estatutos del Taller',
-    description: 'Reglamento interno aprobado y concordante con los estatutos generales.',
-    completed: false,
-    notes: undefined,
-  },
-  {
-    id: 7,
-    title: 'Libros de Registro',
-    description: 'Libro de oro de firmas, registros de afiliaciones, iniciaciones y pasaportes.',
-    completed: false,
-    notes: undefined,
-  },
-  {
-    id: 8,
-    title: 'Cuestionario de Visitas Oficiales',
-    description: 'Formulario oficial de Gran Logia diligenciado previo a la llegada de la comisión inspectora.',
-    completed: false,
-    notes: undefined,
-  },
-];
-
-function loadLocalChecklist(): OfficialVisitChecklistItem[] {
-  try {
-    const raw = localStorage.getItem(LOCAL_CHECKLIST_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {
-    // ignore
-  }
-  return defaultChecklist;
-}
-
-function saveLocalChecklist(list: OfficialVisitChecklistItem[]) {
-  try {
-    localStorage.setItem(LOCAL_CHECKLIST_KEY, JSON.stringify(list));
-  } catch {
-    // ignore
-  }
-}
-
-const defaultSettings: LodgeSettings = {
-  id: 'lodge-uf21',
-  lodgeName: 'Resp.·. Log.·. Unión Fraternal No. 21',
-  lodgeNumber: 21,
-  orient: 'Oriente de Panamá',
-  rite: 'Rito Escocés Antiguo y Aceptado',
-  charterDate: '1921-06-24',
-  regularMeetingDays: 'Todos los 2do y 4to miércoles de cada mes a las 7:30 p.m.',
-  templeAddress: '',
-  contactEmail: 'secretaria@unionfraternal21.org',
-  currentVenerableMaster: 'Denzel Coronado',
-  currentSecretary: '',
-  privacyPolicyUrl: 'https://unionfraternal21.org/privacidad-ley81',
-  updatedAt: new Date().toISOString(),
-};
-
-function loadLocalSettings(): LodgeSettings {
-  try {
-    const raw = localStorage.getItem(LOCAL_SETTINGS_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {
-    // ignore
-  }
-  return defaultSettings;
-}
-
-function saveLocalSettings(settings: LodgeSettings) {
-  try {
-    localStorage.setItem(LOCAL_SETTINGS_KEY, JSON.stringify(settings));
-  } catch {
-    // ignore
-  }
-}
-
 export const officialVisitService = {
   async getChecklist(): Promise<OfficialVisitChecklistItem[]> {
-    if (isSupabaseConfigured()) {
-      try {
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    {
         const { data, error } = await supabase
           .from('official_visit_checklist')
           .select('*')
           .order('id', { ascending: true });
-        if (!error && data && data.length > 0) {
+        if (error) throw error;
+        if (data) {
           return data.map((d) => ({
             id: d.id,
             title: d.title,
@@ -143,11 +30,8 @@ export const officialVisitService = {
             verifiedAt: d.verified_at,
           }));
         }
-      } catch (e) {
-        console.warn('Error al consultar checklist en Supabase:', e);
       }
-    }
-    return loadLocalChecklist();
+    return [];
   },
 
   async updateChecklistItem(
@@ -157,9 +41,9 @@ export const officialVisitService = {
     user: { id?: string; email?: string }
   ): Promise<void> {
     const now = new Date().toISOString();
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    {
+        const { error } = await supabase
           .from('official_visit_checklist')
           .update({
             completed,
@@ -168,31 +52,17 @@ export const officialVisitService = {
             verified_at: completed ? now : null,
           })
           .eq('id', id);
-      } catch (e) {
-        console.warn('Error en updateChecklistItem Supabase:', e);
-      }
+        if (error) throw error;
     }
-
-    const local = loadLocalChecklist();
-    const item = local.find((i) => i.id === id);
-    if (item) {
-      item.completed = completed;
-      item.notes = notes;
-      item.verifiedBy = completed ? user.id : undefined;
-      item.verifiedAt = completed ? now : undefined;
-      saveLocalChecklist(local);
-      await auditService.log('CHECKLIST_VISITA_ACTUALIZADO', 'official_visit_checklist', String(id), user, {
-        title: item.title,
-        completed,
-      });
-    }
+    await auditService.log('CHECKLIST_VISITA_ACTUALIZADO', 'official_visit_checklist', String(id), user, { completed });
   },
 
   async getLodgeSettings(): Promise<LodgeSettings> {
-    if (isSupabaseConfigured()) {
-      try {
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    {
         const { data, error } = await supabase.from('lodge_settings').select('*').limit(1).single();
-        if (!error && data) {
+        if (error) throw error;
+        if (data) {
           return {
             id: data.id,
             lodgeName: data.lodge_name,
@@ -209,11 +79,8 @@ export const officialVisitService = {
             updatedAt: data.updated_at,
           };
         }
-      } catch (e) {
-        console.warn('Error en Supabase getLodgeSettings:', e);
       }
-    }
-    return loadLocalSettings();
+    throw new Error('No se encontró la configuración de la logia.');
   },
 
   async updateLodgeSettings(
@@ -227,9 +94,9 @@ export const officialVisitService = {
       updatedAt: new Date().toISOString(),
     };
 
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    {
+        const { error } = await supabase
           .from('lodge_settings')
           .update({
             lodge_name: updated.lodgeName,
@@ -245,12 +112,8 @@ export const officialVisitService = {
             privacy_policy_url: updated.privacyPolicyUrl,
           })
           .eq('id', updated.id);
-      } catch (e) {
-        console.warn('Error actualizando lodge_settings Supabase:', e);
-      }
+        if (error) throw error;
     }
-
-    saveLocalSettings(updated);
     await auditService.log('CONFIGURACION_LOGIA_ACTUALIZADA', 'lodge_settings', updated.id, user, {
       lodgeName: updated.lodgeName,
     });

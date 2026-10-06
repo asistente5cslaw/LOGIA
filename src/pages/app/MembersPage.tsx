@@ -14,7 +14,6 @@ import {
   Phone,
   Award,
   FileText,
-  Compass,
   ShieldCheck,
   ShieldAlert,
   CheckCircle2,

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type ReactNode } from 'react';
+import { useState, useRef, useEffect, useCallback, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Check, Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -53,7 +53,7 @@ export function AppleSelect<T extends string = string>({
     : options;
 
   // Calcular posición exacta usando portal para que nunca se recorte dentro de modales
-  const updatePosition = () => {
+  const updatePosition = useCallback(() => {
     if (!triggerRef.current) return;
     const rect = triggerRef.current.getBoundingClientRect();
     const dropdownHeight = Math.min(320, options.length * 44 + (isSearchEnabled ? 50 : 0) + 20);
@@ -74,7 +74,7 @@ export function AppleSelect<T extends string = string>({
       zIndex: 9999,
       backgroundColor: '#ffffff',
     });
-  };
+  }, [isSearchEnabled, options.length]);
 
   useEffect(() => {
     if (isOpen) {
@@ -88,7 +88,7 @@ export function AppleSelect<T extends string = string>({
         window.removeEventListener('scroll', handleScrollOrResize, true);
       };
     }
-  }, [isOpen, options.length]);
+  }, [isOpen, updatePosition]);
 
   // Cerrar al hacer clic fuera o presionar Escape
   useEffect(() => {
