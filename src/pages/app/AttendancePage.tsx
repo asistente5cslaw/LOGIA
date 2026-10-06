@@ -58,7 +58,11 @@ export function AttendancePage() {
 
   const isOwnMember = (member: Member): boolean => (
     Boolean(user?.memberId && user.memberId === member.id) ||
-    Boolean(user?.email && member.email && user.email.toLowerCase() === member.email.toLowerCase())
+    Boolean(user?.email && member.email && user.email.toLowerCase() === member.email.toLowerCase()) ||
+    Boolean(
+      user?.displayName &&
+      `${member.firstName} ${member.lastName}`.trim().toLowerCase() === user.displayName.trim().toLowerCase()
+    )
   );
 
   const loadInitial = async () => {
@@ -119,6 +123,16 @@ export function AttendancePage() {
     }
 
     void loadAttendanceForSelected(selectedEventId, members);
+  }, [selectedEventId, members]);
+
+  // Mantiene los contadores y estados sincronizados entre dispositivos aunque
+  // el canal realtime tarde o no esté disponible en el navegador.
+  useEffect(() => {
+    if (!selectedEventId || members.length === 0) return undefined;
+    const intervalId = window.setInterval(() => {
+      void loadAttendanceForSelected(selectedEventId, members);
+    }, 5000);
+    return () => window.clearInterval(intervalId);
   }, [selectedEventId, members]);
 
   const selectedEvent = useMemo(() => {
@@ -471,6 +485,11 @@ export function AttendancePage() {
                           Escribir mi excusa
                         </button>
                       )
+                    )}
+                    {!isOwnMember(m) && currentStatus === 'excusa' && (
+                      <span className="text-[11px] font-medium text-amber-700">
+                        Excusa pendiente de explicación por el hermano
+                      </span>
                     )}
                     {editingExcuseMemberId === m.id && isOwnMember(m) && (
                       <div className="w-full max-w-xs space-y-1.5 rounded-xl border border-amber-200 bg-amber-50 p-2.5 sm:w-80">
