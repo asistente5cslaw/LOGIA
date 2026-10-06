@@ -100,8 +100,11 @@ export function AttendancePage() {
       setAttendanceMap(map);
       setExcuseReasons(reasons);
       setExcuseSubmittedAt(submitted);
-      setEditingExcuseMemberId(null);
-      setExcuseDraft('');
+      const ownPendingExcuse = currentMembers.find(
+        (member) => isOwnMember(member) && map[member.id] === 'excusa' && !submitted[member.id]
+      );
+      setEditingExcuseMemberId(ownPendingExcuse?.id || null);
+      setExcuseDraft(ownPendingExcuse ? '' : '');
       setVisitors(visList);
     } catch {
       console.error('Error cargando asistencia del evento');
@@ -171,6 +174,12 @@ export function AttendancePage() {
         delete next[memberId];
         return next;
       });
+    }
+
+    const ownMember = members.find((member) => member.id === memberId);
+    if (status === 'excusa' && ownMember && isOwnMember(ownMember)) {
+      setEditingExcuseMemberId(memberId);
+      setExcuseDraft(excuseReasons[memberId] || '');
     }
 
     if (!selectedEventId) return;
