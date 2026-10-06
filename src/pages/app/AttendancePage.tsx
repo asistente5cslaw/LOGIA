@@ -156,19 +156,42 @@ export function AttendancePage() {
     );
   }, [members, searchMember]);
 
-  const handleStatusToggle = (memberId: string, status: AttendanceStatus) => {
+  const handleStatusToggle = async (memberId: string, status: AttendanceStatus) => {
     if (!canManageAttendance) return;
-    setAttendanceMap((prev) => ({
-      ...prev,
+    const nextMap = {
+      ...attendanceMap,
       [memberId]: status,
-    }));
+    };
+    setAttendanceMap(() => nextMap);
     setHasUnsavedChanges(true);
+
     if (status !== 'excusa') {
       setExcuseReasons((prev) => {
         const next = { ...prev };
         delete next[memberId];
         return next;
       });
+    }
+
+    if (!selectedEventId) return;
+    setIsSaving(true);
+    try {
+      const records = Object.entries(nextMap).map(([currentMemberId, currentStatus]) => ({
+        memberId: currentMemberId,
+        status: currentStatus,
+        excuseReason: currentMemberId === memberId && status !== 'excusa'
+          ? undefined
+          : excuseReasons[currentMemberId],
+      }));
+      await attendanceService.saveAttendanceBatch(selectedEventId, records, {
+        id: user?.id,
+        email: user?.email,
+      });
+      setHasUnsavedChanges(false);
+    } catch {
+      toast.error('No se pudo guardar el estado de asistencia.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
