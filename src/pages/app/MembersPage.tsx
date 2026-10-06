@@ -854,13 +854,16 @@ export function MembersPage() {
               );
               const newRole = String(details.newRoleId || details.roleId || '—');
               const newRoleLabel = institutionalRoles.find((role) => role.id === newRole)?.name || newRole;
-              const actor = String(details.actorName || log.userEmail || 'Sistema');
+              const actorMember = members.find((member) => member.email.toLowerCase() === log.userEmail.toLowerCase());
+              const actor = String(
+                details.actorName || (actorMember ? `${actorMember.firstName} ${actorMember.lastName}` : log.userEmail || 'Sistema')
+              );
 
               return (
                 <div key={log.id} className="rounded-xl border border-border bg-surface-container-low p-3 text-sm break-words">
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                      <p className="font-semibold text-ink">{targetName}</p>
+                      <p className="font-semibold text-ink">Cambio de rol</p>
                     </div>
                     <span className="inline-flex items-center gap-1 text-xs text-ink-muted sm:shrink-0 sm:text-right">
                       <Clock className="h-3.5 w-3.5" />

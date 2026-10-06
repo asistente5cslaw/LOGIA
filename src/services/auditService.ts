@@ -85,6 +85,36 @@ export const auditService = {
       createdAt: d.created_at,
     }));
 
-    return { logs, hasNext: (count ?? 0) > to };
+    const targetIds = logs.map((log) => log.entityId).filter((id): id is string => Boolean(id));
+    const actorIds = logs.map((log) => log.userId).filter((id): id is string => Boolean(id && id !== 'sistema'));
+    const [membersResult, profilesResult] = await Promise.all([
+      targetIds.length > 0
+        ? supabase.from('members').select('id, first_name, last_name').in('id', targetIds)
+        : Promise.resolve({ data: [], error: null }),
+      actorIds.length > 0
+        ? supabase.from('profiles').select('id, display_name').in('id', actorIds)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+    if (membersResult.error) throw membersResult.error;
+    if (profilesResult.error) throw profilesResult.error;
+
+    const targetNames = new Map(
+      (membersResult.data || []).map((member) => [member.id, `${member.first_name} ${member.last_name}`.trim()])
+    );
+    const actorNames = new Map(
+      (profilesResult.data || []).map((profile) => [profile.id, profile.display_name])
+    );
+    const enrichedLogs = logs.map((log) => {
+      const details = { ...(log.details || {}) };
+      if (!details.targetName && log.entityId && targetNames.has(log.entityId)) {
+        details.targetName = targetNames.get(log.entityId);
+      }
+      if (!details.actorName && log.userId && actorNames.has(log.userId)) {
+        details.actorName = actorNames.get(log.userId);
+      }
+      return { ...log, details };
+    });
+
+    return { logs: enrichedLogs, hasNext: (count ?? 0) > to };
   },
 };
