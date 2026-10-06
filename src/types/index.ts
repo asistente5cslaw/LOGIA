@@ -72,6 +72,7 @@ export interface Member {
   otherBodies?: string[];
   joinedAt: string;
   isActive: boolean;
+  deletedAt?: string;
   createdAt?: string;
   updatedAt?: string;
   // Validación de identidad y selfie de registro
@@ -92,6 +93,7 @@ export interface UserProfile {
   technicalRole: TechnicalRole;
   identityVerified: boolean;
   identityStatus: 'pending' | 'verified' | 'rejected' | 'not_started';
+  accessDisabled?: boolean;
   createdAt: string;
 }
 

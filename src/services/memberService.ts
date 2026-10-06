@@ -23,6 +23,7 @@ function mapSupabaseMember(d: Record<string, unknown>): Member {
     avatarUrl: value('avatar_url') as string | undefined,
     joinedAt: String(value('joined_at') || ''),
     isActive: Boolean(value('is_active')),
+    deletedAt: value('deleted_at') as string | undefined,
     createdAt: value('created_at') as string | undefined,
     updatedAt: value('updated_at') as string | undefined,
     identityVerified: value('identity_verified') as boolean | undefined,
@@ -78,11 +79,14 @@ export const memberService = {
     if (error) throw error;
   },
 
-  async getAllMembers(includeInactive = true): Promise<Member[]> {
+  async getAllMembers(includeInactive = true, includeDeleted = false): Promise<Member[]> {
     if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
 
     let membersFromDatabase: Member[] = [];
-    let query = supabase.from('members').select('*').is('deleted_at', null);
+    let query = supabase.from('members').select('*');
+      if (!includeDeleted) {
+        query = query.is('deleted_at', null);
+      }
       if (!includeInactive) {
         query = query.eq('is_active', true);
       }
@@ -254,6 +258,18 @@ export const memberService = {
       .eq('id', id);
     if (error) throw error;
     await auditService.log('BAJA_LOGICA_MIEMBRO', 'members', id, user, {});
+  },
+
+  async restoreMember(id: string, user: { id?: string; email?: string; name?: string }): Promise<void> {
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    const { error } = await supabase
+      .from('members')
+      .update({ is_active: true, deleted_at: null, updated_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) throw error;
+    await auditService.log('RESTAURAR_ACCESO_MIEMBRO', 'members', id, user, {
+      actorName: user.name,
+    });
   },
 
   async updateIdentityStatus(

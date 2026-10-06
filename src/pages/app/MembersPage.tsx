@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { memberService } from '@/services/memberService';
 import { authService } from '@/services/authService';
@@ -23,6 +23,7 @@ import {
   X,
   History,
   Clock,
+  RotateCcw,
 } from 'lucide-react';
 import { Modal } from '@/components/shared/Modal';
 import { AppleSelect, type AppleSelectOption } from '@/components/shared/AppleSelect';
@@ -108,19 +109,20 @@ export function MembersPage() {
 
   // El Secretario y el Venerable Maestro pueden validar identidades y selfies de registro
   const canValidateIdentity = isVenerableMaestro || isSecretario || canManageMembers;
+  const canViewDeletedMembers = isVenerableMaestro || isSecretario || user?.profile?.technicalRole === 'admin';
 
-  const loadMembers = async () => {
+  const loadMembers = useCallback(async () => {
     try {
-      const list = await memberService.getAllMembers(true);
+      const list = await memberService.getAllMembers(true, canViewDeletedMembers);
       setMembers(list);
     } catch {
       toast.error('Error al cargar miembros');
     }
-  };
+  }, [canViewDeletedMembers]);
 
   useEffect(() => {
-    loadMembers();
-  }, []);
+    void loadMembers();
+  }, [loadMembers]);
 
   useRealtimeRefresh(() => {
     void loadMembers();
@@ -352,6 +354,28 @@ export function MembersPage() {
     }
   };
 
+  const handleRestore = async (id: string, name: string) => {
+    const confirmed = await showConfirm({
+      title: 'Restaurar acceso',
+      message: `¿Confirmas que deseas restaurar el acceso de ${name}? Sus datos y credenciales se conservarán sin cambios.`,
+      confirmText: 'Restaurar acceso',
+      cancelText: 'Cancelar',
+      type: 'info',
+    });
+    if (!confirmed) return;
+    try {
+      await memberService.restoreMember(id, {
+        id: user?.id,
+        email: user?.email,
+        name: user?.displayName,
+      });
+      toast.success(`Acceso restaurado para ${name}`);
+      await loadMembers();
+    } catch {
+      toast.error('No se pudo restaurar el acceso. Solo un Venerable puede hacerlo.');
+    }
+  };
+
   return (
     <div className="space-y-4 sm:space-y-5 px-4 pt-2.5 pb-8 sm:py-6 md:px-8 max-w-6xl mx-auto">
       {/* Cabecera limpia y despejada */}
@@ -454,6 +478,7 @@ export function MembersPage() {
           <div className="divide-y divide-border">
             {filteredMembers.map((m) => {
               const role = institutionalRoles.find((r) => r.id === m.roleId);
+              const isDeleted = Boolean(m.deletedAt);
 
               const isPendingValidation = m.identityStatus === 'pending';
               const isVerified = m.identityStatus === 'verified';
@@ -531,8 +556,8 @@ export function MembersPage() {
 
                         {/* Condición de membresía discreta */}
                         {!m.isActive ? (
-                          <span className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium text-zinc-500">
-                            Inactivo
+                          <span className="inline-flex items-center gap-1 rounded-md bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700">
+                            {isDeleted ? 'Eliminado' : 'Inactivo'}
                           </span>
                         ) : m.condition !== 'activo' ? (
                           <span className="inline-flex items-center gap-1 rounded-md bg-purple-50 text-purple-700 px-1.5 py-0.5 text-[10px] font-medium">
@@ -610,7 +635,7 @@ export function MembersPage() {
 
                     {/* Botones de Edición y Baja */}
                     <div className="flex items-center gap-1">
-                      {canManageMembers && (
+                      {canManageMembers && !isDeleted && (
                         <button
                           type="button"
                           onClick={() => handleOpenEditModal(m)}
@@ -621,7 +646,7 @@ export function MembersPage() {
                         </button>
                       )}
 
-                      {canManageMembers && m.isActive && (
+                      {canManageMembers && m.isActive && !isDeleted && (
                         <button
                           type="button"
                           onClick={() => handleSoftDelete(m.id, `${m.firstName} ${m.lastName}`)}
@@ -629,6 +654,17 @@ export function MembersPage() {
                           title="Baja lógica"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+
+                      {isVenerableMaestro && isDeleted && (
+                        <button
+                          type="button"
+                          onClick={() => void handleRestore(m.id, `${m.firstName} ${m.lastName}`)}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors cursor-pointer active:scale-95 shadow-2xs"
+                          title="Restaurar acceso"
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
                         </button>
                       )}
                     </div>

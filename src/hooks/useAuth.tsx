@@ -57,6 +57,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             })
             .catch((e) => {
               console.warn('Error resolviendo perfil en onAuthStateChange:', e);
+              setUser(null);
+              void supabase.auth.signOut().catch((signOutError) => {
+                console.warn('No se pudo cerrar la sesión bloqueada:', signOutError);
+              });
             })
             .finally(() => {
               setIsLoading(false);
@@ -104,8 +108,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (current) setUser(current);
     } catch (e) {
       console.warn('Error al refrescar usuario:', e);
+      setUser(null);
+      if (isSupabaseConfigured()) {
+        await supabase.auth.signOut().catch((signOutError) => {
+          console.warn('No se pudo cerrar la sesión bloqueada:', signOutError);
+        });
+      }
     }
   }, []);
+
+  useEffect(() => {
+    if (!user?.id || !isSupabaseConfigured()) return undefined;
+
+    const channel = supabase
+      .channel(`profile-access-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` },
+        () => {
+          void refreshUser();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [user?.id, refreshUser]);
 
   const hasPermission = useCallback(
     (permission: Permission): boolean => {

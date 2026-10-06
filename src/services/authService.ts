@@ -17,6 +17,7 @@ interface ProfileRow {
   technical_role?: UserProfile['technicalRole'];
   identity_verified?: boolean;
   identity_status?: UserProfile['identityStatus'];
+  access_disabled?: boolean;
   created_at: string;
 }
 
@@ -211,7 +212,13 @@ export const authService = {
         throw new Error('Credenciales incorrectas o usuario no encontrado.');
       }
 
-      const profile = await this.fetchProfile(data.user.id, data.user.email || cleanEmail);
+      let profile: UserProfile;
+      try {
+        profile = await this.fetchProfile(data.user.id, data.user.email || cleanEmail);
+      } catch (error) {
+        await supabase.auth.signOut();
+        throw error;
+      }
       const user: User = {
         id: data.user.id,
         email: data.user.email || cleanEmail,
@@ -273,7 +280,13 @@ export const authService = {
       }
 
       // El trigger de Supabase crea el perfil y consume la invitación atómicamente si existe.
-      const profile = await this.fetchProfile(data.user.id, cleanEmail);
+      let profile: UserProfile;
+      try {
+        profile = await this.fetchProfile(data.user.id, cleanEmail);
+      } catch (error) {
+        await supabase.auth.signOut();
+        throw error;
+      }
 
       const user: User = {
         id: data.user.id,
@@ -319,7 +332,13 @@ export const authService = {
     if (error) throw error;
     if (!data.session?.user) return null;
     const u = data.session.user;
-    const profile = await this.fetchProfile(u.id, u.email || '');
+    let profile: UserProfile;
+    try {
+      profile = await this.fetchProfile(u.id, u.email || '');
+    } catch (error) {
+      await supabase.auth.signOut();
+      throw error;
+    }
     return { id: u.id, email: u.email || '', memberId: profile.memberId, displayName: profile.displayName, isAuthenticated: true, profile };
   },
 
@@ -337,6 +356,9 @@ export const authService = {
 
         if (error) throw error;
         if (data) {
+          if (data.access_disabled) {
+            throw new Error('Esta cuenta fue dada de baja y ya no tiene acceso al sistema.');
+          }
           return {
             id: data.id,
             email: data.email || defaultEmail,
@@ -346,6 +368,7 @@ export const authService = {
             technicalRole: data.technical_role || 'member',
             identityVerified: data.identity_verified ?? true,
             identityStatus: data.identity_status || 'verified',
+            accessDisabled: data.access_disabled ?? false,
             createdAt: data.created_at,
           };
         }
