@@ -322,6 +322,19 @@ export const memberService = {
           .update(payload)
           .eq('id', memberId);
       if (error) throw error;
+
+      // La pantalla de acceso restringido consulta el estado en profiles.
+      // Mantener ambos registros sincronizados permite liberar el acceso
+      // inmediatamente después de aprobar la identidad.
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          identity_status: status,
+          identity_verified: status === 'verified',
+          updated_at: now,
+        })
+        .or(`member_id.eq.${memberId},id.eq.${memberId}`);
+      if (profileError) throw profileError;
     }
 
     const members = await this.getAllMembers(true, false, true);

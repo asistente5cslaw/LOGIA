@@ -336,7 +336,7 @@ class PushNotificationService {
       url: '/app/miembros',
       tag: `nuevo-registro-${email.toLowerCase()}`,
       type: 'nuevo_registro',
-      recipientRoles: ['vm', 'sec'],
+      recipientRoles: ['vm', 'sec', 'adm'],
     });
   }
 

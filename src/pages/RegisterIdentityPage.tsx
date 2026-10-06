@@ -77,10 +77,13 @@ export function RegisterIdentityPage() {
 
       // Avisar únicamente a Venerables y Secretarios; un fallo del push no invalida el registro.
       try {
-        await pushNotificationService.notifyNewRegistration(
+        const notificationResult = await pushNotificationService.notifyNewRegistration(
           `${pendingData.firstName.trim()} ${pendingData.lastName.trim()}`,
           pendingData.email.trim().toLowerCase()
         );
+        if (notificationResult.sent === 0) {
+          console.warn('Registro creado, pero no hay dispositivos push activos para Venerables, Secretarios o Administradores.');
+        }
       } catch (notificationError) {
         console.warn('No se pudo avisar a Venerables/Secretarios del nuevo registro:', notificationError);
       }

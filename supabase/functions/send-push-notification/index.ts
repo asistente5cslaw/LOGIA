@@ -35,8 +35,8 @@ Deno.serve(async (request) => {
       const { data: recipients, error: recipientsError } = await admin
         .from('profiles')
         .select('id')
-        .in('role_id', ['vm', 'sec'])
-        .eq('access_disabled', false);
+        .in('role_id', ['vm', 'sec', 'adm'])
+        .or('access_disabled.eq.false,access_disabled.is.null');
       if (recipientsError) throw recipientsError;
       const recipientIds = (recipients || []).map((recipient) => recipient.id);
       if (recipientIds.length === 0) return response({ sent: 0, removed: 0 });
@@ -46,7 +46,7 @@ Deno.serve(async (request) => {
         .from('profiles')
         .select('id')
         .in('role_id', recipientRoles)
-        .eq('access_disabled', false);
+        .or('access_disabled.eq.false,access_disabled.is.null');
       if (recipientsError) throw recipientsError;
       const recipientIds = (recipients || []).map((recipient) => recipient.id);
       if (recipientIds.length === 0) return response({ sent: 0, removed: 0 });

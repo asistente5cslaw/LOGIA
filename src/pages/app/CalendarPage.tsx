@@ -1174,14 +1174,16 @@ export function CalendarPage() {
                 </button>
               </div>
 
-              <button
-                type="button"
-                onClick={handleSendConvocation}
-                className="flex min-h-[40px] items-center gap-1.5 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary-pressed shadow-sm"
-              >
-                <Send className="h-4 w-4" />
-                Marcar Convocada
-              </button>
+              {convocationEvent.status !== 'convocada' && (
+                <button
+                  type="button"
+                  onClick={handleSendConvocation}
+                  className="flex min-h-[40px] items-center gap-1.5 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary-pressed shadow-sm"
+                >
+                  <Send className="h-4 w-4" />
+                  Marcar Convocada
+                </button>
+              )}
             </div>
           </div>
         )}
