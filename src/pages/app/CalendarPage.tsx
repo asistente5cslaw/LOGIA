@@ -366,6 +366,29 @@ export function CalendarPage() {
     setShowConvocationModal(true);
   };
 
+  const handleConvocationStatusChange = async (status: EventStatus) => {
+    if (!convocationEvent || status === convocationEvent.status) return;
+
+    if (status === 'cancelada') {
+      setPendingCancellation({ ...convocationEvent, status: 'cancelada', updatedAt: new Date().toISOString() });
+      setShowConvocationModal(false);
+      setShowCancellationModal(true);
+      return;
+    }
+
+    try {
+      await eventService.updateEventStatus(convocationEvent.id, status, {
+        id: user?.id,
+        email: user?.email,
+      });
+      setConvocationEvent({ ...convocationEvent, status });
+      toast.success(`Estado actualizado a “${eventStatusLabel(status)}”`);
+      loadData();
+    } catch {
+      toast.error('No se pudo actualizar el estado de la tenida');
+    }
+  };
+
   const handleCopyConvocation = () => {
     navigator.clipboard.writeText(convocationText);
     setCopied(true);
@@ -1091,6 +1114,13 @@ export function CalendarPage() {
                 {institutionalRoles.find((role) => role.id === convocationEvent.roleRequired)?.name || 'Todos los miembros'}
               </span>
             </div>
+
+            <AppleSelect<EventStatus>
+              label="Estado de la tenida"
+              value={convocationEvent.status}
+              onChange={handleConvocationStatusChange}
+              options={eventStatusOptions}
+            />
 
             <textarea
               rows={9}
