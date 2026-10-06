@@ -6,7 +6,8 @@ export interface PushNotificationPayload {
   body: string;
   url?: string;
   tag?: string;
-  type?: 'convocatoria' | 'trazado' | 'aviso';
+  type?: 'convocatoria' | 'trazado' | 'aviso' | 'nuevo_registro';
+  recipientRoles?: string[];
 }
 
 export interface LodgeNotificationItem {
@@ -17,7 +18,7 @@ export interface LodgeNotificationItem {
   time: string;
   timestamp: number;
   read: boolean;
-  type: 'convocatoria' | 'trazado' | 'aviso';
+  type: 'convocatoria' | 'trazado' | 'aviso' | 'nuevo_registro';
 }
 
 const STORAGE_KEY = 'lodge_notifications_list';
@@ -326,6 +327,17 @@ class PushNotificationService {
     const { data, error } = await supabase.functions.invoke('send-push-notification', { body: payload });
     if (error) throw error;
     return { sent: Number(data?.sent || 0), removed: Number(data?.removed || 0) };
+  }
+
+  public async notifyNewRegistration(displayName: string, email: string): Promise<{ sent: number; removed: number }> {
+    return this.sendPushToAll({
+      title: 'Nuevo registro pendiente',
+      body: `${displayName} (${email}) se registró. Revisa su identidad y asigna el rol correspondiente.`,
+      url: '/app/miembros',
+      tag: `nuevo-registro-${email.toLowerCase()}`,
+      type: 'nuevo_registro',
+      recipientRoles: ['vm', 'sec'],
+    });
   }
 
   /**

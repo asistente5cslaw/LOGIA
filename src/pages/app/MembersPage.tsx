@@ -113,12 +113,12 @@ export function MembersPage() {
 
   const loadMembers = useCallback(async () => {
     try {
-      const list = await memberService.getAllMembers(true, canViewDeletedMembers);
+      const list = await memberService.getAllMembers(true, canViewDeletedMembers, canValidateIdentity);
       setMembers(list);
     } catch {
       toast.error('Error al cargar miembros');
     }
-  }, [canViewDeletedMembers]);
+  }, [canViewDeletedMembers, canValidateIdentity]);
 
   useEffect(() => {
     void loadMembers();
@@ -515,10 +515,10 @@ export function MembersPage() {
                     {/* Avatar o Selfie de Registro */}
                     <div
                       onClick={() => handleOpenValidationModal(m)}
-                      className="relative h-12 w-12 shrink-0 rounded-2xl overflow-hidden border border-border bg-surface shadow-2xs cursor-pointer group flex items-center justify-center transition-transform active:scale-95"
-                      title="Ver validación de identidad"
+                      className={`relative h-12 w-12 shrink-0 rounded-2xl overflow-hidden border border-border bg-surface shadow-2xs flex items-center justify-center transition-transform ${canValidateIdentity ? 'cursor-pointer group active:scale-95' : ''}`}
+                      title={canValidateIdentity ? 'Ver validación de identidad' : undefined}
                     >
-                      {m.selfieUrl ? (
+                      {canValidateIdentity && m.selfieUrl ? (
                         <img
                           src={m.selfieUrl}
                           alt={`${m.firstName} ${m.lastName}`}
@@ -550,7 +550,7 @@ export function MembersPage() {
                       <div className="flex flex-wrap items-center gap-1.5">
                         <h4
                           onClick={() => handleOpenValidationModal(m)}
-                          className="font-serif text-sm sm:text-base font-bold text-ink leading-tight hover:text-primary transition-colors cursor-pointer"
+                          className={`font-serif text-sm sm:text-base font-bold text-ink leading-tight ${canValidateIdentity ? 'hover:text-primary transition-colors cursor-pointer' : ''}`}
                         >
                           {m.firstName} {m.lastName}
                         </h4>
@@ -711,7 +711,7 @@ export function MembersPage() {
       <Modal
         isOpen={Boolean(validatingMember)}
         onClose={() => setValidatingMember(null)}
-        title="Validación de Identidad y Registro Facial"
+        title={validatingMember?.identityStatus === 'verified' ? 'Identidad verificada' : 'Validación de Identidad y Registro Facial'}
         maxWidth="md"
       >
         {validatingMember && (
@@ -806,7 +806,7 @@ export function MembersPage() {
                 Cerrar
               </button>
 
-              {canValidateIdentity && (
+              {canValidateIdentity && validatingMember.identityStatus !== 'verified' && (
                 <div className="flex items-center gap-2 w-full sm:w-auto">
                   <button
                     type="button"
@@ -1012,7 +1012,7 @@ export function MembersPage() {
             {/* Tarjeta Resumen del Hermano */}
             <div className="flex items-center gap-3 p-3 rounded-2xl bg-surface-container-low border border-border">
               <div className="h-11 w-11 shrink-0 rounded-xl overflow-hidden border border-border bg-surface flex items-center justify-center font-serif font-bold text-primary text-sm shadow-2xs">
-                {roleModalMember.selfieUrl ? (
+                {canValidateIdentity && roleModalMember.selfieUrl ? (
                   <img
                     src={roleModalMember.selfieUrl}
                     alt={roleModalMember.firstName}
@@ -1026,10 +1026,7 @@ export function MembersPage() {
                 <p className="text-xs font-bold text-ink truncate">
                   {roleModalMember.firstName} {roleModalMember.lastName}
                 </p>
-                <p className="text-[11px] text-ink-muted truncate">
-                  {roleModalMember.email} • Grado:{' '}
-                  <span className="capitalize font-medium text-ink-secondary">{roleModalMember.degree}</span>
-                </p>
+                <p className="text-[11px] text-ink-muted truncate">{roleModalMember.email}</p>
               </div>
             </div>
 

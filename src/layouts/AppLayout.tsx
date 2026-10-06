@@ -10,6 +10,7 @@ import {
   Shield,
   Menu,
   Smartphone,
+  ShieldAlert,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -46,6 +47,20 @@ export function AppLayout() {
   const [isCollapsed, setIsCollapsed] = useState(() => {
     return localStorage.getItem('sidebar_collapsed') === 'true';
   });
+  const isIdentityRestricted = Boolean(
+    user?.profile &&
+    user.profile.identityStatus !== 'verified' &&
+    user.profile.roleId !== 'vm' &&
+    user.profile.roleId !== 'sec' &&
+    user.profile.technicalRole !== 'admin'
+  );
+
+  const visibleDesktopNavItems = isIdentityRestricted
+    ? desktopNavItems.filter((item) => item.to === '/app')
+    : desktopNavItems;
+  const visibleMobileNavItems = isIdentityRestricted
+    ? mobileNavItems.filter((item) => item.to === '/app')
+    : mobileNavItems;
 
   useEffect(() => {
     if (sessionStorage.getItem('reopen_icon_selector') === 'true') {
@@ -147,7 +162,7 @@ export function AppLayout() {
 
         {/* Lista de navegación fija sin scroll */}
         <nav className="flex flex-1 flex-col gap-1 p-3 overflow-hidden">
-          {desktopNavItems.map(({ to, label, icon: Icon, end }) => (
+          {visibleDesktopNavItems.map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}
@@ -293,13 +308,17 @@ export function AppLayout() {
 
         {/* Contenido de página con scroll */}
         <main className="mobile-scroll-content flex-1 overflow-y-auto md:pb-6">
-          <Outlet />
+          {isIdentityRestricted ? (
+            <RestrictedAccessScreen status={user?.profile?.identityStatus} />
+          ) : (
+            <Outlet />
+          )}
         </main>
       </div>
 
       {/* Barra de navegación inferior móvil */}
       <nav className="fixed bottom-0 left-0 right-0 z-30 flex items-center justify-around border-t border-border bg-white safe-area-bottom md:hidden shadow-lg">
-        {mobileNavItems.map(({ to, label, icon: Icon, end }) => (
+        {visibleMobileNavItems.map(({ to, label, icon: Icon, end }) => (
           <NavLink
             key={to}
             to={to}
@@ -316,6 +335,33 @@ export function AppLayout() {
           </NavLink>
         ))}
       </nav>
+    </div>
+  );
+}
+
+function RestrictedAccessScreen({ status }: { status?: 'pending' | 'verified' | 'rejected' | 'not_started' }) {
+  const isRejected = status === 'rejected';
+
+  return (
+    <div className="flex min-h-full items-center justify-center px-4 py-10 sm:px-6">
+      <section className="w-full max-w-xl rounded-3xl border border-border bg-white p-6 text-center shadow-xs sm:p-10">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-50 text-amber-700">
+          <ShieldAlert className="h-8 w-8" />
+        </div>
+        <h1 className="mt-5 font-serif text-2xl font-bold text-ink">
+          {isRejected ? 'Se requiere una nueva validación' : 'Registro pendiente de validación'}
+        </h1>
+        <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-ink-secondary">
+          {isRejected
+            ? 'Tu selfie fue devuelta por Secretaría. Completa la nueva captura solicitada para recuperar el acceso a la información de la logia.'
+            : 'Puedes acceder al sistema, pero el calendario, las actas, la asistencia y el directorio permanecerán ocultos hasta que un Venerable o Secretario apruebe tu identidad.'}
+        </p>
+        <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-left text-xs leading-5 text-amber-900">
+          {isRejected
+            ? 'La ventana de captura aparecerá automáticamente para completar la nueva selfie.'
+            : 'Recibirás acceso automáticamente cuando tu identidad sea aprobada. No necesitas volver a registrarte.'}
+        </div>
+      </section>
     </div>
   );
 }

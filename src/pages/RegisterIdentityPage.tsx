@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import type { BiometricValidationResult } from '@/services/identityService';
 import { memberService } from '@/services/memberService';
 import { Shield, AlertCircle, Loader2 } from 'lucide-react';
+import { pushNotificationService } from '@/services/pushNotificationService';
 
 interface PendingRegistration {
   firstName: string;
@@ -73,6 +74,16 @@ export function RegisterIdentityPage() {
 
       // 3. Iniciar sesión automáticamente
       await login(pendingData.email, pendingData.password);
+
+      // Avisar únicamente a Venerables y Secretarios; un fallo del push no invalida el registro.
+      try {
+        await pushNotificationService.notifyNewRegistration(
+          `${pendingData.firstName.trim()} ${pendingData.lastName.trim()}`,
+          pendingData.email.trim().toLowerCase()
+        );
+      } catch (notificationError) {
+        console.warn('No se pudo avisar a Venerables/Secretarios del nuevo registro:', notificationError);
+      }
 
       // 4. Limpiar datos temporales
       sessionStorage.removeItem('logia_reg_pending');

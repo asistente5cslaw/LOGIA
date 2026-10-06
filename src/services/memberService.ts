@@ -79,11 +79,13 @@ export const memberService = {
     if (error) throw error;
   },
 
-  async getAllMembers(includeInactive = true, includeDeleted = false): Promise<Member[]> {
+  async getAllMembers(includeInactive = true, includeDeleted = false, includeIdentity = false): Promise<Member[]> {
     if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
 
     let membersFromDatabase: Member[] = [];
-    let query = supabase.from('members').select('*');
+    let query = includeIdentity
+      ? supabase.from('members').select('*')
+      : supabase.from('members').select('id, first_name, last_name, email, phone, role_id, degree, condition, mother_lodge, initiation_date, passing_date, raising_date, diploma_number, passport_number, other_bodies, avatar_url, joined_at, is_active, deleted_at, identity_verified, identity_status, identity_validated_at, identity_validated_by, identity_notes, created_at, updated_at');
       if (!includeDeleted) {
         query = query.is('deleted_at', null);
       }
@@ -121,7 +123,7 @@ export const memberService = {
   },
 
   async getMemberById(id: string): Promise<Member | undefined> {
-    const list = await this.getAllMembers(true);
+    const list = await this.getAllMembers(true, false, true);
     return list.find((m) => m.id === id);
   },
 
@@ -309,7 +311,7 @@ export const memberService = {
       if (error) throw error;
     }
 
-    const members = await this.getAllMembers(true);
+    const members = await this.getAllMembers(true, false, true);
     const member = members.find((m) => m.id === memberId);
     if (!member) {
       throw new Error('Miembro no encontrado');

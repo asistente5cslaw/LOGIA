@@ -12,17 +12,47 @@ Deno.serve(async (request) => {
     const { data: { user } } = await admin.auth.getUser(authHeader.replace('Bearer ', ''));
     if (!user) return response({ error: 'No autenticado' }, 401);
 
-    const { data: profile } = await admin.from('profiles').select('technical_role, role_id').eq('id', user.id).maybeSingle();
+    const { data: profile } = await admin.from('profiles').select('technical_role, role_id, access_disabled').eq('id', user.id).maybeSingle();
+    if (profile?.access_disabled) return response({ error: 'Cuenta deshabilitada' }, 403);
+    const requestPayload = await request.json() as {
+      recipientRoles?: string[];
+      type?: string;
+      [key: string]: unknown;
+    };
+    const isNewRegistrationNotice = requestPayload.type === 'nuevo_registro';
     const allowed = profile && ['admin', 'secretary'].includes(profile.technical_role) || profile?.role_id === 'vm' || profile?.role_id === 'sec';
-    if (!allowed) return response({ error: 'No autorizado' }, 403);
+    if (!allowed && !isNewRegistrationNotice) return response({ error: 'No autorizado' }, 403);
 
     webpush.setVapidDetails(
       Deno.env.get('VAPID_SUBJECT') || 'mailto:secretaria@unionfraternal21.org',
       Deno.env.get('VAPID_PUBLIC_KEY')!,
       Deno.env.get('VAPID_PRIVATE_KEY')!,
     );
-    const payload = JSON.stringify(await request.json());
-    const { data: subscriptions, error } = await admin.from('push_subscriptions').select('id, endpoint, expiration_time, p256dh, auth');
+    const { recipientRoles, ...notificationPayload } = requestPayload;
+    const payload = JSON.stringify(notificationPayload);
+    let subscriptionsQuery = admin.from('push_subscriptions').select('id, endpoint, expiration_time, p256dh, auth, user_id');
+    if (isNewRegistrationNotice) {
+      const { data: recipients, error: recipientsError } = await admin
+        .from('profiles')
+        .select('id')
+        .in('role_id', ['vm', 'sec'])
+        .eq('access_disabled', false);
+      if (recipientsError) throw recipientsError;
+      const recipientIds = (recipients || []).map((recipient) => recipient.id);
+      if (recipientIds.length === 0) return response({ sent: 0, removed: 0 });
+      subscriptionsQuery = subscriptionsQuery.in('user_id', recipientIds);
+    } else if (recipientRoles && recipientRoles.length > 0) {
+      const { data: recipients, error: recipientsError } = await admin
+        .from('profiles')
+        .select('id')
+        .in('role_id', recipientRoles)
+        .eq('access_disabled', false);
+      if (recipientsError) throw recipientsError;
+      const recipientIds = (recipients || []).map((recipient) => recipient.id);
+      if (recipientIds.length === 0) return response({ sent: 0, removed: 0 });
+      subscriptionsQuery = subscriptionsQuery.in('user_id', recipientIds);
+    }
+    const { data: subscriptions, error } = await subscriptionsQuery;
     if (error) throw error;
     let sent = 0;
     let removed = 0;
