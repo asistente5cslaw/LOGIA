@@ -52,7 +52,7 @@ const roleOptions: AppleSelectOption<InstitutionalRoleCode>[] = institutionalRol
 type FilterTab = 'todos' | 'pendientes' | 'aprendiz' | 'companero' | 'maestro';
 
 export function MembersPage() {
-  const { user, hasPermission } = useAuth();
+  const { user, hasPermission, refreshUser } = useAuth();
   const { showConfirm } = useAppleDialog();
   const [members, setMembers] = useState<Member[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -124,7 +124,8 @@ export function MembersPage() {
       await authService.updateUserRole(roleModalMember.email, roleModalSelectedId);
       toast.success(`Cargo asignado a ${roleModalMember.firstName} ${roleModalMember.lastName}`);
       setRoleModalMember(null);
-      loadMembers();
+      await loadMembers();
+      await refreshUser();
     } catch {
       toast.error('Error al actualizar el cargo del hermano');
     } finally {
@@ -261,7 +262,8 @@ export function MembersPage() {
 
       toast.success('Ficha y rol del hermano actualizados');
       setShowMemberModal(false);
-      loadMembers();
+      await loadMembers();
+      await refreshUser();
     } catch {
       toast.error('Error al guardar datos del miembro');
     }

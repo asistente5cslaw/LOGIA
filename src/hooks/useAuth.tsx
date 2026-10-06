@@ -17,6 +17,7 @@ const defaultAuthContext: AuthContextValue = {
   hasPermission: () => false,
   isSecretaryOrVM: false,
   userRoleName: 'Hermano',
+  refreshUser: async () => {},
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -97,6 +98,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await authService.resetPassword(email);
   };
 
+  const refreshUser = useCallback(async () => {
+    try {
+      const current = await authService.getCurrentSessionUser();
+      if (current) setUser(current);
+    } catch (e) {
+      console.warn('Error al refrescar usuario:', e);
+    }
+  }, []);
+
   const hasPermission = useCallback(
     (permission: Permission): boolean => {
       if (!user) return false;
@@ -127,6 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         hasPermission,
         isSecretaryOrVM,
         userRoleName,
+        refreshUser,
       }}
     >
       {children}

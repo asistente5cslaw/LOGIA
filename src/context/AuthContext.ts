@@ -17,6 +17,7 @@ export interface AuthContextValue {
   hasPermission: (permission: Permission) => boolean;
   isSecretaryOrVM: boolean;
   userRoleName: string;
+  refreshUser: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextValue | undefined>(undefined);

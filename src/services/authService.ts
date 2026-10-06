@@ -611,6 +611,7 @@ export const authService = {
 
     if (isSupabaseConfigured()) {
       try {
+        // Actualizar en profiles
         await supabase
           .from('profiles')
           .update({
@@ -620,6 +621,16 @@ export const authService = {
           .eq('email', email.trim().toLowerCase());
       } catch (e) {
         console.warn('Error actualizando rol en Supabase profiles:', e);
+      }
+
+      try {
+        // También actualizar en members (si el hermano tiene registro ahí)
+        await supabase
+          .from('members')
+          .update({ role_id: roleId, updated_at: new Date().toISOString() })
+          .eq('email', email.trim().toLowerCase());
+      } catch (e) {
+        console.warn('Error actualizando rol en Supabase members:', e);
       }
     }
 

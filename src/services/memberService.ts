@@ -73,7 +73,7 @@ function mapProfileAsMember(profile: any): Member {
     firstName,
     lastName,
     email: profile.email,
-    roleId: profile.role_id || 'her',
+    roleId: profile.role_id || 'apr',
     degree: 'aprendiz',
     condition: 'activo',
     motherLodge: 'Resp.·. Log.·. Unión Fraternal No. 21',
@@ -233,12 +233,79 @@ export const memberService = {
     roleId: InstitutionalRoleCode,
     user: { id?: string; email?: string }
   ): Promise<Member> {
-    const members = await this.getAllMembers(true);
-    const member = members.find((m) => m.id === memberId);
-    if (!member) throw new Error('Miembro no encontrado');
-    member.roleId = roleId;
-    member.updatedAt = new Date().toISOString();
-    return this.saveMember(member, user);
+    const now = new Date().toISOString();
+
+    if (isSupabaseConfigured()) {
+      // 1. Actualizar en la tabla members (si existe ese registro)
+      try {
+        await supabase
+          .from('members')
+          .update({ role_id: roleId, updated_at: now })
+          .eq('id', memberId);
+      } catch (e) {
+        console.warn('Error actualizando role_id en members:', e);
+      }
+
+      // 2. Actualizar en la tabla profiles (por member_id o id)
+      try {
+        await supabase
+          .from('profiles')
+          .update({ role_id: roleId })
+          .or(`member_id.eq.${memberId},id.eq.${memberId}`);
+      } catch (e) {
+        console.warn('Error actualizando role_id en profiles:', e);
+      }
+    }
+
+    // 3. Actualizar en localStorage (modo local)
+    try {
+      const raw = localStorage.getItem(LOCAL_MEMBERS_KEY);
+      if (raw) {
+        const list = JSON.parse(raw) as Member[];
+        const idx = list.findIndex((m) => m.id === memberId);
+        if (idx >= 0) {
+          list[idx].roleId = roleId;
+          list[idx].updatedAt = now;
+          localStorage.setItem(LOCAL_MEMBERS_KEY, JSON.stringify(list));
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    // 4. Sincronizar sesión activa si el miembro modificado es el usuario logueado
+    try {
+      const raw = localStorage.getItem('logia_session_backup');
+      if (raw) {
+        const sessionUser = JSON.parse(raw);
+        if (sessionUser?.memberId === memberId && sessionUser.profile) {
+          sessionUser.profile.roleId = roleId;
+          localStorage.setItem('logia_session_backup', JSON.stringify(sessionUser));
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    await auditService.log('CAMBIAR_ROL_MIEMBRO', 'members', memberId, user, { roleId });
+
+    // Devolver el miembro actualizado
+    const allMembers = await this.getAllMembers(true);
+    const updated = allMembers.find((m) => m.id === memberId);
+    if (updated) return updated;
+
+    // Fallback mínimo si no se encuentra tras el update
+    return {
+      id: memberId,
+      roleId,
+      firstName: '',
+      lastName: '',
+      email: '',
+      degree: 'aprendiz',
+      condition: 'activo',
+      joinedAt: now,
+      isActive: true,
+    };
   },
 
   async softDeleteMember(id: string, user: { id?: string; email?: string }): Promise<void> {
