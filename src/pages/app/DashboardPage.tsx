@@ -22,6 +22,9 @@ export function DashboardPage() {
   const [events, setEvents] = useState<LodgeEvent[]>([]);
   const [conflicts, setConflicts] = useState<EventConflict[]>([]);
   const [pendingExcuseEvents, setPendingExcuseEvents] = useState<LodgeEvent[]>([]);
+  const [ownMemberId, setOwnMemberId] = useState<string | null>(null);
+  const [excuseDrafts, setExcuseDrafts] = useState<Record<string, string>>({});
+  const [savingExcuseEventId, setSavingExcuseEventId] = useState<string | null>(null);
   const [stats, setStats] = useState({
     activeCount: 0,
     upcomingMeetingsCount: 0,
@@ -44,6 +47,7 @@ export function DashboardPage() {
       const ownMemberId = user?.memberId || memList.find(
         (member) => member.email.toLowerCase() === user?.email?.toLowerCase()
       )?.id;
+      setOwnMemberId(ownMemberId || null);
       if (ownMemberId) {
         const pendingExcuses = await attendanceService.getPendingExcusesForMember(ownMemberId);
         const pendingIds = new Set(pendingExcuses.map((item) => item.eventId));
@@ -88,6 +92,30 @@ export function DashboardPage() {
 
   const nextMeeting = upcomingEvents[0];
   const nextMeetingBody = nextMeeting ? getBodyById(nextMeeting.bodyId) : null;
+
+  const handleSaveDashboardExcuse = async (eventId: string) => {
+    const reason = excuseDrafts[eventId]?.trim();
+    if (!ownMemberId || !reason) return;
+
+    setSavingExcuseEventId(eventId);
+    try {
+      await attendanceService.saveMemberExcuse(eventId, ownMemberId, reason, {
+        id: user?.id,
+        email: user?.email,
+      });
+      setPendingExcuseEvents((previous) => previous.filter((event) => event.id !== eventId));
+      setExcuseDrafts((previous) => {
+        const next = { ...previous };
+        delete next[eventId];
+        return next;
+      });
+    } catch (error) {
+      console.error('Error guardando excusa desde el inicio:', error);
+    } finally {
+      setSavingExcuseEventId(null);
+    }
+  };
+
   return (
     <div className="space-y-4 sm:space-y-6 px-4 pt-2.5 pb-6 sm:py-6 md:px-8 max-w-6xl mx-auto">
       {/* Cabecera Fraternal */}
@@ -131,19 +159,32 @@ export function DashboardPage() {
 
       {pendingExcuseEvents.length > 0 && (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-xs">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h3 className="text-sm font-semibold text-amber-900">Tienes una excusa pendiente</h3>
-              <p className="mt-1 text-xs text-amber-800">
-                Debes explicar tu excusa para: {pendingExcuseEvents.map((event) => event.title).join(', ')}.
-              </p>
-            </div>
-            <Link
-              to="/app/asistencia"
-              className="inline-flex min-h-[38px] items-center justify-center rounded-xl bg-amber-700 px-4 text-xs font-semibold text-white hover:bg-amber-800"
-            >
-              Escribir mi excusa
-            </Link>
+          <h3 className="text-sm font-semibold text-amber-900">Tienes una excusa pendiente</h3>
+          <div className="mt-3 space-y-3">
+            {pendingExcuseEvents.map((event) => (
+              <div key={event.id} className="rounded-xl border border-amber-200 bg-white/70 p-3">
+                <p className="text-xs text-amber-800">
+                  Explica tu excusa para <span className="font-semibold">{event.title}</span>:
+                </p>
+                <textarea
+                  value={excuseDrafts[event.id] || ''}
+                  onChange={(e) => setExcuseDrafts((previous) => ({ ...previous, [event.id]: e.target.value }))}
+                  placeholder="Escribe aquí el motivo de tu excusa..."
+                  rows={3}
+                  className="mt-2 w-full resize-y rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm text-ink outline-none placeholder:text-ink-muted focus:border-amber-500 focus:ring-2 focus:ring-amber-200"
+                />
+                <div className="mt-2 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => void handleSaveDashboardExcuse(event.id)}
+                    disabled={!excuseDrafts[event.id]?.trim() || savingExcuseEventId === event.id}
+                    className="inline-flex min-h-[38px] items-center justify-center rounded-xl bg-amber-700 px-4 text-xs font-semibold text-white hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {savingExcuseEventId === event.id ? 'Guardando...' : 'Guardar excusa'}
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
