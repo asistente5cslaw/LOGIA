@@ -100,8 +100,15 @@ export const memberService = {
     if (profilesError) throw profilesError;
     if (profiles) {
       const knownEmails = new Set(membersFromDatabase.map((m) => m.email.toLowerCase()));
+      const visibleMemberIds = new Set(membersFromDatabase.map((m) => m.id));
       const profileMembers = profiles
-        .filter((profile) => profile.email && !knownEmails.has(String(profile.email).toLowerCase()))
+        .filter((profile) => {
+          if (!profile.email || knownEmails.has(String(profile.email).toLowerCase())) return false;
+          // Un perfil vinculado a un miembro dado de baja no debe reaparecer
+          // como si fuera un registro independiente.
+          if (profile.member_id && !visibleMemberIds.has(String(profile.member_id))) return false;
+          return true;
+        })
         .map(mapProfileAsMember);
       membersFromDatabase = [...membersFromDatabase, ...profileMembers];
     }

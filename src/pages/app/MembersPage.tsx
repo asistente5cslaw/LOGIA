@@ -279,7 +279,8 @@ export function MembersPage() {
     try {
       await memberService.softDeleteMember(id, { id: user?.id, email: user?.email });
       toast.info(`Baja lógica registrada para ${name}`);
-      loadMembers();
+      setMembers((current) => current.filter((member) => member.id !== id));
+      await loadMembers();
     } catch {
       toast.error('Error al dar de baja');
     }

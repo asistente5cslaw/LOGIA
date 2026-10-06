@@ -17,6 +17,7 @@ import { LodgeLogo } from '@/components/shared/LodgeLogo';
 import { NotificationButton } from '@/components/shared/NotificationButton';
 import { useAppleDialog } from '@/components/shared/AppleDialog';
 import { AppIconSelectorModal } from '@/components/shared/AppIconSelectorModal';
+import { IdentityRevalidationModal } from '@/components/shared/IdentityRevalidationModal';
 
 const desktopNavItems = [
   { to: '/app', label: 'Inicio', icon: Home, end: true },
@@ -80,6 +81,7 @@ export function AppLayout() {
         isOpen={isIconModalOpen}
         onClose={() => setIsIconModalOpen(false)}
       />
+      <IdentityRevalidationModal />
 
       {/* Barra lateral escritorio fija */}
       <aside
