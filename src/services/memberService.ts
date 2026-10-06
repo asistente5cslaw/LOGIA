@@ -2,16 +2,23 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import type { Member, MasonicDegree, MemberStatusCondition, InstitutionalRoleCode } from '@/types';
 import { auditService } from './auditService';
 
+function degreeForRole(roleId: InstitutionalRoleCode): MasonicDegree {
+  if (roleId === 'apr' || roleId === 'her') return 'aprendiz';
+  if (roleId === 'comp') return 'companero';
+  return 'maestro';
+}
+
 function mapSupabaseMember(d: Record<string, unknown>): Member {
   const value = (key: string) => d[key];
+  const roleId = value('role_id') as InstitutionalRoleCode;
   return {
     id: String(value('id')),
     firstName: String(value('first_name') || ''),
     lastName: String(value('last_name') || ''),
     email: String(value('email') || ''),
     phone: value('phone') as string | undefined,
-    roleId: value('role_id') as InstitutionalRoleCode,
-    degree: value('degree') as MasonicDegree,
+    roleId,
+    degree: degreeForRole(roleId),
     condition: value('condition') as MemberStatusCondition,
     motherLodge: value('mother_lodge') as string | undefined,
     initiationDate: value('initiation_date') as string | undefined,
@@ -41,13 +48,15 @@ function mapProfileAsMember(profile: Record<string, unknown>): Member {
   const firstName = parts.shift() || 'Hermano';
   const lastName = parts.join(' ') || 'Sin apellido';
 
+  const roleId = (profile.role_id || 'apr') as InstitutionalRoleCode;
+
   return {
     id: String(profile.member_id || profile.id),
     firstName,
     lastName,
     email: String(profile.email || ''),
-    roleId: (profile.role_id || 'apr') as InstitutionalRoleCode,
-    degree: 'aprendiz',
+    roleId,
+    degree: degreeForRole(roleId),
     condition: 'activo',
     motherLodge: 'Resp.·. Log.·. Unión Fraternal No. 21',
     joinedAt: String(profile.created_at || new Date().toISOString()).split('T')[0],
@@ -153,7 +162,7 @@ export const memberService = {
           email: member.email,
           phone: member.phone,
           role_id: member.roleId,
-          degree: member.degree,
+          degree: degreeForRole(member.roleId),
           condition: member.condition,
           mother_lodge: member.motherLodge,
           initiation_date: member.initiationDate,
@@ -219,7 +228,11 @@ export const memberService = {
       // 1. Actualizar en la tabla members (si existe ese registro)
       const { data: updatedMember, error: memberError } = await supabase
           .from('members')
-          .update({ role_id: roleId, updated_at: now })
+          .update({
+            role_id: roleId,
+            degree: degreeForRole(roleId),
+            updated_at: now,
+          })
           .eq('id', memberId)
           .select('id')
           .single();

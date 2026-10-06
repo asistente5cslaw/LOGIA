@@ -394,7 +394,7 @@ export function AttendancePage() {
                       <p className="text-xs sm:text-sm font-semibold text-ink">
                         {m.firstName} {m.lastName}
                       </p>
-                      <p className="text-[11px] text-ink-muted uppercase">Grado: {m.degree}</p>
+                      <p className="text-[11px] text-ink-muted uppercase">Grado: {m.roleId === 'vm' ? 'maestro' : m.degree}</p>
                     </div>
                   </div>
 

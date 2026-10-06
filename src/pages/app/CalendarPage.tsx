@@ -22,9 +22,10 @@ import {
   Mail,
   FileEdit,
   Trash2,
+  CalendarClock,
 } from 'lucide-react';
 import { AppleEmoji } from '@/components/shared/AppleEmoji';
-import { AppleSelect } from '@/components/shared/AppleSelect';
+import { AppleSelect, type AppleSelectOption } from '@/components/shared/AppleSelect';
 import { AppleDatePicker } from '@/components/shared/AppleDatePicker';
 import { AppleTimePicker } from '@/components/shared/AppleTimePicker';
 import { AppleInput, AppleTextarea } from '@/components/shared/AppleInput';
@@ -37,6 +38,17 @@ import { cn } from '@/lib/utils';
 import { formatDateSpanish, formatTime12, formatTimeRange12 } from '@/lib/dateUtils';
 import { toast } from 'sonner';
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
+
+const eventStatusOptions: AppleSelectOption<EventStatus>[] = [
+  { value: 'programada', label: 'Programada', description: 'Actividad agendada' },
+  { value: 'convocada', label: 'Convocada', description: 'Convocatoria difundida' },
+  { value: 'celebrada', label: 'Culminada', description: 'Actividad finalizada' },
+  { value: 'cancelada', label: 'Cancelada', description: 'Actividad suspendida' },
+];
+
+function eventStatusLabel(status: EventStatus): string {
+  return status === 'celebrada' ? 'Culminada' : status.charAt(0).toUpperCase() + status.slice(1);
+}
 
 export function CalendarPage() {
   const { user, hasPermission } = useAuth();
@@ -59,6 +71,12 @@ export function CalendarPage() {
   const [detectedClashes, setDetectedClashes] = useState<LodgeEvent[]>([]);
   const [alternativeDates, setAlternativeDates] = useState<{ startDate: string; endDate?: string; label: string }[]>([]);
   const [conflictJustification, setConflictJustification] = useState('');
+  const [showCancellationModal, setShowCancellationModal] = useState(false);
+  const [pendingCancellation, setPendingCancellation] = useState<LodgeEvent | null>(null);
+  const [notifyCancellationPush, setNotifyCancellationPush] = useState(true);
+  const [notifyCancellationWhatsApp, setNotifyCancellationWhatsApp] = useState(false);
+  const [notifyCancellationEmail, setNotifyCancellationEmail] = useState(false);
+  const [isSendingCancellationPush, setIsSendingCancellationPush] = useState(false);
 
   // Modal de Convocatoria
   const [showConvocationModal, setShowConvocationModal] = useState(false);
@@ -204,6 +222,13 @@ export function CalendarPage() {
       createdAt: editingEvent ? editingEvent.createdAt : new Date().toISOString(),
     };
 
+    if (candidate.status === 'cancelada' && editingEvent?.status !== 'cancelada') {
+      setPendingCancellation(candidate);
+      setShowEventModal(false);
+      setShowCancellationModal(true);
+      return;
+    }
+
     // Validar conflictos de horario
     const clashes = eventService.detectConflicts(candidate, events);
 
@@ -226,6 +251,59 @@ export function CalendarPage() {
     } catch {
       toast.error('Error al guardar el evento');
     }
+  };
+
+  const handleConfirmCancellation = async () => {
+    if (!pendingCancellation) return;
+    try {
+      await eventService.saveEvent(
+        pendingCancellation,
+        { id: user?.id, email: user?.email, name: user?.displayName }
+      );
+
+      if (notifyCancellationPush) {
+        setIsSendingCancellationPush(true);
+        try {
+          await pushNotificationService.sendPushToAll({
+            title: `Tenida cancelada: ${pendingCancellation.title}`,
+            body: `La tenida del ${formatPushDateTime(pendingCancellation.startDate, pendingCancellation.startTime || '19:30')} ha sido cancelada.`,
+            url: '/app/calendario',
+            tag: `cancelacion-${pendingCancellation.id}`,
+            type: 'aviso',
+          });
+        } finally {
+          setIsSendingCancellationPush(false);
+        }
+      }
+
+      const activeEmails = members.filter((m) => m.isActive).map((m) => m.email);
+      if (notifyCancellationWhatsApp) {
+        window.open(
+          convocationService.generateWhatsAppUrl(undefined, `Aviso: la tenida “${pendingCancellation.title}” ha sido cancelada.`),
+          '_blank',
+          'noopener,noreferrer'
+        );
+      }
+      if (notifyCancellationEmail) {
+        window.location.href = convocationService.generateMailtoUrl(
+          `Cancelación: ${pendingCancellation.title}`,
+          `Se informa que la tenida “${pendingCancellation.title}” ha sido cancelada.`,
+          activeEmails
+        );
+      }
+
+      toast.success('Tenida cancelada y avisos procesados');
+      setShowCancellationModal(false);
+      setPendingCancellation(null);
+      loadData();
+    } catch {
+      toast.error('No se pudo cancelar la tenida');
+    }
+  };
+
+  const handleRescheduleEvent = (ev: LodgeEvent) => {
+    openEditEventModal(ev);
+    setFormStatus('programada');
   };
 
   const handleForceSaveConflict = async () => {
@@ -512,7 +590,7 @@ export function CalendarPage() {
                               : 'bg-surface-container text-ink'
                           }`}
                         >
-                          {ev.status}
+                          {eventStatusLabel(ev.status)}
                         </span>
                       </div>
 
@@ -538,6 +616,14 @@ export function CalendarPage() {
                             className="flex items-center gap-1 rounded bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
                           >
                             <Send className="h-3.5 w-3.5" /> Convocatoria
+                          </button>
+                        )}
+                        {canManageEvents && ev.status === 'cancelada' && (
+                          <button
+                            onClick={() => handleRescheduleEvent(ev)}
+                            className="flex items-center gap-1 rounded border border-primary/30 bg-primary/5 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
+                          >
+                            <CalendarClock className="h-3.5 w-3.5" /> Reprogramar
                           </button>
                         )}
                         {canManageEvents && (
@@ -622,7 +708,7 @@ export function CalendarPage() {
                           : 'bg-surface-container text-ink'
                       )}
                     >
-                      {ev.status}
+                      {eventStatusLabel(ev.status)}
                     </span>
                   </div>
 
@@ -653,6 +739,19 @@ export function CalendarPage() {
                       >
                         <Send className="h-3.5 w-3.5 shrink-0" />
                         <span>Convocatoria</span>
+                      </button>
+                    )}
+                    {canManageEvents && ev.status === 'cancelada' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowMobileDayModal(false);
+                          handleRescheduleEvent(ev);
+                        }}
+                        className="flex flex-row items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors cursor-pointer"
+                      >
+                        <CalendarClock className="h-3.5 w-3.5 shrink-0" />
+                        <span>Reprogramar</span>
                       </button>
                     )}
                     {canManageEvents && (
@@ -727,6 +826,13 @@ export function CalendarPage() {
               }))}
             />
           </div>
+
+          <AppleSelect<EventStatus>
+            label="Estado de la actividad *"
+            value={formStatus}
+            onChange={setFormStatus}
+            options={eventStatusOptions}
+          />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <AppleDatePicker
@@ -826,6 +932,59 @@ export function CalendarPage() {
             </div>
           </div>
         </form>
+      </Modal>
+
+      {/* Confirmación y canales de aviso al cancelar */}
+      <Modal
+        isOpen={showCancellationModal}
+        onClose={() => {
+          setShowCancellationModal(false);
+          setPendingCancellation(null);
+        }}
+        title="Cancelar tenida"
+        subtitle={pendingCancellation ? `“${pendingCancellation.title}” dejará de estar disponible en el calendario.` : ''}
+        maxWidth="md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-ink-secondary">¿Deseas avisar a los miembros sobre la cancelación?</p>
+          <div className="space-y-2 rounded-xl border border-border bg-surface-container-low p-3">
+            {[
+              { label: 'Notificación push', checked: notifyCancellationPush, setChecked: setNotifyCancellationPush },
+              { label: 'WhatsApp', checked: notifyCancellationWhatsApp, setChecked: setNotifyCancellationWhatsApp },
+              { label: 'Correo electrónico', checked: notifyCancellationEmail, setChecked: setNotifyCancellationEmail },
+            ].map((channel) => (
+              <label key={channel.label} className="flex cursor-pointer items-center gap-2 text-sm text-ink">
+                <input
+                  type="checkbox"
+                  checked={channel.checked}
+                  onChange={(e) => channel.setChecked(e.target.checked)}
+                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary/20"
+                />
+                {channel.label}
+              </label>
+            ))}
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => {
+                setShowCancellationModal(false);
+                setPendingCancellation(null);
+              }}
+              className="min-h-[42px] rounded-xl border border-border px-4 text-xs font-semibold text-ink-secondary hover:bg-surface-container"
+            >
+              Volver
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmCancellation}
+              disabled={isSendingCancellationPush}
+              className="min-h-[42px] rounded-xl bg-destructive px-4 text-xs font-semibold text-white hover:bg-destructive/90 disabled:opacity-60"
+            >
+              {isSendingCancellationPush ? 'Enviando aviso…' : 'Confirmar cancelación'}
+            </button>
+          </div>
+        </div>
       </Modal>
 
       {/* Modal de Resolución de Conflictos */}

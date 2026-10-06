@@ -56,9 +56,9 @@ La Secretaría del Taller`;
       return active; // Todos los grados asisten
     }
     if (degreeRequired === 'companero') {
-      return active.filter((m) => m.degree === 'companero' || m.degree === 'maestro');
+      return active.filter((m) => m.roleId === 'vm' || m.degree === 'companero' || m.degree === 'maestro');
     }
-    return active.filter((m) => m.degree === 'maestro');
+    return active.filter((m) => m.roleId === 'vm' || m.degree === 'maestro');
   },
 
   generateWhatsAppUrl(phone: string | undefined, message: string): string {
