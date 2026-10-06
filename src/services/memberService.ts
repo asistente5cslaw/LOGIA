@@ -206,6 +206,8 @@ export const memberService = {
     user: { id?: string; email?: string }
   ): Promise<Member> {
     const now = new Date().toISOString();
+    const previousMember = await this.getMemberById(memberId);
+    if (!previousMember) throw new Error('Miembro no encontrado.');
 
     if (isSupabaseConfigured()) {
       // 1. Actualizar en la tabla members (si existe ese registro)
@@ -228,7 +230,13 @@ export const memberService = {
       throw new Error('Supabase no está configurado.');
     }
 
-    await auditService.log('CAMBIAR_ROL_MIEMBRO', 'members', memberId, user, { roleId });
+    await auditService.log('CAMBIAR_ROL_MIEMBRO', 'members', memberId, user, {
+      targetMemberId: memberId,
+      targetName: `${previousMember.firstName} ${previousMember.lastName}`,
+      targetEmail: previousMember.email,
+      previousRoleId: previousMember.roleId,
+      newRoleId: roleId,
+    });
 
     // Devolver el miembro actualizado
     const allMembers = await this.getAllMembers(true);

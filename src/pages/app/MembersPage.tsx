@@ -21,6 +21,8 @@ import {
   Camera,
   Check,
   X,
+  History,
+  Clock,
 } from 'lucide-react';
 import { Modal } from '@/components/shared/Modal';
 import { AppleSelect, type AppleSelectOption } from '@/components/shared/AppleSelect';
@@ -30,6 +32,8 @@ import { useAppleDialog } from '@/components/shared/AppleDialog';
 import { formatDateSpanish } from '@/lib/dateUtils';
 import { toast } from 'sonner';
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
+import { auditService } from '@/services/auditService';
+import type { AuditLog } from '@/types';
 
 const conditionOptions: AppleSelectOption<MemberStatusCondition>[] = [
   { value: 'activo', label: 'Activo', color: '#10B981', description: 'Plenos derechos en el taller' },
@@ -64,6 +68,9 @@ export function MembersPage() {
   // Modal de Validación de Identidad (Secretaría / Venerable Maestro)
   const [validatingMember, setValidatingMember] = useState<Member | null>(null);
   const [isProcessingValidation, setIsProcessingValidation] = useState(false);
+  const [isRoleHistoryOpen, setIsRoleHistoryOpen] = useState(false);
+  const [roleHistory, setRoleHistory] = useState<AuditLog[]>([]);
+  const [isLoadingRoleHistory, setIsLoadingRoleHistory] = useState(false);
 
   // Formulario de Miembro
   const [formFirstName, setFormFirstName] = useState('');
@@ -82,6 +89,20 @@ export function MembersPage() {
   const isVenerableMaestro = user?.profile?.roleId === 'vm';
   const isSecretario = user?.profile?.roleId === 'sec';
   const canManageMembers = hasPermission('manage_members') || isVenerableMaestro || isSecretario;
+
+  const canChangeMemberRole = (member: Member): boolean => {
+    if (!canManageMembers) return false;
+    const actorRole = user?.profile?.roleId;
+    if (actorRole === 'sec' && member.id === user?.id) return false;
+    if (actorRole === 'sec' && (member.roleId === 'sec' || member.roleId === 'vm')) return false;
+    if (actorRole === 'vm' && member.roleId === 'vm') return false;
+    return true;
+  };
+
+  const canAssignRole = (member: Member, roleId: InstitutionalRoleCode): boolean => {
+    if (!canChangeMemberRole(member)) return false;
+    return !(user?.profile?.roleId === 'sec' && roleId === 'vm');
+  };
 
   // El Secretario y el Venerable Maestro pueden validar identidades y selfies de registro
   const canValidateIdentity = isVenerableMaestro || isSecretario || canManageMembers;
@@ -104,6 +125,10 @@ export function MembersPage() {
   });
 
   const handleOpenRoleModal = (m: Member) => {
+    if (!canChangeMemberRole(m)) {
+      toast.error('No tienes autorización para cambiar el cargo de este miembro.');
+      return;
+    }
     setRoleModalMember(m);
     setRoleModalSelectedId(m.roleId || 'apr');
   };
@@ -111,6 +136,10 @@ export function MembersPage() {
   const handleSaveRoleOnly = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!roleModalMember) return;
+    if (!canAssignRole(roleModalMember, roleModalSelectedId)) {
+      toast.error('No tienes autorización para cambiar el cargo de este miembro.');
+      return;
+    }
     setIsSavingRole(true);
     try {
       const updatedMember = await memberService.updateMemberRole(
@@ -179,6 +208,27 @@ export function MembersPage() {
     setValidatingMember(m);
   };
 
+  const handleOpenRoleHistory = async () => {
+    setIsRoleHistoryOpen(true);
+    setIsLoadingRoleHistory(true);
+    try {
+      const logs = await auditService.getLogs(100);
+      setRoleHistory(logs.filter((log) => log.action === 'CAMBIAR_ROL_MIEMBRO' && log.entity === 'members'));
+    } catch {
+      toast.error('No se pudo cargar el historial de roles.');
+    } finally {
+      setIsLoadingRoleHistory(false);
+    }
+  };
+
+  const formatHistoryDate = (createdAt: string): string => {
+    return new Intl.DateTimeFormat('es-PA', {
+      dateStyle: 'long',
+      timeStyle: 'short',
+      hour12: true,
+    }).format(new Date(createdAt));
+  };
+
   const handleApproveIdentity = async () => {
     if (!validatingMember) return;
     setIsProcessingValidation(true);
@@ -229,6 +279,10 @@ export function MembersPage() {
 
   const handleSaveMember = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (editingMember && editingMember.roleId !== formRoleId && !canAssignRole(editingMember, formRoleId)) {
+      toast.error('No tienes autorización para cambiar el cargo de este miembro.');
+      return;
+    }
     try {
       const savedMember = await memberService.saveMember(
         {
@@ -358,6 +412,17 @@ export function MembersPage() {
             </button>
           )}
 
+          {canValidateIdentity && (
+            <button
+              type="button"
+              onClick={() => void handleOpenRoleHistory()}
+              className="h-7 px-2.5 rounded-lg font-medium whitespace-nowrap flex items-center gap-1.5 bg-surface-container/70 text-ink-secondary hover:bg-surface-container transition-colors"
+            >
+              <History className="h-3.5 w-3.5" />
+              <span>Historial</span>
+            </button>
+          )}
+
         </div>
       </div>
 
@@ -442,11 +507,11 @@ export function MembersPage() {
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (canManageMembers) handleOpenRoleModal(m);
+                              handleOpenRoleModal(m);
                             }}
-                            disabled={!canManageMembers}
+                            disabled={!canChangeMemberRole(m)}
                             className={`inline-flex items-center rounded-md bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary uppercase tracking-wider ${
-                              canManageMembers
+                              canChangeMemberRole(m)
                                 ? 'hover:bg-primary/20 hover:scale-105 active:scale-95 cursor-pointer transition-transform'
                                 : ''
                             }`}
@@ -689,6 +754,52 @@ export function MembersPage() {
                 </div>
               )}
             </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        isOpen={isRoleHistoryOpen}
+        onClose={() => setIsRoleHistoryOpen(false)}
+        title="Historial de cambios de roles"
+        maxWidth="lg"
+      >
+        {isLoadingRoleHistory ? (
+          <div className="py-8 text-center text-sm text-ink-muted">Cargando historial…</div>
+        ) : roleHistory.length === 0 ? (
+          <div className="py-8 text-center text-sm text-ink-muted">Todavía no hay cambios de roles registrados.</div>
+        ) : (
+          <div className="max-h-[60vh] space-y-2 overflow-y-auto pr-1">
+            {roleHistory.map((log) => {
+              const details = log.details || {};
+              const targetName = String(details.targetName || log.entityId || 'Miembro');
+              const targetEmail = details.targetEmail ? String(details.targetEmail) : '';
+              const previousRole = String(details.previousRoleId || '—');
+              const newRole = String(details.newRoleId || details.roleId || '—');
+              const previousRoleLabel = institutionalRoles.find((role) => role.id === previousRole)?.name || previousRole;
+              const newRoleLabel = institutionalRoles.find((role) => role.id === newRole)?.name || newRole;
+              const actor = log.userEmail || 'Sistema';
+
+              return (
+                <div key={log.id} className="rounded-xl border border-border bg-surface-container-low p-3 text-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-ink">{targetName}</p>
+                      {targetEmail && <p className="text-xs text-ink-muted">{targetEmail}</p>}
+                    </div>
+                    <span className="inline-flex shrink-0 items-center gap-1 text-xs text-ink-muted">
+                      <Clock className="h-3.5 w-3.5" />
+                      {formatHistoryDate(log.createdAt)}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs text-ink-secondary">
+                    <span className="font-semibold">{actor}</span> cambió el rol de{' '}
+                    <span className="font-semibold">{previousRoleLabel}</span> a{' '}
+                    <span className="font-semibold text-primary">{newRoleLabel}</span>.
+                  </p>
+                </div>
+              );
+            })}
           </div>
         )}
       </Modal>
