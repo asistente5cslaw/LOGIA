@@ -56,27 +56,15 @@ export function RegisterIdentityPage() {
         throw new Error('La cuenta fue creada, pero no se encontró su ficha de miembro en Supabase.');
       }
 
-      // 2. Registrar la ficha del hermano con su selfie biométrica para revisión
+      // 2. Guardar únicamente los datos de identidad en la ficha creada por el trigger
       const identityStatus = result.status === 'approved' ? 'verified' : 'pending';
       try {
-        await memberService.saveMember(
-          {
-            id: registeredUser.memberId,
-            firstName: pendingData.firstName,
-            lastName: pendingData.lastName,
-            email: pendingData.email,
-            roleId: 'apr',
-            degree: 'aprendiz',
-            condition: 'activo',
-            motherLodge: 'Resp.·. Log.·. Unión Fraternal No. 21',
-            isActive: true,
+        await memberService.saveRegistrationIdentity(registeredUser.memberId, {
             identityVerified: identityStatus === 'verified',
             identityStatus,
             selfieUrl: result.selfieUrl,
             identityValidatedAt: new Date().toISOString(),
-          },
-          { id: registeredUser.id, email: pendingData.email }
-        );
+        });
       } catch (saveErr) {
         throw new Error(
           `La cuenta fue creada, pero no se pudo guardar la ficha de miembro: ${saveErr instanceof Error ? saveErr.message : 'error desconocido'}`

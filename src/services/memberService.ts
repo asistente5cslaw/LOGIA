@@ -58,6 +58,26 @@ function mapProfileAsMember(profile: Record<string, unknown>): Member {
 }
 
 export const memberService = {
+  async saveRegistrationIdentity(
+    memberId: string,
+    identity: Pick<Member, 'identityVerified' | 'identityStatus' | 'selfieUrl' | 'identityValidatedAt'>
+  ): Promise<void> {
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+
+    const { error } = await supabase
+      .from('members')
+      .update({
+        identity_verified: identity.identityVerified ?? false,
+        identity_status: identity.identityStatus || 'pending',
+        selfie_url: identity.selfieUrl || null,
+        identity_validated_at: identity.identityValidatedAt || new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', memberId);
+
+    if (error) throw error;
+  },
+
   async getAllMembers(includeInactive = true): Promise<Member[]> {
     if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
 
@@ -182,11 +202,14 @@ export const memberService = {
 
     if (isSupabaseConfigured()) {
       // 1. Actualizar en la tabla members (si existe ese registro)
-      const { error: memberError } = await supabase
+      const { data: updatedMember, error: memberError } = await supabase
           .from('members')
           .update({ role_id: roleId, updated_at: now })
-          .eq('id', memberId);
+          .eq('id', memberId)
+          .select('id')
+          .single();
       if (memberError) throw memberError;
+      if (!updatedMember) throw new Error('No se encontró el miembro que se intentó actualizar.');
 
       // 2. Actualizar en la tabla profiles (por member_id o id)
       const { error: profileError } = await supabase
@@ -194,6 +217,8 @@ export const memberService = {
           .update({ role_id: roleId })
           .or(`member_id.eq.${memberId},id.eq.${memberId}`);
       if (profileError) throw profileError;
+    } else {
+      throw new Error('Supabase no está configurado.');
     }
 
     await auditService.log('CAMBIAR_ROL_MIEMBRO', 'members', memberId, user, { roleId });
@@ -203,18 +228,7 @@ export const memberService = {
     const updated = allMembers.find((m) => m.id === memberId);
     if (updated) return updated;
 
-    // Fallback mínimo si no se encuentra tras el update
-    return {
-      id: memberId,
-      roleId,
-      firstName: '',
-      lastName: '',
-      email: '',
-      degree: 'aprendiz',
-      condition: 'activo',
-      joinedAt: now,
-      isActive: true,
-    };
+    throw new Error('El cargo se actualizó, pero no se pudo recargar el miembro.');
   },
 
   async softDeleteMember(id: string, user: { id?: string; email?: string }): Promise<void> {

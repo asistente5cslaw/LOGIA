@@ -120,7 +120,6 @@ export function MembersPage() {
         roleModalSelectedId,
         { id: user?.id, email: user?.email }
       );
-      await authService.updateUserRole(roleModalMember.email, roleModalSelectedId);
       toast.success(`Cargo asignado a ${roleModalMember.firstName} ${roleModalMember.lastName}`);
       setRoleModalMember(null);
       await loadMembers();
