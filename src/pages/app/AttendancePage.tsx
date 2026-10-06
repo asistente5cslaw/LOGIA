@@ -52,7 +52,14 @@ export function AttendancePage() {
   const [visDegree, setVisDegree] = useState<MasonicDegree>('maestro');
   const [visNotes, setVisNotes] = useState('');
 
-  const canManageAttendance = user?.profile?.roleId === 'sec';
+  const canManageAttendance = Boolean(
+    user?.profile?.roleId === 'sec' || user?.profile?.technicalRole === 'admin'
+  );
+
+  const isOwnMember = (member: Member): boolean => (
+    Boolean(user?.memberId && user.memberId === member.id) ||
+    Boolean(user?.email && member.email && user.email.toLowerCase() === member.email.toLowerCase())
+  );
 
   const loadInitial = async () => {
     try {
@@ -177,7 +184,8 @@ export function AttendancePage() {
   };
 
   const handleOpenExcuseEditor = (memberId: string) => {
-    if (user?.memberId !== memberId || attendanceMap[memberId] !== 'excusa') return;
+    const member = members.find((candidate) => candidate.id === memberId);
+    if (!member || !isOwnMember(member) || attendanceMap[memberId] !== 'excusa') return;
     const submittedAt = excuseSubmittedAt[memberId];
     if (submittedAt && Date.now() >= new Date(submittedAt).getTime() + 24 * 60 * 60 * 1000) {
       toast.info('El plazo de 24 horas para editar esta excusa ya venció.');
@@ -188,11 +196,12 @@ export function AttendancePage() {
   };
 
   const handleSaveExcuse = async (memberId: string) => {
-    if (!selectedEventId || user?.memberId !== memberId || !excuseDraft.trim()) return;
+    const member = members.find((candidate) => candidate.id === memberId);
+    if (!selectedEventId || !member || !isOwnMember(member) || !excuseDraft.trim()) return;
     try {
       await attendanceService.saveMemberExcuse(selectedEventId, memberId, excuseDraft, {
-        id: user.id,
-        email: user.email,
+        id: user?.id,
+        email: user?.email,
       });
       setExcuseReasons((prev) => ({ ...prev, [memberId]: excuseDraft.trim() }));
       setExcuseSubmittedAt((prev) => ({
@@ -440,7 +449,7 @@ export function AttendancePage() {
                       <X className="h-3.5 w-3.5" /> Ausente
                     </button>
                     </div>
-                    {user?.memberId === m.id && currentStatus === 'excusa' && (
+                    {isOwnMember(m) && currentStatus === 'excusa' && (
                       excuseReasons[m.id] ? (
                         excuseSubmittedAt[m.id] && Date.now() < new Date(excuseSubmittedAt[m.id]).getTime() + 24 * 60 * 60 * 1000 ? (
                           <button
@@ -463,7 +472,7 @@ export function AttendancePage() {
                         </button>
                       )
                     )}
-                    {editingExcuseMemberId === m.id && user?.memberId === m.id && (
+                    {editingExcuseMemberId === m.id && isOwnMember(m) && (
                       <div className="w-full max-w-xs space-y-1.5 rounded-xl border border-amber-200 bg-amber-50 p-2.5 sm:w-80">
                         <label className="text-[11px] font-semibold text-amber-900">Explica tu excusa</label>
                         <textarea
