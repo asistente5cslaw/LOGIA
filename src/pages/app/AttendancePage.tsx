@@ -543,23 +543,6 @@ export function AttendancePage() {
                         <span className="text-[11px] font-medium text-amber-700">Excusa registrada</span>
                       )
                     )}
-                    {editingExcuseMemberId === m.id && isOwnMember(m) && (
-                      <div className="w-full max-w-xs space-y-1.5 rounded-xl border border-amber-200 bg-amber-50 p-2.5 sm:w-80">
-                        <label className="text-[11px] font-semibold text-amber-900">Explica tu excusa</label>
-                        <textarea
-                          value={excuseDraft}
-                          onChange={(e) => setExcuseDraft(e.target.value)}
-                          rows={3}
-                          maxLength={500}
-                          placeholder="Escribe el motivo de tu ausencia..."
-                          className="w-full resize-none rounded-lg border border-amber-200 bg-white px-2.5 py-2 text-xs text-ink outline-none focus:border-primary"
-                        />
-                        <div className="flex justify-end gap-2">
-                          <button type="button" onClick={() => setEditingExcuseMemberId(null)} className="rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-ink-secondary hover:bg-white">Cancelar</button>
-                          <button type="button" disabled={!excuseDraft.trim()} onClick={() => void handleSaveExcuse(m.id)} className="rounded-lg bg-primary px-2.5 py-1.5 text-[11px] font-semibold text-white disabled:opacity-50">Guardar excusa</button>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
               );
@@ -602,6 +585,53 @@ export function AttendancePage() {
       </div>
       </>
       )}
+
+      {/* Modal para explicar la excusa del miembro autenticado */}
+      <Modal
+        isOpen={Boolean(editingExcuseMemberId)}
+        onClose={() => {
+          setEditingExcuseMemberId(null);
+          setExcuseDraft('');
+        }}
+        title="Explicar mi excusa"
+        subtitle={editingExcuseMemberId ? selectedEvent?.title : undefined}
+        maxWidth="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-ink-secondary">
+            Escribe el motivo de tu ausencia. Podrás editarlo durante las primeras 24 horas desde el primer guardado.
+          </p>
+          <textarea
+            autoFocus
+            value={excuseDraft}
+            onChange={(e) => setExcuseDraft(e.target.value)}
+            rows={5}
+            maxLength={500}
+            placeholder="Escribe el motivo de tu ausencia..."
+            className="w-full resize-none rounded-xl border border-border bg-surface-container-low px-3 py-2.5 text-sm text-ink outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+          />
+          <div className="flex justify-end gap-2.5 border-t border-border pt-3">
+            <button
+              type="button"
+              onClick={() => {
+                setEditingExcuseMemberId(null);
+                setExcuseDraft('');
+              }}
+              className="min-h-[40px] rounded-xl border border-border px-4 text-xs font-semibold text-ink-secondary hover:bg-surface-container"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              disabled={!excuseDraft.trim() || !editingExcuseMemberId}
+              onClick={() => editingExcuseMemberId && void handleSaveExcuse(editingExcuseMemberId)}
+              className="min-h-[40px] rounded-xl bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary-pressed disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Guardar excusa
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Modal Registrar Visitante */}
       <Modal
