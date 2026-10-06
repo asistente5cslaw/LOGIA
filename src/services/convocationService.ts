@@ -1,4 +1,5 @@
 import type { LodgeEvent, Member, MasonicDegree } from '@/types';
+import { institutionalRoles } from '@/data/rolesData';
 import { getBodyById } from '@/data/bodiesData';
 import { formatDateSpanish, formatTime12 } from '@/lib/dateUtils';
 
@@ -16,12 +17,7 @@ export const convocationService = {
    */
   generateOfficialText(event: LodgeEvent, lodgeName = 'Resp.·. Log.·. Unión Fraternal No. 21'): string {
     const body = getBodyById(event.bodyId);
-    const degreeLabel =
-      event.degreeRequired === 'aprendiz'
-        ? 'Primer Grado (Aprendiz)'
-        : event.degreeRequired === 'companero'
-        ? 'Segundo Grado (Compañero)'
-        : 'Tercer Grado (Maestro)';
+    const roleLabel = institutionalRoles.find((role) => role.id === event.roleRequired)?.name || 'Todos los miembros';
 
     const timeFormatted = event.startTime ? `a las ${formatTime12(event.startTime)}` : 'a la hora ritual';
     const dateFormatted = formatDateSpanish(event.startDate);
@@ -43,7 +39,7 @@ Por disposición del Venerable Maestro y de conformidad con nuestros Antiguos L�
 • FECHA: ${dateFormatted}
 • HORA: ${timeFormatted}
 • LUGAR: ${event.location}
-• CÁMARA DE TRABAJO: ${degreeLabel}
+• ROL REQUERIDO: ${roleLabel}
 
 ${event.notes ? `OBSERVACIONES: ${event.notes}\n` : ''}
 Se recuerda a todos los QQ.·. HH.·. la estricta puntualidad, el uso del mandil, arreos correspondientes y vestimenta formal oscura reglamentaria.

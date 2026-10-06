@@ -1,6 +1,12 @@
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import type { LodgeEvent, EventConflict, MasonicBodyId } from '@/types';
+import type { LodgeEvent, EventConflict, MasonicBodyId, InstitutionalRoleCode, MasonicDegree } from '@/types';
 import { auditService } from './auditService';
+
+function roleFromLegacyDegree(degree: MasonicDegree): InstitutionalRoleCode {
+  if (degree === 'companero') return 'comp';
+  if (degree === 'maestro') return 'mae';
+  return 'apr';
+}
 
 /**
  * Convierte un evento en timestamps para comparar solapamiento exacto
@@ -35,6 +41,7 @@ export const eventService = {
             title: d.title,
             bodyId: d.body_id,
             degreeRequired: d.degree_required,
+            roleRequired: d.role_required || roleFromLegacyDegree(d.degree_required),
             startDate: d.start_date,
             endDate: d.end_date,
             startTime: d.start_time,
@@ -182,6 +189,7 @@ export const eventService = {
           title: fullEvent.title,
           body_id: fullEvent.bodyId,
           degree_required: fullEvent.degreeRequired,
+          role_required: fullEvent.roleRequired || roleFromLegacyDegree(fullEvent.degreeRequired),
           start_date: fullEvent.startDate,
           end_date: fullEvent.endDate,
           start_time: fullEvent.startTime,

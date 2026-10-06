@@ -3,9 +3,10 @@ import { useAuth } from '@/hooks/useAuth';
 import { eventService } from '@/services/eventService';
 import { memberService } from '@/services/memberService';
 import { convocationService } from '@/services/convocationService';
-import { masonicBodies, getBodyById } from '@/data/bodiesData';
+import { getBodyById } from '@/data/bodiesData';
 import { PageHeader } from '@/components/shared/PageHeader';
-import type { LodgeEvent, MasonicBodyId, MasonicDegree, EventStatus, Member } from '@/types';
+import type { LodgeEvent, MasonicBodyId, EventStatus, Member, InstitutionalRoleCode } from '@/types';
+import { institutionalRoles } from '@/data/rolesData';
 import {
   Calendar as CalendarIcon,
   ChevronLeft,
@@ -19,9 +20,7 @@ import {
   Check,
   Share2,
   Mail,
-  X,
   FileEdit,
-  ChevronDown,
   Trash2,
 } from 'lucide-react';
 import { AppleEmoji } from '@/components/shared/AppleEmoji';
@@ -45,25 +44,11 @@ export function CalendarPage() {
   const [events, setEvents] = useState<LodgeEvent[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [configuredTempleAddress, setConfiguredTempleAddress] = useState('');
-  const [selectedBodyFilter, setSelectedBodyFilter] = useState<MasonicBodyId | 'all'>('all');
-  const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [selectedDateStr, setSelectedDateStr] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
 
-  const bodyEventCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: events.length };
-    masonicBodies.forEach((b) => {
-      counts[b.id] = events.filter((e) => e.bodyId === b.id).length;
-    });
-    return counts;
-  }, [events]);
-
-  const selectedBody = useMemo(() => {
-    if (selectedBodyFilter === 'all') return null;
-    return getBodyById(selectedBodyFilter);
-  }, [selectedBodyFilter]);
 
   // Modales
   const [showEventModal, setShowEventModal] = useState(false);
@@ -85,7 +70,7 @@ export function CalendarPage() {
   // Formulario nuevo evento
   const [formTitle, setFormTitle] = useState('');
   const [formBodyId, setFormBodyId] = useState<MasonicBodyId>('uf21');
-  const [formDegree, setFormDegree] = useState<MasonicDegree>('aprendiz');
+  const [formRole, setFormRole] = useState<InstitutionalRoleCode>('apr');
   const [formStartDate, setFormStartDate] = useState(selectedDateStr);
   const [formEndDate, setFormEndDate] = useState('');
   const [formStartTime, setFormStartTime] = useState('19:30');
@@ -126,10 +111,7 @@ export function CalendarPage() {
   });
 
   // Filtrado de eventos
-  const filteredEvents = useMemo(() => {
-    if (selectedBodyFilter === 'all') return events;
-    return events.filter((e) => e.bodyId === selectedBodyFilter);
-  }, [events, selectedBodyFilter]);
+  const filteredEvents = useMemo(() => events, [events]);
 
   // Navegación mensual
   const nextMonth = () => {
@@ -165,7 +147,7 @@ export function CalendarPage() {
     setEditingEvent(null);
     setFormTitle('');
     setFormBodyId('uf21');
-    setFormDegree('aprendiz');
+    setFormRole('apr');
     setFormStartDate(selectedDateStr);
     setFormEndDate('');
     setFormStartTime('19:30');
@@ -182,7 +164,7 @@ export function CalendarPage() {
     setEditingEvent(ev);
     setFormTitle(ev.title);
     setFormBodyId(ev.bodyId);
-    setFormDegree(ev.degreeRequired);
+    setFormRole(ev.roleRequired || (ev.degreeRequired === 'maestro' ? 'mae' : ev.degreeRequired === 'companero' ? 'comp' : 'apr'));
     setFormStartDate(ev.startDate);
     setFormEndDate(ev.endDate || '');
     setFormStartTime(ev.startTime || '19:30');
@@ -207,7 +189,8 @@ export function CalendarPage() {
       id: editingEvent ? editingEvent.id : `ev-${Date.now()}`,
       title: formTitle.trim(),
       bodyId: formBodyId,
-      degreeRequired: formDegree,
+      degreeRequired: formRole === 'mae' ? 'maestro' : formRole === 'comp' ? 'companero' : 'aprendiz',
+      roleRequired: formRole,
       startDate: formStartDate,
       endDate: formEndDate ? formEndDate : undefined,
       startTime: formIsAllDay ? undefined : formStartTime,
@@ -361,131 +344,6 @@ export function CalendarPage() {
         />
 
         <div className="flex w-full sm:w-auto items-center gap-2">
-          {/* Selector y Filtro de Cuerpos estilo Apple (Compacto) */}
-          <div className="relative flex-1 min-w-0 sm:flex-initial">
-            <button
-              type="button"
-              onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
-              className={cn(
-                "w-full sm:w-auto flex min-h-[40px] items-center justify-between sm:justify-start gap-2 rounded-xl border px-3 py-2 text-xs font-semibold shadow-xs transition-all cursor-pointer",
-                selectedBody
-                  ? "border-primary/40 bg-primary/10 text-primary"
-                  : "border-border bg-surface text-ink hover:bg-surface-container"
-              )}
-            >
-              <div className="flex items-center gap-2 min-w-0 truncate">
-                <AppleEmoji name={selectedBody ? selectedBody.appleEmoji : 'globe'} size={18} />
-                <span className="font-serif text-xs font-bold text-ink truncate">
-                  {selectedBody ? selectedBody.shortName : 'Todos los Cuerpos'}
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <span className="rounded-full bg-surface-container-high px-1.5 py-0.5 text-[10px] font-mono text-ink-muted">
-                  {selectedBody ? (bodyEventCounts[selectedBody.id] || 0) : events.length}
-                </span>
-                <ChevronDown className={cn("h-3.5 w-3.5 text-ink-muted transition-transform shrink-0", isFilterDropdownOpen && "rotate-180")} />
-              </div>
-            </button>
-
-            {/* Menú flotante estilo Apple con todos los cuerpos masónicos */}
-            {isFilterDropdownOpen && (
-              <>
-                <div
-                  className="fixed inset-0 z-30"
-                  onClick={() => setIsFilterDropdownOpen(false)}
-                />
-                <div className="absolute left-0 sm:right-0 sm:left-auto top-full mt-2 z-40 w-72 sm:w-80 rounded-2xl border border-border bg-surface p-2 shadow-2xl animate-in fade-in zoom-in-95">
-                  <div className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-muted flex items-center justify-between">
-                    <span>Jurisdicción</span>
-                    <span className="text-[10px] lowercase font-normal">mostrar en calendario</span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedBodyFilter('all');
-                      setIsFilterDropdownOpen(false);
-                    }}
-                    className={cn(
-                      "flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-xs transition-colors cursor-pointer text-left mt-1",
-                      selectedBodyFilter === 'all'
-                        ? "bg-primary/10 text-primary font-bold"
-                        : "text-ink hover:bg-surface-container"
-                    )}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <AppleEmoji name="globe" size={20} />
-                      <div>
-                        <div className="font-semibold">Todos los Cuerpos</div>
-                        <div className="text-[10px] text-ink-muted">Vista combinada de actividades</div>
-                      </div>
-                    </div>
-                    <span className="rounded-full bg-surface-container px-2 py-0.5 text-[10px] font-mono text-ink-muted">
-                      {events.length}
-                    </span>
-                  </button>
-
-                  <div className="my-1.5 border-t border-border" />
-
-                  <div className="space-y-1 max-h-[300px] overflow-y-auto">
-                    {masonicBodies.map((body) => {
-                      const count = bodyEventCounts[body.id] || 0;
-                      const isSelected = selectedBodyFilter === body.id;
-                      return (
-                        <button
-                          key={body.id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedBodyFilter(body.id);
-                            setIsFilterDropdownOpen(false);
-                          }}
-                          className={cn(
-                            "flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-xs transition-colors cursor-pointer text-left",
-                            isSelected
-                              ? "bg-primary/10 text-primary font-bold"
-                              : "text-ink hover:bg-surface-container"
-                          )}
-                        >
-                          <div className="flex items-center gap-2.5 overflow-hidden">
-                            <AppleEmoji name={body.appleEmoji} size={20} />
-                            <div className="truncate">
-                              <div className="font-semibold truncate flex items-center gap-1.5">
-                                <span
-                                  className="inline-block h-2 w-2 rounded-full shrink-0"
-                                  style={{ backgroundColor: body.color }}
-                                />
-                                {body.shortName}
-                              </div>
-                              <div className="text-[10px] text-ink-muted truncate max-w-[180px]">
-                                {body.description}
-                              </div>
-                            </div>
-                          </div>
-                          <span className="rounded-full bg-surface-container px-2 py-0.5 text-[10px] font-mono text-ink-muted shrink-0">
-                            {count}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Botón rápido para remover filtro si no es 'all' */}
-          {selectedBody && (
-            <button
-              type="button"
-              onClick={() => setSelectedBodyFilter('all')}
-              className="flex h-10 items-center justify-center gap-1 rounded-xl bg-surface-container-high px-2.5 text-xs font-medium text-ink-secondary hover:bg-surface-container-highest transition-colors cursor-pointer shrink-0"
-              title="Mostrar todos los cuerpos"
-            >
-              <X className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Quitar</span>
-            </button>
-          )}
-
           {canManageEvents && (
             <button
               onClick={openNewEventModal}
@@ -856,29 +714,17 @@ export function CalendarPage() {
             placeholder="Ej. Tenida Ordinaria de Primer Grado y Recepción"
           />
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            <AppleSelect<MasonicBodyId>
-              label="Cuerpo Masónico *"
-              value={formBodyId}
-              onChange={setFormBodyId}
-              options={masonicBodies.map((b) => ({
-                value: b.id,
-                label: b.shortName,
-                description: b.name,
-                color: b.color,
-                icon: <AppleEmoji name={b.appleEmoji} size={18} />,
+          <div className="grid grid-cols-1 gap-3.5">
+            <AppleSelect<InstitutionalRoleCode>
+              label="Rol requerido *"
+              value={formRole}
+              onChange={setFormRole}
+              options={institutionalRoles.map((role) => ({
+                value: role.id,
+                label: role.name,
+                description: role.category === 'dignatario' ? 'Dignatario' : role.category === 'oficial' ? 'Oficial' : 'Miembro',
+                icon: <AppleEmoji name="members" size={16} />,
               }))}
-            />
-
-            <AppleSelect<MasonicDegree>
-              label="Grado Requerido *"
-              value={formDegree}
-              onChange={setFormDegree}
-              options={[
-                { value: 'aprendiz', label: 'Primer Grado (Aprendiz)', icon: <AppleEmoji name="ruler" size={16} /> },
-                { value: 'companero', label: 'Segundo Grado (Compañero)', icon: <AppleEmoji name="cross" size={16} /> },
-                { value: 'maestro', label: 'Tercer Grado (Maestro)', icon: <AppleEmoji name="temple" size={16} /> },
-              ]}
             />
           </div>
 
@@ -1081,9 +927,9 @@ export function CalendarPage() {
         {convocationEvent && (
           <div className="space-y-3">
             <div className="flex items-center justify-between text-xs">
-              <span className="font-semibold text-ink">Destinatarios por grado:</span>
+              <span className="font-semibold text-ink">Destinatarios por rol:</span>
               <span className="rounded-full bg-gold/15 px-2.5 py-0.5 text-gold-dark text-amber-800 font-semibold uppercase">
-                {convocationEvent.degreeRequired}
+                {institutionalRoles.find((role) => role.id === convocationEvent.roleRequired)?.name || 'Todos los miembros'}
               </span>
             </div>
 

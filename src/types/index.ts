@@ -131,6 +131,7 @@ export interface LodgeEvent {
   title: string;
   bodyId: MasonicBodyId;
   degreeRequired: MasonicDegree;
+  roleRequired?: InstitutionalRoleCode;
   startDate: string; // ISO string or YYYY-MM-DD
   endDate?: string; // Optional end date for multi-day
   startTime?: string; // HH:mm
