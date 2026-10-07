@@ -73,7 +73,7 @@ export function SettingsPage() {
   const [isImporting, setIsImporting] = useState(false);
 
   const canConfigure = hasPermission('configure_lodge') || isSecretaryOrVM;
-  const canManagePush = user?.profile?.technicalRole === 'admin' || user?.profile?.roleId === 'adm';
+  const canManagePush = user?.email?.trim().toLowerCase() === 'asistente4@castillosucre.com';
 
   const loadPushSubscribers = async () => {
     if (!canManagePush) return;

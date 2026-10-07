@@ -1,4 +1,3 @@
--- Solo el administrador fantasma designado puede consultar el listado de dispositivos push.
 CREATE OR REPLACE FUNCTION public.is_designated_push_admin()
 RETURNS BOOLEAN
 LANGUAGE SQL STABLE SECURITY DEFINER
