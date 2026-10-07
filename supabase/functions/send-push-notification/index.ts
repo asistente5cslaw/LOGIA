@@ -56,6 +56,8 @@ Deno.serve(async (request) => {
     if (error) throw error;
     let sent = 0;
     let removed = 0;
+    let failed = 0;
+    let lastError = '';
     for (const subscription of subscriptions || []) {
       try {
         await webpush.sendNotification({ endpoint: subscription.endpoint, expirationTime: subscription.expiration_time, keys: { p256dh: subscription.p256dh, auth: subscription.auth } }, payload);
@@ -65,10 +67,13 @@ Deno.serve(async (request) => {
         if (statusCode === 404 || statusCode === 410) {
           await admin.from('push_subscriptions').delete().eq('id', subscription.id);
           removed++;
+        } else {
+          failed++;
+          lastError = error instanceof Error ? error.message : String(error);
         }
       }
     }
-    return response({ sent, removed });
+    return response({ sent, removed, failed, ...(lastError ? { lastError } : {}) });
   } catch (error) {
     return response({ error: error instanceof Error ? error.message : 'Error enviando push' }, 500);
   }
