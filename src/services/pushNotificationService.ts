@@ -22,6 +22,16 @@ export interface LodgeNotificationItem {
   type: 'convocatoria' | 'trazado' | 'aviso' | 'nuevo_registro' | 'identidad_reenviada';
 }
 
+export interface PushSubscriber {
+  userId: string;
+  email: string;
+  displayName: string;
+  roleName: string;
+  deviceCount: number;
+  lastRegisteredAt: string;
+  userAgents: string[];
+}
+
 const STORAGE_KEY = 'lodge_notifications_list';
 
 const WEEKDAYS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
@@ -396,6 +406,61 @@ class PushNotificationService {
     const { data, error } = await supabase.functions.invoke('send-push-notification', { body: payload });
     if (error) throw error;
     return { sent: Number(data?.sent || 0), removed: Number(data?.removed || 0) };
+  }
+
+  public async getPushSubscribers(): Promise<PushSubscriber[]> {
+    const { supabase, isSupabaseConfigured } = await import('@/lib/supabase');
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    const { data: subscriptions, error: subscriptionsError } = await supabase
+      .from('push_subscriptions')
+      .select('user_id, user_agent, created_at, updated_at')
+      .order('updated_at', { ascending: false });
+    if (subscriptionsError) throw subscriptionsError;
+
+    const userIds = Array.from(new Set((subscriptions || []).map((item) => item.user_id)));
+    if (userIds.length === 0) return [];
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, email, display_name, role_id, roles(name)')
+      .in('id', userIds);
+    if (profilesError) throw profilesError;
+
+    const profileById = new Map((profiles || []).map((profile) => [profile.id, profile]));
+    const grouped = new Map<string, PushSubscriber>();
+    for (const subscription of subscriptions || []) {
+      const profile = profileById.get(subscription.user_id);
+      if (!profile) continue;
+      const role = Array.isArray(profile.roles) ? profile.roles[0] : profile.roles;
+      const registeredAt = subscription.updated_at || subscription.created_at;
+      const current = grouped.get(subscription.user_id);
+      if (current) {
+        current.deviceCount += 1;
+        if (new Date(registeredAt) > new Date(current.lastRegisteredAt)) current.lastRegisteredAt = registeredAt;
+        if (subscription.user_agent && !current.userAgents.includes(subscription.user_agent)) current.userAgents.push(subscription.user_agent);
+      } else {
+        grouped.set(subscription.user_id, {
+          userId: subscription.user_id,
+          email: profile.email,
+          displayName: profile.display_name,
+          roleName: role?.name || profile.role_id,
+          deviceCount: 1,
+          lastRegisteredAt: registeredAt,
+          userAgents: subscription.user_agent ? [subscription.user_agent] : [],
+        });
+      }
+    }
+    return Array.from(grouped.values()).sort((a, b) => new Date(b.lastRegisteredAt).getTime() - new Date(a.lastRegisteredAt).getTime());
+  }
+
+  public async sendTestPushToUser(email: string): Promise<{ sent: number; removed: number }> {
+    return this.sendPushToAll({
+      title: 'Notificación de prueba',
+      body: 'Esta es una notificación de prueba enviada desde la administración de la Logia.',
+      url: '/app',
+      tag: `prueba-push-${email.toLowerCase()}-${Date.now()}`,
+      type: 'aviso',
+      recipientEmails: [email.trim().toLowerCase()],
+    });
   }
 
   public async notifyNewRegistration(displayName: string, email: string): Promise<{ sent: number; removed: number }> {

@@ -7,6 +7,7 @@ import { minuteService } from '@/services/minuteService';
 import { backupService, type ImportPreview } from '@/services/backupService';
 import { auditService } from '@/services/auditService';
 import { authService } from '@/services/authService';
+import { pushNotificationService, type PushSubscriber } from '@/services/pushNotificationService';
 import { institutionalRoles, permissionLabels } from '@/data/rolesData';
 import { PageHeader } from '@/components/shared/PageHeader';
 import type {
@@ -28,6 +29,8 @@ import {
   Download,
   CheckCircle,
   RefreshCw,
+  Bell,
+  Send,
 } from 'lucide-react';
 import { AppleSelect } from '@/components/shared/AppleSelect';
 import { AppleDatePicker } from '@/components/shared/AppleDatePicker';
@@ -43,7 +46,7 @@ export function SettingsPage() {
   const { user, hasPermission, isSecretaryOrVM } = useAuth();
 
   const [activeTab, setActiveTab] = useState<
-    'visita' | 'configuracion' | 'permisos' | 'invitaciones' | 'respaldo' | 'auditoria'
+    'visita' | 'configuracion' | 'permisos' | 'invitaciones' | 'notificaciones' | 'respaldo' | 'auditoria'
   >('visita');
 
   // Visita Oficial & Configuración
@@ -59,6 +62,9 @@ export function SettingsPage() {
 
   // Auditoría
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [pushSubscribers, setPushSubscribers] = useState<PushSubscriber[]>([]);
+  const [isLoadingPushSubscribers, setIsLoadingPushSubscribers] = useState(false);
+  const [sendingPushTo, setSendingPushTo] = useState<string | null>(null);
 
   // Respaldo e Importación
   const [importJsonText, setImportJsonText] = useState('');
@@ -67,6 +73,32 @@ export function SettingsPage() {
   const [isImporting, setIsImporting] = useState(false);
 
   const canConfigure = hasPermission('configure_lodge') || isSecretaryOrVM;
+  const canManagePush = user?.profile?.technicalRole === 'admin' || user?.profile?.roleId === 'adm';
+
+  const loadPushSubscribers = async () => {
+    if (!canManagePush) return;
+    setIsLoadingPushSubscribers(true);
+    try {
+      setPushSubscribers(await pushNotificationService.getPushSubscribers());
+    } catch {
+      toast.error('No se pudo cargar el listado de dispositivos push.');
+    } finally {
+      setIsLoadingPushSubscribers(false);
+    }
+  };
+
+  const handleSendTestPush = async (subscriber: PushSubscriber) => {
+    setSendingPushTo(subscriber.userId);
+    try {
+      const result = await pushNotificationService.sendTestPushToUser(subscriber.email);
+      if (result.sent > 0) toast.success(`Notificación enviada a ${subscriber.displayName}.`);
+      else toast.warning('El usuario no tiene un dispositivo push disponible.');
+    } catch {
+      toast.error('No se pudo enviar la notificación de prueba.');
+    } finally {
+      setSendingPushTo(null);
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -101,6 +133,10 @@ export function SettingsPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'notificaciones') void loadPushSubscribers();
+  }, [activeTab]);
 
   const handleToggleChecklistItem = async (item: OfficialVisitChecklistItem) => {
     if (!canConfigure) {
@@ -227,6 +263,9 @@ export function SettingsPage() {
           { id: 'permisos' as const, label: 'Matriz de Permisos', shortLabel: 'Permisos', icon: ShieldCheck },
           ...(isSecretaryOrVM
             ? [{ id: 'invitaciones' as const, label: 'Códigos de Invitación', shortLabel: 'Invitaciones', icon: KeyRound }]
+            : []),
+          ...(canManagePush
+            ? [{ id: 'notificaciones' as const, label: 'Notificaciones Push', shortLabel: 'Push', icon: Bell }]
             : []),
           { id: 'respaldo' as const, label: 'Respaldo y Restauración', shortLabel: 'Respaldos', icon: Database },
           { id: 'auditoria' as const, label: 'Reportes y Auditoría', shortLabel: 'Auditoría', icon: FileText },
@@ -690,6 +729,58 @@ export function SettingsPage() {
                 ))
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. RESPALDO Y RESTAURACIÓN */}
+      {activeTab === 'notificaciones' && canManagePush && (
+        <div className="space-y-6">
+          <div className="rounded-xl border border-border bg-surface p-5 sm:p-6 shadow-card">
+            <div className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="font-serif text-lg font-bold text-ink">Dispositivos con notificaciones push</h3>
+                <p className="mt-1 text-xs text-ink-secondary">Usuarios que activaron notificaciones y tienen al menos un dispositivo registrado.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void loadPushSubscribers()}
+                className="flex min-h-[38px] items-center justify-center gap-2 rounded-lg border border-border px-3 text-xs font-semibold text-ink hover:bg-surface-container"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${isLoadingPushSubscribers ? 'animate-spin' : ''}`} /> Actualizar
+              </button>
+            </div>
+
+            {isLoadingPushSubscribers ? (
+              <p className="py-8 text-center text-xs text-ink-muted">Cargando dispositivos registrados…</p>
+            ) : pushSubscribers.length === 0 ? (
+              <p className="py-8 text-center text-xs text-ink-muted">No hay dispositivos push registrados.</p>
+            ) : (
+              <div className="mt-4 divide-y divide-border/60">
+                {pushSubscribers.map((subscriber) => (
+                  <div key={subscriber.userId} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-semibold text-ink">{subscriber.displayName}</p>
+                        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">{subscriber.roleName}</span>
+                        <span className="rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-semibold text-success">{subscriber.deviceCount} dispositivo(s)</span>
+                      </div>
+                      <p className="mt-0.5 truncate text-xs text-ink-secondary">{subscriber.email}</p>
+                      <p className="mt-1 text-[11px] text-ink-muted">Último registro: {new Date(subscriber.lastRegisteredAt).toLocaleString('es-PA')}</p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={sendingPushTo === subscriber.userId}
+                      onClick={() => void handleSendTestPush(subscriber)}
+                      className="flex min-h-[38px] shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary-pressed disabled:cursor-wait disabled:opacity-60"
+                    >
+                      <Send className="h-3.5 w-3.5" />
+                      {sendingPushTo === subscriber.userId ? 'Enviando…' : 'Enviar prueba'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
