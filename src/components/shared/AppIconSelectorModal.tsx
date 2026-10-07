@@ -72,7 +72,7 @@ export const AppIconSelectorModal: React.FC<AppIconSelectorModalProps> = ({
   useEffect(() => {
     const handleInstalled = () => {
       setIsInstalled(true);
-      setInstallMessage('La aplicación fue instalada correctamente.');
+      setInstallMessage('La aplicación fue instalada correctamente. Cierra esta pestaña del navegador y abre el nuevo ícono desde la pantalla de inicio.');
       clearDeferredInstallPrompt();
       setInstallPrompt(null);
     };
@@ -100,12 +100,9 @@ export const AppIconSelectorModal: React.FC<AppIconSelectorModalProps> = ({
         installPrompt.prompt();
         const choiceResult = await installPrompt.userChoice;
         if (choiceResult.outcome === 'accepted') {
-          setInstallMessage('Aplicación instalada correctamente. Puedes abrirla desde la pantalla de inicio.');
+          setInstallMessage('La aplicación fue instalada correctamente. Cierra esta pestaña del navegador y abre el nuevo ícono desde la pantalla de inicio.');
           clearDeferredInstallPrompt();
           setInstallPrompt(null);
-          setTimeout(() => {
-            onClose();
-          }, 2000);
         }
       } catch (err) {
         console.warn('Error launching install prompt:', err);
