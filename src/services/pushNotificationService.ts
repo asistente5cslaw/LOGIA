@@ -246,12 +246,17 @@ class PushNotificationService {
       return 'denied';
     }
 
-    await this.initServiceWorker();
-
     try {
+      // La solicitud debe ejecutarse mientras todavía existe la activación
+      // del usuario (por ejemplo, después de pulsar “Iniciar sesión”).
+      // Registrar el Service Worker antes podía hacer que Safari/Chrome
+      // bloquearan el diálogo nativo por haberse perdido esa activación.
       const permission = await Notification.requestPermission();
       localStorage.setItem('lodge_notifications_enabled', permission === 'granted' ? 'true' : 'false');
-      if (permission === 'granted') await this.registerCurrentDevice();
+      if (permission === 'granted') {
+        await this.initServiceWorker();
+        await this.registerCurrentDevice();
+      }
       this.notifyListeners();
       return permission;
     } catch (err) {

@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Mail, Lock, Loader2, ArrowRight, UserPlus, Eye, EyeOff } from 'lucide-react';
 import { LodgeLogo } from '@/components/shared/LodgeLogo';
 import { Modal } from '@/components/shared/Modal';
+import { pushNotificationService } from '@/services/pushNotificationService';
 
 export function LoginPage() {
   const { user, login, resetPassword } = useAuth();
@@ -42,9 +43,19 @@ export function LoginPage() {
     }, 9000);
 
     try {
+      // Solicitar el permiso antes de la llamada de autenticación mantiene la
+      // activación nativa del clic en “Iniciar sesión” en todos los navegadores
+      // que permiten notificaciones web. Rechazarlo no impide entrar al sistema.
+      try {
+        await pushNotificationService.requestPermission();
+      } catch (notificationError) {
+        console.warn('No se pudo solicitar el permiso de notificaciones al iniciar sesión:', notificationError);
+      }
+
       await login(email, password);
       finished = true;
       clearTimeout(timer);
+
       navigate('/app', { replace: true });
     } catch (err: unknown) {
       finished = true;
