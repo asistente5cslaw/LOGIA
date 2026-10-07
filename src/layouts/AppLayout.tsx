@@ -20,6 +20,7 @@ import { useAppleDialog } from '@/components/shared/AppleDialog';
 import { AppIconSelectorModal } from '@/components/shared/AppIconSelectorModal';
 import { IdentityRevalidationModal } from '@/components/shared/IdentityRevalidationModal';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { pushNotificationService } from '@/services/pushNotificationService';
 import { DATA_CHANGED_EVENT } from '@/hooks/useRealtimeRefresh';
 
 const desktopNavItems = [
@@ -68,6 +69,20 @@ export function AppLayout() {
       setIsIconModalOpen(true);
     }
   }, []);
+
+  // Una PWA instalada puede abrirse con la sesión ya guardada y no pasar por
+  // LoginPage. Intentamos solicitar el permiso al iniciar; si el navegador
+  // exige una acción explícita, el botón de campana queda como respaldo.
+  useEffect(() => {
+    if (!user?.id || !pushNotificationService.isSupported()) return undefined;
+    if (pushNotificationService.getPermission() !== 'default') return undefined;
+
+    const timer = window.setTimeout(() => {
+      void pushNotificationService.requestPermission().catch(() => undefined);
+    }, 400);
+
+    return () => window.clearTimeout(timer);
+  }, [user?.id]);
 
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
