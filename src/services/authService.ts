@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { supabase, supabaseUrl, isSupabaseConfigured } from '@/lib/supabase';
 import type { User, UserProfile, Invitation, MasonicDegree, InstitutionalRoleCode } from '@/types';
 import { institutionalRoles } from '@/data/rolesData';
 import { auditService } from './auditService';
@@ -322,8 +322,22 @@ export const authService = {
 
   async logout(): Promise<void> {
     if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
-    const { error } = await supabase.auth.signOut();
-    if (error) throw new Error(translateAuthError(error));
+    // El cierre debe ser inmediato aunque el navegador móvil no consiga
+    // contactar al servidor. scope=local elimina la sesión persistida en el
+    // dispositivo y evita que la PWA vuelva a abrirla automáticamente.
+    try {
+      const { error } = await supabase.auth.signOut({ scope: 'local' });
+      if (error) throw new Error(translateAuthError(error));
+    } finally {
+      try {
+        sessionStorage.clear();
+        const projectRef = new URL(supabaseUrl).hostname.split('.')[0];
+        localStorage.removeItem(`sb-${projectRef}-auth-token`);
+      } catch {
+        // El estado de sesión de Supabase ya fue limpiado; ignora restricciones
+        // de almacenamiento privado del navegador.
+      }
+    }
   },
 
   async getCurrentSessionUser(): Promise<User | null> {

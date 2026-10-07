@@ -143,8 +143,13 @@ export function AppLayout() {
       type: 'confirm',
     });
     if (confirmed) {
-      await logout();
-      navigate('/login');
+      try {
+        await logout();
+      } finally {
+        // Incluso si el navegador interrumpe la llamada de red, la pantalla
+        // protegida no debe permanecer visible.
+        navigate('/login', { replace: true });
+      }
     }
   };
 

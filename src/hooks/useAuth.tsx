@@ -94,8 +94,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    await authService.logout();
+    // Ocultar la sesión de inmediato para que la UI móvil no quede abierta
+    // mientras Supabase termina de limpiar el almacenamiento local.
     setUser(null);
+    await authService.logout();
   };
 
   const resetPassword = async (email: string) => {
