@@ -125,7 +125,7 @@ export function DashboardPage() {
             Bienvenido, {user?.displayName || 'Hermano'}
           </h1>
           <p className="text-xs sm:text-sm text-ink-muted mt-1 flex items-center gap-2">
-            <span>Resp.·. Log.·. Unión Fraternal No. 21</span>
+            <span>R.·. L.·. L.·. Unión Fraternal No. 21</span>
             <span>•</span>
             <span className="text-amber-700 font-semibold">{userRoleName}</span>
           </p>
