@@ -153,6 +153,7 @@ export const memberService = {
     const now = new Date().toISOString();
     const isNew = !member.id;
     const memberId = member.id || `m-${Date.now()}`;
+    const previousMember = member.id ? await this.getMemberById(member.id) : undefined;
 
     const completeMember: Member = {
       ...member,
@@ -220,6 +221,17 @@ export const memberService = {
       user,
       { name: `${completeMember.firstName} ${completeMember.lastName}`, role: completeMember.roleId }
     );
+
+    if (previousMember && previousMember.roleId !== completeMember.roleId) {
+      await auditService.log('CAMBIAR_ROL_MIEMBRO', 'members', completeMember.id, user, {
+        targetMemberId: completeMember.id,
+        targetName: `${completeMember.firstName} ${completeMember.lastName}`,
+        actorName: user.name,
+        previousRoleId: previousMember.roleId,
+        newRoleId: completeMember.roleId,
+        source: 'edicion_ficha',
+      });
+    }
 
     return completeMember;
   },
