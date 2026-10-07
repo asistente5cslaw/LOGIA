@@ -21,6 +21,26 @@ interface AppIconSelectorModalProps {
   onClose: () => void;
 }
 
+function getInstallFallbackMessage(): string {
+  if (typeof navigator === 'undefined') return '';
+  const userAgent = navigator.userAgent.toLowerCase();
+  const isIOS = /iphone|ipad|ipod/.test(userAgent) || (userAgent.includes('macintosh') && navigator.maxTouchPoints > 1);
+
+  if (isIOS) {
+    return 'En iPhone o iPad: abre esta página en Safari, toca Compartir y selecciona “Añadir a la pantalla de inicio”. Apple no permite que una web confirme esa instalación automáticamente.';
+  }
+  if (userAgent.includes('android')) {
+    return 'En Android: abre el menú del navegador y selecciona “Instalar aplicación” o “Añadir a pantalla de inicio”. Chrome y Edge mostrarán el diálogo automáticamente cuando el dispositivo cumpla los requisitos de instalación.';
+  }
+  if (userAgent.includes('firefox')) {
+    return 'En Firefox: abre el menú del navegador y selecciona “Instalar” o “Añadir a la pantalla de inicio”, según tu dispositivo.';
+  }
+  if (userAgent.includes('safari') && !userAgent.includes('chrome')) {
+    return 'En Safari: usa el menú Compartir y selecciona “Añadir al Dock” o “Añadir a la pantalla de inicio”, según el dispositivo.';
+  }
+  return 'Este navegador no habilitó el instalador automático. Abre su menú y selecciona “Instalar aplicación” o “Añadir a pantalla de inicio”.';
+}
+
 export const AppIconSelectorModal: React.FC<AppIconSelectorModalProps> = ({
   isOpen,
   onClose,
@@ -104,11 +124,7 @@ export const AppIconSelectorModal: React.FC<AppIconSelectorModalProps> = ({
         console.warn('Error launching install prompt:', err);
       }
     } else {
-      setInstallMessage(
-        isIOS
-          ? 'Ícono guardado. En Safari toca Compartir y luego “Añadir a la pantalla de inicio”.'
-          : 'El navegador no habilitó el instalador automático para esta sesión. Abre su menú y elige “Instalar aplicación” o “Añadir a pantalla de inicio”.'
-      );
+      setInstallMessage(getInstallFallbackMessage());
     }
   };
 
