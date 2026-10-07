@@ -428,8 +428,9 @@ export function CalendarPage() {
       } else {
         toast.success(`Push enviado a ${result.sent} dispositivo${result.sent === 1 ? '' : 's'}.`);
       }
-    } catch {
-      toast.error('No se pudo enviar el push global. Verifica las claves VAPID y la Edge Function.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Error desconocido';
+      toast.error(`No se pudo enviar el push global: ${message}`);
     } finally {
       setIsSendingPush(false);
     }
