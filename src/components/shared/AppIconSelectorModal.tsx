@@ -107,7 +107,7 @@ export const AppIconSelectorModal: React.FC<AppIconSelectorModalProps> = ({
       setInstallMessage(
         isIOS
           ? 'Ícono guardado. En Safari toca Compartir y luego “Añadir a la pantalla de inicio”.'
-          : 'Ícono guardado. Abre el menú del navegador y elige “Instalar aplicación” o “Añadir a pantalla de inicio”.'
+          : 'El navegador no habilitó el instalador automático para esta sesión. Abre su menú y elige “Instalar aplicación” o “Añadir a pantalla de inicio”.'
       );
     }
   };
@@ -262,8 +262,8 @@ export const AppIconSelectorModal: React.FC<AppIconSelectorModalProps> = ({
               </>
             ) : (
               <>
-                <Check className="w-4 h-4" />
-                <span>{isIOS ? 'Guardar y ver instrucciones' : 'Guardar y ver instalación'}</span>
+                <Download className="w-4 h-4" />
+                <span>{isIOS ? 'Guardar y ver instrucciones' : 'Instalar aplicación'}</span>
               </>
             )}
           </button>

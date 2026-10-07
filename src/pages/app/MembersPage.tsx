@@ -110,6 +110,7 @@ export function MembersPage() {
   // El Secretario y el Venerable Maestro pueden validar identidades y selfies de registro
   const canValidateIdentity = isVenerableMaestro || isSecretario || canManageMembers;
   const canViewDeletedMembers = isVenerableMaestro || isSecretario || user?.profile?.technicalRole === 'admin';
+  const canManageDeletedMembers = isVenerableMaestro || user?.profile?.technicalRole === 'admin';
 
   const loadMembers = useCallback(async () => {
     try {
@@ -678,7 +679,7 @@ export function MembersPage() {
                         </button>
                       )}
 
-                      {isVenerableMaestro && isDeleted && (
+                      {canManageDeletedMembers && isDeleted && (
                         <>
                           <button
                             type="button"

@@ -3,6 +3,9 @@ import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 
+// Registrar el listener beforeinstallprompt antes de montar la interfaz.
+// Así el botón de instalación puede abrir el diálogo nativo del navegador.
+import './services/pwaIconService';
 import { pushNotificationService } from './services/pushNotificationService';
 
 // Limpieza forzada de datos falsos / mock de versiones anteriores en el navegador del usuario
