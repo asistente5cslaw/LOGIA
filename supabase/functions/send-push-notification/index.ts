@@ -16,41 +16,56 @@ Deno.serve(async (request) => {
     if (profile?.access_disabled) return response({ error: 'Cuenta deshabilitada' }, 403);
     const requestPayload = await request.json() as {
       recipientRoles?: string[];
+      recipientEmails?: string[];
       type?: string;
       [key: string]: unknown;
     };
     const isNewRegistrationNotice = requestPayload.type === 'nuevo_registro';
+    const isIdentityResubmission = requestPayload.type === 'identidad_reenviada';
     const allowed = profile && ['admin', 'secretary'].includes(profile.technical_role) || profile?.role_id === 'vm' || profile?.role_id === 'sec';
-    if (!allowed && !isNewRegistrationNotice) return response({ error: 'No autorizado' }, 403);
+    if (!allowed && !isNewRegistrationNotice && !isIdentityResubmission) return response({ error: 'No autorizado' }, 403);
 
     webpush.setVapidDetails(
       Deno.env.get('VAPID_SUBJECT') || 'mailto:secretaria@unionfraternal21.org',
       Deno.env.get('VAPID_PUBLIC_KEY')!,
       Deno.env.get('VAPID_PRIVATE_KEY')!,
     );
-    const { recipientRoles, ...notificationPayload } = requestPayload;
+    const { recipientRoles, recipientEmails, ...notificationPayload } = requestPayload;
     const payload = JSON.stringify(notificationPayload);
     let subscriptionsQuery = admin.from('push_subscriptions').select('id, endpoint, expiration_time, p256dh, auth, user_id');
     if (isNewRegistrationNotice) {
       const { data: recipients, error: recipientsError } = await admin
         .from('profiles')
         .select('id')
-        .in('role_id', ['vm', 'sec', 'adm'])
+        .in('role_id', ['sec', 'adm'])
         .or('access_disabled.eq.false,access_disabled.is.null');
       if (recipientsError) throw recipientsError;
       const recipientIds = (recipients || []).map((recipient) => recipient.id);
-      if (recipientIds.length === 0) return response({ sent: 0, removed: 0 });
+      if (recipientIds.size === 0) return response({ sent: 0, removed: 0 });
       subscriptionsQuery = subscriptionsQuery.in('user_id', recipientIds);
-    } else if (recipientRoles && recipientRoles.length > 0) {
-      const { data: recipients, error: recipientsError } = await admin
-        .from('profiles')
-        .select('id')
-        .in('role_id', recipientRoles)
-        .or('access_disabled.eq.false,access_disabled.is.null');
-      if (recipientsError) throw recipientsError;
-      const recipientIds = (recipients || []).map((recipient) => recipient.id);
+    } else {
+      const recipientIds = new Set<string>();
+      if (recipientRoles && recipientRoles.length > 0) {
+        const { data: recipients, error: recipientsError } = await admin
+          .from('profiles')
+          .select('id')
+          .in('role_id', recipientRoles)
+          .or('access_disabled.eq.false,access_disabled.is.null');
+        if (recipientsError) throw recipientsError;
+        (recipients || []).forEach((recipient) => recipientIds.add(recipient.id));
+      }
+      if (recipientEmails && recipientEmails.length > 0) {
+        const normalizedEmails = recipientEmails.map((email) => email.trim().toLowerCase()).filter(Boolean);
+        const { data: recipients, error: recipientsError } = await admin
+          .from('profiles')
+          .select('id')
+          .in('email', normalizedEmails)
+          .or('access_disabled.eq.false,access_disabled.is.null');
+        if (recipientsError) throw recipientsError;
+        (recipients || []).forEach((recipient) => recipientIds.add(recipient.id));
+      }
       if (recipientIds.length === 0) return response({ sent: 0, removed: 0 });
-      subscriptionsQuery = subscriptionsQuery.in('user_id', recipientIds);
+      subscriptionsQuery = subscriptionsQuery.in('user_id', Array.from(recipientIds));
     }
     const { data: subscriptions, error } = await subscriptionsQuery;
     if (error) throw error;

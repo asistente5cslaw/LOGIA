@@ -6,8 +6,9 @@ export interface PushNotificationPayload {
   body: string;
   url?: string;
   tag?: string;
-  type?: 'convocatoria' | 'trazado' | 'aviso' | 'nuevo_registro';
+  type?: 'convocatoria' | 'trazado' | 'aviso' | 'nuevo_registro' | 'identidad_reenviada';
   recipientRoles?: string[];
+  recipientEmails?: string[];
 }
 
 export interface LodgeNotificationItem {
@@ -18,7 +19,7 @@ export interface LodgeNotificationItem {
   time: string;
   timestamp: number;
   read: boolean;
-  type: 'convocatoria' | 'trazado' | 'aviso' | 'nuevo_registro';
+  type: 'convocatoria' | 'trazado' | 'aviso' | 'nuevo_registro' | 'identidad_reenviada';
 }
 
 const STORAGE_KEY = 'lodge_notifications_list';
@@ -341,7 +342,35 @@ class PushNotificationService {
       url: '/app/miembros',
       tag: `nuevo-registro-${email.toLowerCase()}`,
       type: 'nuevo_registro',
-      recipientRoles: ['vm', 'sec', 'adm'],
+      recipientRoles: ['sec', 'adm'],
+    });
+  }
+
+  public async notifyIdentityResult(
+    email: string,
+    approved: boolean,
+    reviewerName?: string,
+  ): Promise<{ sent: number; removed: number }> {
+    return this.sendPushToAll({
+      title: approved ? 'Identidad aprobada' : 'Nueva selfie solicitada',
+      body: approved
+        ? 'Tu identidad fue aprobada. Ya tienes acceso completo al sistema.'
+        : `${reviewerName || 'Secretaría'} rechazó la selfie. Debes enviar una nueva selfie para continuar con la validación.`,
+      url: '/app',
+      tag: `identidad-${approved ? 'aprobada' : 'rechazada'}-${email.toLowerCase()}`,
+      type: 'aviso',
+      recipientEmails: [email.trim().toLowerCase()],
+    });
+  }
+
+  public async notifyIdentityResubmission(displayName: string, email: string): Promise<{ sent: number; removed: number }> {
+    return this.sendPushToAll({
+      title: 'Nueva selfie pendiente de revisión',
+      body: `${displayName} (${email}) envió una nueva selfie. Revisa nuevamente su identidad.`,
+      url: '/app/miembros',
+      tag: `identidad-reenviada-${email.toLowerCase()}`,
+      type: 'identidad_reenviada',
+      recipientRoles: ['sec', 'adm'],
     });
   }
 

@@ -7,6 +7,7 @@ import { memberService } from '@/services/memberService';
 import type { BiometricValidationResult } from '@/services/identityService';
 import type { Member } from '@/types';
 import { toast } from 'sonner';
+import { pushNotificationService } from '@/services/pushNotificationService';
 
 export function IdentityRevalidationModal() {
   const { user, refreshUser } = useAuth();
@@ -52,6 +53,10 @@ export function IdentityRevalidationModal() {
         selfieUrl: result.selfieUrl,
         identityValidatedAt: new Date().toISOString(),
       });
+      void pushNotificationService.notifyIdentityResubmission(
+        user.displayName || user.profile?.displayName || 'Un miembro',
+        user.email,
+      ).catch((error) => console.warn('No se pudo avisar la nueva selfie a Secretaría:', error));
       await refreshUser();
       setMember((current) => current ? {
         ...current,

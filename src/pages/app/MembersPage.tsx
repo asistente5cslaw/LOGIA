@@ -32,6 +32,7 @@ import { AppleEmoji } from '@/components/shared/AppleEmoji';
 import { useAppleDialog } from '@/components/shared/AppleDialog';
 import { formatDateSpanish } from '@/lib/dateUtils';
 import { toast } from 'sonner';
+import { pushNotificationService } from '@/services/pushNotificationService';
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 import { auditService } from '@/services/auditService';
 import type { AuditLog } from '@/types';
@@ -254,6 +255,11 @@ export function MembersPage() {
         'verified',
         validatorUser
       );
+      void pushNotificationService.notifyIdentityResult(
+        validatingMember.email,
+        true,
+        user?.displayName || user?.profile?.displayName,
+      ).catch((error) => console.warn('No se pudo enviar aviso de identidad aprobada:', error));
       toast.success(`Identidad de ${validatingMember.firstName} ${validatingMember.lastName} aprobada exitosamente.`);
       setValidatingMember(null);
       loadMembers();
@@ -278,6 +284,11 @@ export function MembersPage() {
         'rejected',
         validatorUser
       );
+      void pushNotificationService.notifyIdentityResult(
+        validatingMember.email,
+        false,
+        user?.displayName || user?.profile?.displayName,
+      ).catch((error) => console.warn('No se pudo enviar aviso de nueva selfie:', error));
       toast.info(`Validación rechazada. Se solicitará nueva selfie al hermano.`);
       setValidatingMember(null);
       loadMembers();
