@@ -67,6 +67,7 @@ export function SettingsPage() {
   const [pushSubscribers, setPushSubscribers] = useState<PushSubscriber[]>([]);
   const [isLoadingPushSubscribers, setIsLoadingPushSubscribers] = useState(false);
   const [sendingPushTo, setSendingPushTo] = useState<string | null>(null);
+  const [selectedPushUserId, setSelectedPushUserId] = useState<string | null>(null);
 
   // Respaldo e Importación
   const [importJsonText, setImportJsonText] = useState('');
@@ -90,7 +91,7 @@ export function SettingsPage() {
   };
 
   const handleSendTestPush = async (subscriber: PushSubscriber) => {
-    setSendingPushTo(subscriber.subscriptionId);
+    setSendingPushTo(subscriber.userId);
     try {
       const result = await pushNotificationService.sendTestPushToUser(subscriber.email);
       if (result.sent > 0) toast.success(`Notificación enviada a ${subscriber.displayName}.`);
@@ -122,6 +123,19 @@ export function SettingsPage() {
       toast.error('No se pudo eliminar el dispositivo.');
     }
   };
+
+  const pushSubscriberGroups = Array.from(
+    pushSubscribers.reduce((groups, device) => {
+      const existing = groups.get(device.userId);
+      if (existing) existing.push(device);
+      else groups.set(device.userId, [device]);
+      return groups;
+    }, new Map<string, PushSubscriber[]>())
+  ).map(([userId, devices]) => ({ userId, devices }));
+
+  const selectedPushDevices = selectedPushUserId
+    ? pushSubscribers.filter((device) => device.userId === selectedPushUserId)
+    : [];
 
   const loadData = async () => {
     try {
@@ -770,51 +784,80 @@ export function SettingsPage() {
               <p className="py-8 text-center text-xs text-ink-muted">No hay dispositivos push registrados.</p>
             ) : (
               <div className="mt-4 divide-y divide-border/60">
-                {pushSubscribers.map((subscriber) => (
-                  <div key={subscriber.subscriptionId} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+                {pushSubscriberGroups.map(({ userId, devices }) => {
+                  const subscriber = devices[0];
+                  return (
+                  <div key={userId} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="font-semibold text-ink">{subscriber.displayName}</p>
                         <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">{subscriber.roleName}</span>
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${subscriber.enabled ? 'bg-success/10 text-success' : 'bg-surface-container text-ink-muted'}`}>
-                          {subscriber.enabled ? 'Activo' : 'Deshabilitado'}
-                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedPushUserId(userId)}
+                          className="rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-semibold text-success underline decoration-dotted underline-offset-2 hover:bg-success/20"
+                        >
+                          {devices.length} dispositivo{devices.length === 1 ? '' : 's'}
+                        </button>
                       </div>
                       <p className="mt-0.5 truncate text-xs text-ink-secondary">{subscriber.email}</p>
-                      <p className="mt-1 text-xs font-medium text-ink-secondary">{subscriber.deviceLabel}</p>
-                      <p className="mt-1 text-[11px] text-ink-muted">Registrado: {new Date(subscriber.registeredAt).toLocaleString('es-PA')} · Actualizado: {new Date(subscriber.updatedAt).toLocaleString('es-PA')}</p>
+                      <p className="mt-1 text-[11px] text-ink-muted">Último registro: {new Date(Math.max(...devices.map((device) => new Date(device.updatedAt).getTime()))).toLocaleString('es-PA')}</p>
                     </div>
-                    <div className="flex flex-wrap gap-2 sm:justify-end">
-                      <button
-                        type="button"
-                        onClick={() => void handleTogglePushDevice(subscriber)}
-                        className="flex min-h-[38px] items-center justify-center gap-2 rounded-lg border border-border px-3 text-xs font-semibold text-ink hover:bg-surface-container"
-                      >
-                        <Power className="h-3.5 w-3.5" />
-                        {subscriber.enabled ? 'Deshabilitar' : 'Habilitar'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void handleDeletePushDevice(subscriber)}
-                        className="flex min-h-[38px] items-center justify-center gap-2 rounded-lg border border-error/30 px-3 text-xs font-semibold text-error hover:bg-error/5"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" /> Eliminar
-                      </button>
-                      <button
-                        type="button"
-                        disabled={!subscriber.enabled || sendingPushTo === subscriber.subscriptionId}
-                        onClick={() => void handleSendTestPush(subscriber)}
-                        className="flex min-h-[38px] items-center justify-center gap-2 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary-pressed disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        <Send className="h-3.5 w-3.5" />
-                        {sendingPushTo === subscriber.subscriptionId ? 'Enviando…' : 'Enviar prueba'}
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      disabled={devices.every((device) => !device.enabled) || sendingPushTo === userId}
+                      onClick={() => void handleSendTestPush(subscriber)}
+                      className="flex min-h-[38px] shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary-pressed disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <Send className="h-3.5 w-3.5" />
+                      {sendingPushTo === userId ? 'Enviando…' : 'Enviar prueba'}
+                    </button>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
+
+          {selectedPushUserId && selectedPushDevices.length > 0 && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" role="dialog" aria-modal="true" aria-labelledby="push-devices-title">
+              <div className="w-full max-w-2xl rounded-2xl border border-border bg-surface shadow-2xl">
+                <div className="flex items-start justify-between border-b border-border px-5 py-4">
+                  <div>
+                    <h3 id="push-devices-title" className="font-serif text-xl font-bold text-ink">Dispositivos push</h3>
+                    <p className="mt-1 text-xs text-ink-secondary">{selectedPushDevices[0].displayName} · {selectedPushDevices[0].email}</p>
+                  </div>
+                  <button type="button" onClick={() => setSelectedPushUserId(null)} className="rounded-lg px-2 py-1 text-xl text-ink-muted hover:bg-surface-container" aria-label="Cerrar">×</button>
+                </div>
+                <div className="max-h-[65vh] overflow-y-auto px-5">
+                  {selectedPushDevices.map((device) => (
+                    <div key={device.subscriptionId} className="flex flex-col gap-3 border-b border-border/60 py-4 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-semibold text-ink">{device.deviceLabel}</p>
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${device.enabled ? 'bg-success/10 text-success' : 'bg-surface-container text-ink-muted'}`}>
+                            {device.enabled ? 'Activo' : 'Deshabilitado'}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-[11px] text-ink-muted">Registrado: {new Date(device.registeredAt).toLocaleString('es-PA')}</p>
+                      </div>
+                      <div className="flex flex-wrap gap-2 sm:justify-end">
+                        <button type="button" onClick={() => void handleTogglePushDevice(device)} className="flex min-h-[36px] items-center gap-2 rounded-lg border border-border px-3 text-xs font-semibold text-ink hover:bg-surface-container">
+                          <Power className="h-3.5 w-3.5" /> {device.enabled ? 'Deshabilitar' : 'Habilitar'}
+                        </button>
+                        <button type="button" onClick={() => void handleDeletePushDevice(device)} className="flex min-h-[36px] items-center gap-2 rounded-lg border border-error/30 px-3 text-xs font-semibold text-error hover:bg-error/5">
+                          <Trash2 className="h-3.5 w-3.5" /> Eliminar
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-end px-5 py-4">
+                  <button type="button" onClick={() => setSelectedPushUserId(null)} className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary-pressed">Cerrar</button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
