@@ -92,6 +92,7 @@ export function MembersPage() {
 
   const isVenerableMaestro = user?.profile?.roleId === 'vm';
   const isSecretario = user?.profile?.roleId === 'sec';
+  const isAdministrador = user?.profile?.technicalRole === 'admin' || user?.profile?.roleId === 'adm';
   const canManageMembers = hasPermission('manage_members') || isVenerableMaestro || isSecretario;
 
   const canChangeMemberRole = (member: Member): boolean => {
@@ -108,8 +109,8 @@ export function MembersPage() {
     return !(user?.profile?.roleId === 'sec' && roleId === 'vm');
   };
 
-  // El Secretario y el Venerable Maestro pueden validar identidades y selfies de registro
-  const canValidateIdentity = isVenerableMaestro || isSecretario || canManageMembers;
+  // Solo Secretaría y Administración validan identidades y selfies de registro.
+  const canValidateIdentity = isSecretario || isAdministrador;
   const canViewDeletedMembers = isVenerableMaestro || isSecretario || user?.profile?.technicalRole === 'admin';
   const canManageDeletedMembers = isVenerableMaestro || user?.profile?.technicalRole === 'admin';
 

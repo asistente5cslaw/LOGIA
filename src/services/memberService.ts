@@ -332,18 +332,9 @@ export const memberService = {
           .eq('id', memberId);
       if (error) throw error;
 
-      // La pantalla de acceso restringido consulta el estado en profiles.
-      // Mantener ambos registros sincronizados permite liberar el acceso
-      // inmediatamente después de aprobar la identidad.
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({
-          identity_status: status,
-          identity_verified: status === 'verified',
-          updated_at: now,
-        })
-        .or(`member_id.eq.${memberId},id.eq.${memberId}`);
-      if (profileError) throw profileError;
+      // El trigger trg_sync_member_identity_status sincroniza automáticamente
+      // members con profiles. Evitamos una segunda actualización directa que
+      // puede ser bloqueada por RLS y dejar el rechazo/aprobación incompleto.
     }
 
     const members = await this.getAllMembers(true, false, true);
