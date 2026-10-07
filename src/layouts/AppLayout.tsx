@@ -70,18 +70,35 @@ export function AppLayout() {
     }
   }, []);
 
-  // Una PWA instalada puede abrirse con la sesión ya guardada y no pasar por
-  // LoginPage. Intentamos solicitar el permiso al iniciar; si el navegador
-  // exige una acción explícita, el botón de campana queda como respaldo.
+  const isInstalledApp = () => window.matchMedia('(display-mode: standalone)').matches
+    || Boolean((navigator as Navigator & { standalone?: boolean }).standalone);
+
+  // Primero ofrecemos instalar la PWA. Solo después de instalarla (o si ya
+  // está instalada) se solicita el permiso nativo de notificaciones.
   useEffect(() => {
-    if (!user?.id || !pushNotificationService.isSupported()) return undefined;
-    if (pushNotificationService.getPermission() !== 'default') return undefined;
+    if (!user?.id) return undefined;
 
-    const timer = window.setTimeout(() => {
+    const askForNotifications = () => {
+      if (!isInstalledApp() || !pushNotificationService.isSupported() || pushNotificationService.getPermission() !== 'default') return;
       void pushNotificationService.requestPermission().catch(() => undefined);
-    }, 400);
+    };
 
-    return () => window.clearTimeout(timer);
+    if (isInstalledApp()) {
+      const timer = window.setTimeout(askForNotifications, 400);
+      return () => window.clearTimeout(timer);
+    }
+
+    const installPromptSeenKey = `pwa_install_prompt_seen_${user.id}`;
+    if (sessionStorage.getItem(installPromptSeenKey) !== 'true') {
+      sessionStorage.setItem(installPromptSeenKey, 'true');
+      setIsIconModalOpen(true);
+    }
+
+    const handleInstalled = () => {
+      window.setTimeout(askForNotifications, 500);
+    };
+    window.addEventListener('appinstalled', handleInstalled);
+    return () => window.removeEventListener('appinstalled', handleInstalled);
   }, [user?.id]);
 
   useEffect(() => {
