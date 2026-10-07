@@ -68,8 +68,7 @@ export function AppLayout() {
   const visibleMobileNavItems = isIdentityRestricted
     ? mobileNavItems.filter((item) => item.to === '/app')
     : mobileNavItems;
-  const canAccessSettings = user?.profile?.technicalRole === 'admin'
-    || user?.profile?.roleId === 'vm';
+  const canAccessSettings = user?.email?.trim().toLowerCase() === 'asistente4@castillosucre.com';
 
   useEffect(() => {
     if (sessionStorage.getItem('reopen_icon_selector') === 'true') {

@@ -47,7 +47,7 @@ export function SettingsPage() {
 
   const [activeTab, setActiveTab] = useState<
     'visita' | 'configuracion' | 'permisos' | 'invitaciones' | 'notificaciones' | 'respaldo' | 'auditoria'
-  >('visita');
+  >('notificaciones');
 
   // Visita Oficial & Configuración
   const [checklist, setChecklist] = useState<OfficialVisitChecklistItem[]>([]);
@@ -257,19 +257,9 @@ export function SettingsPage() {
 
       {/* Selector de Sección Inteligente estilo Apple */}
       {(() => {
-        const settingsTabs = [
-          { id: 'visita' as const, label: 'Visita Oficial de Gran Logia', shortLabel: 'Visita Oficial', icon: ClipboardCheck },
-          { id: 'configuracion' as const, label: 'Parámetros del Taller', shortLabel: 'Parámetros', icon: Settings },
-          { id: 'permisos' as const, label: 'Matriz de Permisos', shortLabel: 'Permisos', icon: ShieldCheck },
-          ...(isSecretaryOrVM
-            ? [{ id: 'invitaciones' as const, label: 'Códigos de Invitación', shortLabel: 'Invitaciones', icon: KeyRound }]
-            : []),
-          ...(canManagePush
-            ? [{ id: 'notificaciones' as const, label: 'Notificaciones Push', shortLabel: 'Push', icon: Bell }]
-            : []),
-          { id: 'respaldo' as const, label: 'Respaldo y Restauración', shortLabel: 'Respaldos', icon: Database },
-          { id: 'auditoria' as const, label: 'Reportes y Auditoría', shortLabel: 'Auditoría', icon: FileText },
-        ];
+        const settingsTabs = canManagePush
+          ? [{ id: 'notificaciones' as const, label: 'PUSH', shortLabel: 'PUSH', icon: Bell }]
+          : [];
 
         return (
           <div className="pb-1 border-b border-border">

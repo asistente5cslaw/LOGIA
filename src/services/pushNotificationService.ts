@@ -421,16 +421,22 @@ class PushNotificationService {
     if (userIds.length === 0) return [];
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
-      .select('id, email, display_name, role_id, roles(name)')
+      .select('id, email, display_name, role_id')
       .in('id', userIds);
     if (profilesError) throw profilesError;
+
+    const roleIds = Array.from(new Set((profiles || []).map((profile) => profile.role_id).filter(Boolean)));
+    const { data: roles, error: rolesError } = roleIds.length > 0
+      ? await supabase.from('roles').select('id, name').in('id', roleIds)
+      : { data: [], error: null };
+    if (rolesError) throw rolesError;
+    const roleById = new Map((roles || []).map((role) => [role.id, role.name]));
 
     const profileById = new Map((profiles || []).map((profile) => [profile.id, profile]));
     const grouped = new Map<string, PushSubscriber>();
     for (const subscription of subscriptions || []) {
       const profile = profileById.get(subscription.user_id);
       if (!profile) continue;
-      const role = Array.isArray(profile.roles) ? profile.roles[0] : profile.roles;
       const registeredAt = subscription.updated_at || subscription.created_at;
       const current = grouped.get(subscription.user_id);
       if (current) {
@@ -442,7 +448,7 @@ class PushNotificationService {
           userId: subscription.user_id,
           email: profile.email,
           displayName: profile.display_name,
-          roleName: role?.name || profile.role_id,
+          roleName: roleById.get(profile.role_id) || profile.role_id,
           deviceCount: 1,
           lastRegisteredAt: registeredAt,
           userAgents: subscription.user_agent ? [subscription.user_agent] : [],
