@@ -10,6 +10,8 @@
   "background_color": "#FBF9F5",
   "theme_color": "#78292A",
   "icons": [
-    { "src": "/icons/logo-uf21-emblem.jpg", "sizes": "1024x1024", "type": "image/jpeg", "purpose": "any maskable" }
+    { "src": "/logo-uf21.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/logo-uf21.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icons/logo-uf21-emblem.jpg", "sizes": "1024x1024", "type": "image/jpeg", "purpose": "any" }
   ]
 }

@@ -1,6 +1,13 @@
 // Service Worker para Notificaciones Push de Logia Unión Fraternal No. 21
-const CACHE_NAME = 'logia-uf21-v3';
-const APP_SHELL = ['/', '/manifest.webmanifest', '/logo-uf21.png', '/apple-touch-icon.png'];
+const CACHE_NAME = 'logia-uf21-v4';
+const APP_SHELL = [
+  '/',
+  '/manifest.webmanifest',
+  '/manifest-emblem.webmanifest',
+  '/manifest-monogram.webmanifest',
+  '/logo-uf21.png',
+  '/apple-touch-icon.png',
+];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
