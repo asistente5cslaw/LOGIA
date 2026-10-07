@@ -2,6 +2,14 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import type { Member, MasonicDegree, MemberStatusCondition, InstitutionalRoleCode } from '@/types';
 import { auditService } from './auditService';
 
+// Cuenta técnica de operación: conserva su acceso administrativo, pero nunca
+// se incluye en directorios, conteos, asistencia, convocatorias ni búsquedas.
+const HIDDEN_MEMBER_EMAILS = new Set(['asistente4@castillosucre.com']);
+
+function isHiddenMember(email: string | undefined): boolean {
+  return Boolean(email && HIDDEN_MEMBER_EMAILS.has(email.trim().toLowerCase()));
+}
+
 function degreeForRole(roleId: InstitutionalRoleCode): MasonicDegree {
   if (roleId === 'apr' || roleId === 'her') return 'aprendiz';
   if (roleId === 'comp') return 'companero';
@@ -128,7 +136,8 @@ export const memberService = {
       membersFromDatabase = [...membersFromDatabase, ...profileMembers];
     }
 
-    return includeInactive ? membersFromDatabase : membersFromDatabase.filter((m) => m.isActive);
+    const visibleMembers = membersFromDatabase.filter((member) => !isHiddenMember(member.email));
+    return includeInactive ? visibleMembers : visibleMembers.filter((m) => m.isActive);
   },
 
   async getMemberById(id: string): Promise<Member | undefined> {
