@@ -31,6 +31,8 @@ import {
   RefreshCw,
   Bell,
   Send,
+  Power,
+  Trash2,
 } from 'lucide-react';
 import { AppleSelect } from '@/components/shared/AppleSelect';
 import { AppleDatePicker } from '@/components/shared/AppleDatePicker';
@@ -88,7 +90,7 @@ export function SettingsPage() {
   };
 
   const handleSendTestPush = async (subscriber: PushSubscriber) => {
-    setSendingPushTo(subscriber.userId);
+    setSendingPushTo(subscriber.subscriptionId);
     try {
       const result = await pushNotificationService.sendTestPushToUser(subscriber.email);
       if (result.sent > 0) toast.success(`Notificación enviada a ${subscriber.displayName}.`);
@@ -97,6 +99,27 @@ export function SettingsPage() {
       toast.error('No se pudo enviar la notificación de prueba.');
     } finally {
       setSendingPushTo(null);
+    }
+  };
+
+  const handleTogglePushDevice = async (device: PushSubscriber) => {
+    try {
+      await pushNotificationService.setPushDeviceEnabled(device.subscriptionId, !device.enabled);
+      toast.success(device.enabled ? 'Dispositivo deshabilitado.' : 'Dispositivo habilitado.');
+      await loadPushSubscribers();
+    } catch {
+      toast.error('No se pudo actualizar el estado del dispositivo.');
+    }
+  };
+
+  const handleDeletePushDevice = async (device: PushSubscriber) => {
+    if (!window.confirm(`¿Eliminar el dispositivo de ${device.displayName}?`)) return;
+    try {
+      await pushNotificationService.removePushDevice(device.subscriptionId);
+      toast.success('Dispositivo eliminado.');
+      await loadPushSubscribers();
+    } catch {
+      toast.error('No se pudo eliminar el dispositivo.');
     }
   };
 
@@ -730,7 +753,7 @@ export function SettingsPage() {
             <div className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h3 className="font-serif text-lg font-bold text-ink">Dispositivos con notificaciones push</h3>
-                <p className="mt-1 text-xs text-ink-secondary">Usuarios que activaron notificaciones y tienen al menos un dispositivo registrado.</p>
+                <p className="mt-1 text-xs text-ink-secondary">Cada fila representa un dispositivo registrado. Los dispositivos deshabilitados no reciben avisos push.</p>
               </div>
               <button
                 type="button"
@@ -748,25 +771,45 @@ export function SettingsPage() {
             ) : (
               <div className="mt-4 divide-y divide-border/60">
                 {pushSubscribers.map((subscriber) => (
-                  <div key={subscriber.userId} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div key={subscriber.subscriptionId} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="font-semibold text-ink">{subscriber.displayName}</p>
                         <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">{subscriber.roleName}</span>
-                        <span className="rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-semibold text-success">{subscriber.deviceCount} dispositivo(s)</span>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${subscriber.enabled ? 'bg-success/10 text-success' : 'bg-surface-container text-ink-muted'}`}>
+                          {subscriber.enabled ? 'Activo' : 'Deshabilitado'}
+                        </span>
                       </div>
                       <p className="mt-0.5 truncate text-xs text-ink-secondary">{subscriber.email}</p>
-                      <p className="mt-1 text-[11px] text-ink-muted">Último registro: {new Date(subscriber.lastRegisteredAt).toLocaleString('es-PA')}</p>
+                      <p className="mt-1 text-xs font-medium text-ink-secondary">{subscriber.deviceLabel}</p>
+                      <p className="mt-1 text-[11px] text-ink-muted">Registrado: {new Date(subscriber.registeredAt).toLocaleString('es-PA')} · Actualizado: {new Date(subscriber.updatedAt).toLocaleString('es-PA')}</p>
                     </div>
-                    <button
-                      type="button"
-                      disabled={sendingPushTo === subscriber.userId}
-                      onClick={() => void handleSendTestPush(subscriber)}
-                      className="flex min-h-[38px] shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary-pressed disabled:cursor-wait disabled:opacity-60"
-                    >
-                      <Send className="h-3.5 w-3.5" />
-                      {sendingPushTo === subscriber.userId ? 'Enviando…' : 'Enviar prueba'}
-                    </button>
+                    <div className="flex flex-wrap gap-2 sm:justify-end">
+                      <button
+                        type="button"
+                        onClick={() => void handleTogglePushDevice(subscriber)}
+                        className="flex min-h-[38px] items-center justify-center gap-2 rounded-lg border border-border px-3 text-xs font-semibold text-ink hover:bg-surface-container"
+                      >
+                        <Power className="h-3.5 w-3.5" />
+                        {subscriber.enabled ? 'Deshabilitar' : 'Habilitar'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleDeletePushDevice(subscriber)}
+                        className="flex min-h-[38px] items-center justify-center gap-2 rounded-lg border border-error/30 px-3 text-xs font-semibold text-error hover:bg-error/5"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" /> Eliminar
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!subscriber.enabled || sendingPushTo === subscriber.subscriptionId}
+                        onClick={() => void handleSendTestPush(subscriber)}
+                        className="flex min-h-[38px] items-center justify-center gap-2 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary-pressed disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <Send className="h-3.5 w-3.5" />
+                        {sendingPushTo === subscriber.subscriptionId ? 'Enviando…' : 'Enviar prueba'}
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

@@ -23,13 +23,16 @@ export interface LodgeNotificationItem {
 }
 
 export interface PushSubscriber {
+  subscriptionId: string;
   userId: string;
   email: string;
   displayName: string;
   roleName: string;
-  deviceCount: number;
-  lastRegisteredAt: string;
-  userAgents: string[];
+  deviceLabel: string;
+  userAgent: string;
+  registeredAt: string;
+  updatedAt: string;
+  enabled: boolean;
 }
 
 const STORAGE_KEY = 'lodge_notifications_list';
@@ -386,6 +389,7 @@ class PushNotificationService {
         p256dh: json.keys.p256dh,
         auth: json.keys.auth,
         user_agent: navigator.userAgent,
+        enabled: true,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'endpoint' });
       if (error) {
@@ -413,7 +417,7 @@ class PushNotificationService {
     if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
     const { data: subscriptions, error: subscriptionsError } = await supabase
       .from('push_subscriptions')
-      .select('user_id, user_agent, created_at, updated_at')
+      .select('id, user_id, user_agent, created_at, updated_at, enabled')
       .order('updated_at', { ascending: false });
     if (subscriptionsError) throw subscriptionsError;
 
@@ -433,29 +437,52 @@ class PushNotificationService {
     const roleById = new Map((roles || []).map((role) => [role.id, role.name]));
 
     const profileById = new Map((profiles || []).map((profile) => [profile.id, profile]));
-    const grouped = new Map<string, PushSubscriber>();
+    const devices: PushSubscriber[] = [];
     for (const subscription of subscriptions || []) {
       const profile = profileById.get(subscription.user_id);
       if (!profile) continue;
-      const registeredAt = subscription.updated_at || subscription.created_at;
-      const current = grouped.get(subscription.user_id);
-      if (current) {
-        current.deviceCount += 1;
-        if (new Date(registeredAt) > new Date(current.lastRegisteredAt)) current.lastRegisteredAt = registeredAt;
-        if (subscription.user_agent && !current.userAgents.includes(subscription.user_agent)) current.userAgents.push(subscription.user_agent);
-      } else {
-        grouped.set(subscription.user_id, {
-          userId: subscription.user_id,
-          email: profile.email,
-          displayName: profile.display_name,
-          roleName: roleById.get(profile.role_id) || profile.role_id,
-          deviceCount: 1,
-          lastRegisteredAt: registeredAt,
-          userAgents: subscription.user_agent ? [subscription.user_agent] : [],
-        });
-      }
+      devices.push({
+        subscriptionId: subscription.id,
+        userId: subscription.user_id,
+        email: profile.email,
+        displayName: profile.display_name,
+        roleName: roleById.get(profile.role_id) || profile.role_id,
+        deviceLabel: this.getDeviceLabel(subscription.user_agent || ''),
+        userAgent: subscription.user_agent || 'Dispositivo no identificado',
+        registeredAt: subscription.created_at,
+        updatedAt: subscription.updated_at,
+        enabled: subscription.enabled !== false,
+      });
     }
-    return Array.from(grouped.values()).sort((a, b) => new Date(b.lastRegisteredAt).getTime() - new Date(a.lastRegisteredAt).getTime());
+    return devices.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+  }
+
+  private getDeviceLabel(userAgent: string): string {
+    if (/android/i.test(userAgent)) {
+      if (/chrome/i.test(userAgent)) return 'Android · Chrome';
+      if (/samsungbrowser/i.test(userAgent)) return 'Android · Samsung Internet';
+      return 'Android · Navegador predeterminado';
+    }
+    if (/iphone|ipad|ipod/i.test(userAgent)) return 'iPhone/iPad · Safari';
+    if (/edg/i.test(userAgent)) return 'Computadora · Microsoft Edge';
+    if (/firefox/i.test(userAgent)) return 'Computadora · Firefox';
+    if (/chrome/i.test(userAgent)) return 'Computadora · Google Chrome';
+    if (/safari/i.test(userAgent)) return 'Computadora · Safari';
+    return 'Dispositivo · Navegador web';
+  }
+
+  public async setPushDeviceEnabled(subscriptionId: string, enabled: boolean): Promise<void> {
+    const { supabase, isSupabaseConfigured } = await import('@/lib/supabase');
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    const { error } = await supabase.from('push_subscriptions').update({ enabled }).eq('id', subscriptionId);
+    if (error) throw error;
+  }
+
+  public async removePushDevice(subscriptionId: string): Promise<void> {
+    const { supabase, isSupabaseConfigured } = await import('@/lib/supabase');
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    const { error } = await supabase.from('push_subscriptions').delete().eq('id', subscriptionId);
+    if (error) throw error;
   }
 
   public async sendTestPushToUser(email: string): Promise<{ sent: number; removed: number }> {

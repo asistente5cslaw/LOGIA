@@ -32,7 +32,7 @@ Deno.serve(async (request) => {
     );
     const { recipientRoles, recipientEmails, ...notificationPayload } = requestPayload;
     const payload = JSON.stringify(notificationPayload);
-    let subscriptionsQuery = admin.from('push_subscriptions').select('id, endpoint, expiration_time, p256dh, auth, user_id');
+    let subscriptionsQuery = admin.from('push_subscriptions').select('id, endpoint, expiration_time, p256dh, auth, user_id').eq('enabled', true);
     let notificationRecipientIds: string[] = [];
     if (isNewRegistrationNotice) {
       const { data: recipients, error: recipientsError } = await admin
