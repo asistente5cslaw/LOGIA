@@ -16,8 +16,10 @@ export function NotificationButton() {
   useEffect(() => {
     setIsSupported(pushNotificationService.isSupported());
     setPermission(pushNotificationService.getPermission());
-    setNotifications(pushNotificationService.getNotifications());
-    setUnreadCount(pushNotificationService.getUnreadCount());
+    void pushNotificationService.loadNotifications().then((items) => {
+      setNotifications(items);
+      setUnreadCount(items.filter((item) => !item.read).length);
+    });
 
     const unsubscribe = pushNotificationService.subscribe(() => {
       setPermission(pushNotificationService.getPermission());
@@ -56,11 +58,11 @@ export function NotificationButton() {
 
   const handleDismissOne = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    pushNotificationService.dismissNotification(id);
+    void pushNotificationService.dismissNotification(id);
   };
 
   const handleItemClick = (item: LodgeNotificationItem) => {
-    pushNotificationService.dismissNotification(item.id);
+    void pushNotificationService.markAsRead(item.id);
     setShowDropdown(false);
     if (item.url) {
       navigate(item.url);

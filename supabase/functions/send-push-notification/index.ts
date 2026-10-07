@@ -33,6 +33,7 @@ Deno.serve(async (request) => {
     const { recipientRoles, recipientEmails, ...notificationPayload } = requestPayload;
     const payload = JSON.stringify(notificationPayload);
     let subscriptionsQuery = admin.from('push_subscriptions').select('id, endpoint, expiration_time, p256dh, auth, user_id');
+    let notificationRecipientIds: string[] = [];
     if (isNewRegistrationNotice) {
       const { data: recipients, error: recipientsError } = await admin
         .from('profiles')
@@ -42,8 +43,9 @@ Deno.serve(async (request) => {
       if (recipientsError) throw recipientsError;
       const recipientIds = (recipients || []).map((recipient) => recipient.id);
       if (recipientIds.length === 0) return response({ sent: 0, removed: 0 });
+      notificationRecipientIds = recipientIds;
       subscriptionsQuery = subscriptionsQuery.in('user_id', recipientIds);
-    } else {
+    } else if ((recipientRoles && recipientRoles.length > 0) || (recipientEmails && recipientEmails.length > 0)) {
       const recipientIds = new Set<string>();
       if (recipientRoles && recipientRoles.length > 0) {
         const { data: recipients, error: recipientsError } = await admin
@@ -65,7 +67,29 @@ Deno.serve(async (request) => {
         (recipients || []).forEach((recipient) => recipientIds.add(recipient.id));
       }
       if (recipientIds.size === 0) return response({ sent: 0, removed: 0 });
-      subscriptionsQuery = subscriptionsQuery.in('user_id', Array.from(recipientIds));
+      notificationRecipientIds = Array.from(recipientIds);
+      subscriptionsQuery = subscriptionsQuery.in('user_id', notificationRecipientIds);
+    } else {
+      const { data: recipients, error: recipientsError } = await admin
+        .from('profiles')
+        .select('id')
+        .or('access_disabled.eq.false,access_disabled.is.null');
+      if (recipientsError) throw recipientsError;
+      notificationRecipientIds = (recipients || []).map((recipient) => recipient.id);
+    }
+
+    if (notificationRecipientIds.length > 0) {
+      const { error: notificationError } = await admin.from('push_notifications').insert(
+        notificationRecipientIds.map((userId) => ({
+          user_id: userId,
+          title: String(notificationPayload.title || 'Nueva notificación'),
+          body: String(notificationPayload.body || ''),
+          url: notificationPayload.url ? String(notificationPayload.url) : null,
+          tag: notificationPayload.tag ? String(notificationPayload.tag) : null,
+          type: notificationPayload.type ? String(notificationPayload.type) : 'aviso',
+        })),
+      );
+      if (notificationError) throw notificationError;
     }
     const { data: subscriptions, error } = await subscriptionsQuery;
     if (error) throw error;
@@ -83,7 +107,7 @@ Deno.serve(async (request) => {
         }
       }
     }
-    return response({ sent, removed });
+    return response({ sent, removed, recipients: notificationRecipientIds.length });
   } catch (error) {
     return response({ error: error instanceof Error ? error.message : 'Error enviando push' }, 500);
   }

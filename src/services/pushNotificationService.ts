@@ -130,6 +130,46 @@ class PushNotificationService {
     }
   }
 
+  public async loadNotifications(): Promise<LodgeNotificationItem[]> {
+    try {
+      const { supabase, isSupabaseConfigured } = await import('@/lib/supabase');
+      if (!isSupabaseConfigured()) return this.getNotifications();
+      const { data, error } = await supabase
+        .from('push_notifications')
+        .select('id, title, body, url, tag, type, created_at')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      const notifications = (data || []).map((item) => ({
+        id: item.id,
+        title: item.title,
+        body: item.body,
+        url: item.url || undefined,
+        time: this.formatRelativeTime(item.created_at),
+        timestamp: new Date(item.created_at).getTime(),
+        read: false,
+        type: item.type as LodgeNotificationItem['type'],
+      }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(notifications));
+      this.notifyListeners();
+      return notifications;
+    } catch (error) {
+      console.warn('No se pudieron cargar las notificaciones persistentes:', error);
+      return this.getNotifications();
+    }
+  }
+
+  private formatRelativeTime(value: string): string {
+    const elapsed = Math.max(0, Date.now() - new Date(value).getTime());
+    const minutes = Math.floor(elapsed / 60000);
+    if (minutes < 1) return 'Hace un momento';
+    if (minutes < 60) return `Hace ${minutes} min`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `Hace ${hours} h`;
+    const days = Math.floor(hours / 24);
+    return `Hace ${days} d`;
+  }
+
   /**
    * Agrega una notificación a la bandeja interna
    */
@@ -182,8 +222,13 @@ class PushNotificationService {
   /**
    * Elimina una sola notificación de la bandeja
    */
-  public dismissNotification(id: string): void {
+  public async dismissNotification(id: string): Promise<void> {
     try {
+      const { supabase, isSupabaseConfigured } = await import('@/lib/supabase');
+      if (isSupabaseConfigured() && !id.startsWith('notif-')) {
+        const { error } = await supabase.from('push_notifications').delete().eq('id', id);
+        if (error) throw error;
+      }
       const list = this.getNotifications();
       const updated = list.filter((item) => item.id !== id);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
@@ -194,8 +239,13 @@ class PushNotificationService {
   /**
    * Marca todas como leídas y las remueve de la bandeja activa
    */
-  public markAllAsReadAndClear(): void {
+  public async markAllAsReadAndClear(): Promise<void> {
     try {
+      const { supabase, isSupabaseConfigured } = await import('@/lib/supabase');
+      if (isSupabaseConfigured()) {
+        const { error } = await supabase.from('push_notifications').delete().not('id', 'is', null);
+        if (error) throw error;
+      }
       localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
     } catch (error) { console.warn('No se pudo eliminar la notificación:', error); }
     this.notifyListeners();
@@ -204,8 +254,13 @@ class PushNotificationService {
   /**
    * Marca una sola notificación como leída
    */
-  public markAsRead(id: string): void {
+  public async markAsRead(id: string): Promise<void> {
     try {
+      const { supabase, isSupabaseConfigured } = await import('@/lib/supabase');
+      if (isSupabaseConfigured()) {
+        const { error } = await supabase.from('push_notifications').delete().eq('id', id);
+        if (error) throw error;
+      }
       const list = this.getNotifications();
       const updated = list.map((item) =>
         item.id === id ? { ...item, read: true } : item
@@ -236,7 +291,7 @@ class PushNotificationService {
       if (!this.serviceWorkerMessageBound) {
         navigator.serviceWorker.addEventListener('message', (event: MessageEvent) => {
           if (event.data?.type !== 'LOGIA_PUSH_RECEIVED' || !event.data.payload) return;
-          this.addNotification(event.data.payload as PushNotificationPayload);
+          void this.loadNotifications();
         });
         this.serviceWorkerMessageBound = true;
       }
