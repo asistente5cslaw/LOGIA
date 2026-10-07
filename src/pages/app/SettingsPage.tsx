@@ -90,11 +90,13 @@ export function SettingsPage() {
     }
   };
 
-  const handleSendTestPush = async (subscriber: PushSubscriber) => {
-    setSendingPushTo(subscriber.userId);
+  const handleSendTestPush = async (subscriber: PushSubscriber, deviceOnly = false) => {
+    setSendingPushTo(deviceOnly ? subscriber.subscriptionId : subscriber.userId);
     try {
-      const result = await pushNotificationService.sendTestPushToUser(subscriber.email);
-      if (result.sent > 0) toast.success(`Notificación enviada a ${subscriber.displayName}.`);
+      const result = deviceOnly
+        ? await pushNotificationService.sendTestPushToDevice(subscriber.subscriptionId)
+        : await pushNotificationService.sendTestPushToUser(subscriber.email);
+      if (result.sent > 0) toast.success(deviceOnly ? `Notificación enviada a ${subscriber.deviceLabel}.` : `Notificación enviada a ${subscriber.displayName}.`);
       else toast.warning('El usuario no tiene un dispositivo push disponible.');
     } catch {
       toast.error('No se pudo enviar la notificación de prueba.');
@@ -847,6 +849,15 @@ export function SettingsPage() {
                         </button>
                         <button type="button" onClick={() => void handleDeletePushDevice(device)} className="flex min-h-[36px] items-center gap-2 rounded-lg border border-error/30 px-3 text-xs font-semibold text-error hover:bg-error/5">
                           <Trash2 className="h-3.5 w-3.5" /> Eliminar
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!device.enabled || sendingPushTo === device.subscriptionId}
+                          onClick={() => void handleSendTestPush(device, true)}
+                          className="flex min-h-[36px] items-center gap-2 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary-pressed disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <Send className="h-3.5 w-3.5" />
+                          {sendingPushTo === device.subscriptionId ? 'Enviando…' : 'Enviar prueba'}
                         </button>
                       </div>
                     </div>

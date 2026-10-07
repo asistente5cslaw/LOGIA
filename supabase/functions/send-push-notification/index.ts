@@ -17,6 +17,7 @@ Deno.serve(async (request) => {
     const requestPayload = await request.json() as {
       recipientRoles?: string[];
       recipientEmails?: string[];
+      subscriptionId?: string;
       type?: string;
       [key: string]: unknown;
     };
@@ -30,11 +31,22 @@ Deno.serve(async (request) => {
       Deno.env.get('VAPID_PUBLIC_KEY')!,
       Deno.env.get('VAPID_PRIVATE_KEY')!,
     );
-    const { recipientRoles, recipientEmails, ...notificationPayload } = requestPayload;
+    const { recipientRoles, recipientEmails, subscriptionId, ...notificationPayload } = requestPayload;
     const payload = JSON.stringify(notificationPayload);
     let subscriptionsQuery = admin.from('push_subscriptions').select('id, endpoint, expiration_time, p256dh, auth, user_id').eq('enabled', true);
     let notificationRecipientIds: string[] = [];
-    if (isNewRegistrationNotice) {
+    if (subscriptionId) {
+      const { data: targetSubscription, error: targetError } = await admin
+        .from('push_subscriptions')
+        .select('id, user_id')
+        .eq('id', subscriptionId)
+        .eq('enabled', true)
+        .maybeSingle();
+      if (targetError) throw targetError;
+      if (!targetSubscription) return response({ sent: 0, removed: 0 });
+      notificationRecipientIds = [targetSubscription.user_id];
+      subscriptionsQuery = subscriptionsQuery.eq('id', subscriptionId);
+    } else if (isNewRegistrationNotice) {
       const { data: recipients, error: recipientsError } = await admin
         .from('profiles')
         .select('id')

@@ -9,6 +9,7 @@ export interface PushNotificationPayload {
   type?: 'convocatoria' | 'trazado' | 'aviso' | 'nuevo_registro' | 'identidad_reenviada';
   recipientRoles?: string[];
   recipientEmails?: string[];
+  subscriptionId?: string;
 }
 
 export interface LodgeNotificationItem {
@@ -493,6 +494,17 @@ class PushNotificationService {
       tag: `prueba-push-${email.toLowerCase()}-${Date.now()}`,
       type: 'aviso',
       recipientEmails: [email.trim().toLowerCase()],
+    });
+  }
+
+  public async sendTestPushToDevice(subscriptionId: string): Promise<{ sent: number; removed: number }> {
+    return this.sendPushToAll({
+      title: 'Notificación de prueba',
+      body: 'Esta es una notificación de prueba enviada desde la administración de la Logia.',
+      url: '/app',
+      tag: `prueba-push-dispositivo-${subscriptionId}-${Date.now()}`,
+      type: 'aviso',
+      subscriptionId,
     });
   }
 
