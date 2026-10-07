@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { createBrowserRouter } from 'react-router-dom';
 import { ProtectedRoute } from '@/routes/ProtectedRoute';
 import { AuthLayout } from '@/layouts/AuthLayout';
 import { AppLayout } from '@/layouts/AppLayout';
@@ -13,6 +13,7 @@ import { CalendarPage } from '@/pages/app/CalendarPage';
 import { MinutesPage } from '@/pages/app/MinutesPage';
 import { AttendancePage } from '@/pages/app/AttendancePage';
 import { MembersPage } from '@/pages/app/MembersPage';
+import { SettingsPage } from '@/pages/app/SettingsPage';
 import { ErrorPage } from '@/pages/ErrorPage';
 
 export const router = createBrowserRouter([
@@ -41,7 +42,7 @@ export const router = createBrowserRouter([
       { path: 'actas', element: <MinutesPage /> },
       { path: 'asistencia', element: <AttendancePage /> },
       { path: 'miembros', element: <MembersPage /> },
-      { path: 'ajustes', element: <Navigate to="/app" replace /> },
+      { path: 'ajustes', element: <SettingsPage /> },
     ],
   },
   // Catch-all: cualquier ruta desconocida

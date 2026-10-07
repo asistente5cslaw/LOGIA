@@ -11,6 +11,7 @@ import {
   Menu,
   Smartphone,
   ShieldAlert,
+  Settings,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -67,6 +68,8 @@ export function AppLayout() {
   const visibleMobileNavItems = isIdentityRestricted
     ? mobileNavItems.filter((item) => item.to === '/app')
     : mobileNavItems;
+  const canAccessSettings = user?.profile?.technicalRole === 'admin'
+    || user?.profile?.roleId === 'vm';
 
   useEffect(() => {
     if (sessionStorage.getItem('reopen_icon_selector') === 'true') {
@@ -237,6 +240,21 @@ export function AppLayout() {
             </NavLink>
           ))}
 
+          {canAccessSettings && (
+            <NavLink
+              to="/app/ajustes"
+              title={isCollapsed ? 'Ajustes' : undefined}
+              className={({ isActive }) => cn(
+                'flex min-h-[44px] items-center rounded-xl text-sm font-medium transition-colors',
+                isCollapsed ? 'justify-center px-0' : 'gap-3 px-3',
+                isActive ? 'bg-primary text-primary-foreground shadow-sm' : 'text-ink-secondary hover:bg-surface-container hover:text-ink'
+              )}
+            >
+              <Settings className="h-5 w-5 shrink-0" />
+              {!isCollapsed && <span className="truncate">Ajustes</span>}
+            </NavLink>
+          )}
+
           {/* Botón directo de Ícono App / Instalar en la barra lateral */}
           {!isInstalled && (
             <button
@@ -394,6 +412,18 @@ export function AppLayout() {
             <span className="truncate max-w-[56px]">{label}</span>
           </NavLink>
         ))}
+        {canAccessSettings && (
+          <NavLink
+            to="/app/ajustes"
+            className={({ isActive }) => cn(
+              'flex min-h-[56px] flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors',
+              isActive ? 'text-primary font-semibold' : 'text-ink-muted hover:text-ink-secondary'
+            )}
+          >
+            <Settings className="h-5 w-5" />
+            <span className="truncate max-w-[56px]">Ajustes</span>
+          </NavLink>
+        )}
       </nav>
     </div>
   );
