@@ -97,22 +97,21 @@ export function MembersPage() {
 
   const canChangeMemberRole = (member: Member): boolean => {
     if (!canManageMembers) return false;
+    if (isSecretario) return true;
     const actorRole = user?.profile?.roleId;
-    if (actorRole === 'sec' && member.id === user?.id) return false;
-    if (actorRole === 'sec' && (member.roleId === 'sec' || member.roleId === 'vm')) return false;
     if (actorRole === 'vm' && member.roleId === 'vm') return false;
     return true;
   };
 
   const canAssignRole = (member: Member, roleId: InstitutionalRoleCode): boolean => {
     if (!canChangeMemberRole(member)) return false;
-    return !(user?.profile?.roleId === 'sec' && roleId === 'vm');
+    return true;
   };
 
   // Solo Secretaría y Administración validan identidades y selfies de registro.
   const canValidateIdentity = isSecretario || isAdministrador;
   const canViewDeletedMembers = isVenerableMaestro || isSecretario || user?.profile?.technicalRole === 'admin';
-  const canManageDeletedMembers = isVenerableMaestro || user?.profile?.technicalRole === 'admin';
+  const canManageDeletedMembers = isVenerableMaestro || isSecretario || user?.profile?.technicalRole === 'admin';
 
   const loadMembers = useCallback(async () => {
     try {
