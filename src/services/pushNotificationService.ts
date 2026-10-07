@@ -302,18 +302,11 @@ class PushNotificationService {
         this.lastRegistrationError = 'Supabase no está configurado en este deployment.';
         return false;
       }
-      const { data: sessionData } = await supabase.auth.getSession();
-      const userId = sessionData.session?.user.id;
-      if (!userId) {
-        this.lastRegistrationError = 'No hay una sesión activa para registrar este dispositivo.';
-        return false;
-      }
       if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) {
         this.lastRegistrationError = 'El navegador no devolvió una suscripción push válida.';
         return false;
       }
       const { error } = await supabase.from('push_subscriptions').upsert({
-        user_id: userId,
         endpoint: json.endpoint,
         expiration_time: json.expirationTime ?? null,
         p256dh: json.keys.p256dh,
