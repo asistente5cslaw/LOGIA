@@ -843,7 +843,7 @@ export function SettingsPage() {
                         </div>
                         <p className="mt-1 text-[11px] text-ink-muted">Registrado: {new Date(device.registeredAt).toLocaleString('es-PA')}</p>
                       </div>
-                      <div className="flex flex-wrap gap-2 sm:justify-end">
+                      <div className="grid w-full grid-cols-1 gap-2 sm:w-auto sm:grid-cols-3">
                         <button type="button" onClick={() => void handleTogglePushDevice(device)} className="flex min-h-[36px] items-center gap-2 rounded-lg border border-border px-3 text-xs font-semibold text-ink hover:bg-surface-container">
                           <Power className="h-3.5 w-3.5" /> {device.enabled ? 'Deshabilitar' : 'Habilitar'}
                         </button>
@@ -854,10 +854,11 @@ export function SettingsPage() {
                           type="button"
                           disabled={!device.enabled || sendingPushTo === device.subscriptionId}
                           onClick={() => void handleSendTestPush(device, true)}
-                          className="flex min-h-[36px] items-center gap-2 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary-pressed disabled:cursor-not-allowed disabled:opacity-60"
+                          aria-label={`Enviar prueba únicamente a ${device.deviceLabel}`}
+                          className="flex min-h-[36px] items-center justify-center gap-2 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary-pressed disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           <Send className="h-3.5 w-3.5" />
-                          {sendingPushTo === device.subscriptionId ? 'Enviando…' : 'Enviar prueba'}
+                          {sendingPushTo === device.subscriptionId ? 'Enviando…' : 'Enviar prueba aquí'}
                         </button>
                       </div>
                     </div>
