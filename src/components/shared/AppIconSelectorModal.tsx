@@ -30,7 +30,7 @@ function getInstallFallbackMessage(): string {
     return 'En iPhone o iPad: abre esta página en Safari, toca Compartir y selecciona “Añadir a la pantalla de inicio”. Apple no permite que una web confirme esa instalación automáticamente.';
   }
   if (userAgent.includes('android')) {
-    return 'En Android: abre el menú del navegador y selecciona “Instalar aplicación” o “Añadir a pantalla de inicio”. Chrome y Edge mostrarán el diálogo automáticamente cuando el dispositivo cumpla los requisitos de instalación.';
+    return 'Este navegador Android no permite abrir automáticamente el menú de instalación. Toca el menú ⋮ del navegador, selecciona “Añadir página a la pantalla de inicio” y confirma. El acceso directo se guardará con el ícono de la Logia.';
   }
   if (userAgent.includes('firefox')) {
     return 'En Firefox: abre el menú del navegador y selecciona “Instalar” o “Añadir a la pantalla de inicio”, según tu dispositivo.';
@@ -48,6 +48,7 @@ export const AppIconSelectorModal: React.FC<AppIconSelectorModalProps> = ({
   const [selectedIcon, setSelectedIcon] = useState<LodgeIconOption>(getSelectedLodgeIcon());
   const [installPrompt, setInstallPrompt] = useState<ReturnType<typeof getDeferredInstallPrompt>>(getDeferredInstallPrompt());
   const [isIOS, setIsIOS] = useState(false);
+  const [isAndroidFallback, setIsAndroidFallback] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
   const [installMessage, setInstallMessage] = useState('');
 
@@ -57,6 +58,7 @@ export const AppIconSelectorModal: React.FC<AppIconSelectorModalProps> = ({
       setInstallPrompt(getDeferredInstallPrompt());
       const userAgent = window.navigator.userAgent.toLowerCase();
       setIsIOS(/iphone|ipad|ipod/.test(userAgent) || (userAgent.includes('macintosh') && navigator.maxTouchPoints > 1));
+      setIsAndroidFallback(userAgent.includes('android') && !getDeferredInstallPrompt());
       setIsInstalled(window.matchMedia('(display-mode: standalone)').matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone));
     }
   }, [isOpen]);
@@ -64,6 +66,7 @@ export const AppIconSelectorModal: React.FC<AppIconSelectorModalProps> = ({
   useEffect(() => {
     const handleInstallable = (e: Event) => {
       setInstallPrompt((e as CustomEvent<ReturnType<typeof getDeferredInstallPrompt>>).detail);
+      setIsAndroidFallback(false);
     };
     window.addEventListener('pwa-installable', handleInstallable);
     return () => window.removeEventListener('pwa-installable', handleInstallable);
@@ -226,6 +229,18 @@ export const AppIconSelectorModal: React.FC<AppIconSelectorModalProps> = ({
             </div>
           )}
 
+          {isAndroidFallback && !isIOS && (
+            <div className="p-3.5 bg-gold-500/10 border border-gold-500/20 rounded-xl space-y-2">
+              <div className="flex items-center space-x-2 text-xs font-semibold text-gold-300">
+                <Download className="w-4 h-4" />
+                <span>Instalación en este navegador Android:</span>
+              </div>
+              <p className="text-xs text-cream-300">
+                Toca el menú <strong>⋮</strong> del navegador, selecciona <strong>“Añadir página a la pantalla de inicio”</strong> y confirma la acción.
+              </p>
+            </div>
+          )}
+
         </div>
 
         {/* Footer */}
@@ -263,7 +278,7 @@ export const AppIconSelectorModal: React.FC<AppIconSelectorModalProps> = ({
             ) : (
               <>
                 <Download className="w-4 h-4" />
-                <span>{isIOS ? 'Guardar y ver instrucciones' : 'Instalar aplicación'}</span>
+                <span>{isIOS || isAndroidFallback ? 'Ver cómo añadir a inicio' : 'Instalar aplicación'}</span>
               </>
             )}
           </button>
