@@ -45,6 +45,11 @@ export function AppLayout() {
   const navigate = useNavigate();
 
   const [isIconModalOpen, setIsIconModalOpen] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(display-mode: standalone)').matches
+      || Boolean((navigator as Navigator & { standalone?: boolean }).standalone);
+  });
   const [isCollapsed, setIsCollapsed] = useState(() => {
     return localStorage.getItem('sidebar_collapsed') === 'true';
   });
@@ -72,6 +77,18 @@ export function AppLayout() {
 
   const isInstalledApp = () => window.matchMedia('(display-mode: standalone)').matches
     || Boolean((navigator as Navigator & { standalone?: boolean }).standalone);
+
+  useEffect(() => {
+    const updateInstallState = () => setIsInstalled(isInstalledApp());
+    updateInstallState();
+    window.addEventListener('appinstalled', updateInstallState);
+    const mediaQuery = window.matchMedia('(display-mode: standalone)');
+    mediaQuery.addEventListener?.('change', updateInstallState);
+    return () => {
+      window.removeEventListener('appinstalled', updateInstallState);
+      mediaQuery.removeEventListener?.('change', updateInstallState);
+    };
+  }, []);
 
   // Primero ofrecemos instalar la PWA. Solo después de instalarla (o si ya
   // está instalada) se solicita el permiso nativo de notificaciones.
@@ -157,7 +174,7 @@ export function AppLayout() {
     <div className="flex h-[100dvh] min-h-[100dvh] w-full overflow-hidden bg-canvas text-ink">
       {/* Modal de selección de ícono / instalación PWA */}
       <AppIconSelectorModal
-        isOpen={isIconModalOpen}
+        isOpen={isIconModalOpen && !isInstalled}
         onClose={() => setIsIconModalOpen(false)}
       />
       <IdentityRevalidationModal />
@@ -221,17 +238,19 @@ export function AppLayout() {
           ))}
 
           {/* Botón directo de Ícono App / Instalar en la barra lateral */}
-          <button
-            onClick={() => setIsIconModalOpen(true)}
-            title="Personalizar Ícono de la App"
-            className={cn(
-              'mt-auto flex min-h-[40px] items-center rounded-xl text-xs font-semibold text-ink-muted hover:text-primary hover:bg-surface-container transition-colors cursor-pointer',
-              isCollapsed ? 'justify-center px-0' : 'gap-3 px-3'
-            )}
-          >
-            <Smartphone className="h-4 w-4 shrink-0 text-gold-600" />
-            {!isCollapsed && <span>Ícono de la App</span>}
-          </button>
+          {!isInstalled && (
+            <button
+              onClick={() => setIsIconModalOpen(true)}
+              title="Personalizar Ícono de la App"
+              className={cn(
+                'mt-auto flex min-h-[40px] items-center rounded-xl text-xs font-semibold text-ink-muted hover:text-primary hover:bg-surface-container transition-colors cursor-pointer',
+                isCollapsed ? 'justify-center px-0' : 'gap-3 px-3'
+              )}
+            >
+              <Smartphone className="h-4 w-4 shrink-0 text-gold-600" />
+              {!isCollapsed && <span>Ícono de la App</span>}
+            </button>
+          )}
         </nav>
 
         {/* Perfil del usuario abajo */}
@@ -292,13 +311,15 @@ export function AppLayout() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setIsIconModalOpen(true)}
-              title="Ícono e Instalación"
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-gold-600 hover:bg-surface-container transition-colors cursor-pointer"
-            >
-              <Smartphone className="h-4 w-4" />
-            </button>
+            {!isInstalled && (
+              <button
+                onClick={() => setIsIconModalOpen(true)}
+                title="Ícono e Instalación"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-gold-600 hover:bg-surface-container transition-colors cursor-pointer"
+              >
+                <Smartphone className="h-4 w-4" />
+              </button>
+            )}
             <NotificationButton />
             <button
               onClick={handleLogout}
@@ -329,13 +350,15 @@ export function AppLayout() {
           </div>
 
           <div className="flex items-center gap-4 text-xs text-ink-muted">
-            <button
-              onClick={() => setIsIconModalOpen(true)}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gold-500/30 text-gold-700 bg-gold-500/5 hover:bg-gold-500/10 transition-colors font-medium cursor-pointer"
-            >
-              <Smartphone className="h-3.5 w-3.5" />
-              <span>Personalizar Ícono App</span>
-            </button>
+            {!isInstalled && (
+              <button
+                onClick={() => setIsIconModalOpen(true)}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gold-500/30 text-gold-700 bg-gold-500/5 hover:bg-gold-500/10 transition-colors font-medium cursor-pointer"
+              >
+                <Smartphone className="h-3.5 w-3.5" />
+                <span>Personalizar Ícono App</span>
+              </button>
+            )}
             <span className="font-serif text-xs text-ink-muted italic hidden lg:inline">
               Oriente de Panamá • Rito Escocés Antiguo y Aceptado
             </span>
