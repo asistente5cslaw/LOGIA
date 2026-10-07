@@ -41,7 +41,7 @@ Deno.serve(async (request) => {
         .or('access_disabled.eq.false,access_disabled.is.null');
       if (recipientsError) throw recipientsError;
       const recipientIds = (recipients || []).map((recipient) => recipient.id);
-      if (recipientIds.size === 0) return response({ sent: 0, removed: 0 });
+      if (recipientIds.length === 0) return response({ sent: 0, removed: 0 });
       subscriptionsQuery = subscriptionsQuery.in('user_id', recipientIds);
     } else {
       const recipientIds = new Set<string>();
@@ -64,7 +64,7 @@ Deno.serve(async (request) => {
         if (recipientsError) throw recipientsError;
         (recipients || []).forEach((recipient) => recipientIds.add(recipient.id));
       }
-      if (recipientIds.length === 0) return response({ sent: 0, removed: 0 });
+      if (recipientIds.size === 0) return response({ sent: 0, removed: 0 });
       subscriptionsQuery = subscriptionsQuery.in('user_id', Array.from(recipientIds));
     }
     const { data: subscriptions, error } = await subscriptionsQuery;
