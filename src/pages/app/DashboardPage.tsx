@@ -267,28 +267,36 @@ export function DashboardPage() {
       {/* Resumen Operativo y Cuadro Institucional */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Miembros Activos */}
-        <div className="rounded-2xl border border-border/80 bg-white p-4 sm:p-5 shadow-2xs">
+        <Link
+          to="/app/miembros"
+          aria-label="Ver miembros del taller"
+          className="group rounded-2xl border border-border/80 bg-white p-4 sm:p-5 shadow-2xs transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary/40"
+        >
           <div className="flex items-center justify-between">
-            <span className="text-xs text-ink-muted font-medium">Membresía Activa</span>
+            <span className="text-xs text-ink-muted font-medium group-hover:text-primary transition-colors">Membresía Activa</span>
             <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <Users className="h-4 w-4" />
             </div>
           </div>
           <p className="mt-2 font-serif text-2xl font-bold text-ink">{stats.activeCount}</p>
           <span className="text-[11px] text-ink-muted mt-0.5 block">Hermanos en el taller</span>
-        </div>
+        </Link>
 
         {/* Tenidas Programadas */}
-        <div className="rounded-2xl border border-border/80 bg-white p-4 sm:p-5 shadow-2xs">
+        <Link
+          to="/app/calendario"
+          aria-label="Ver calendario de tenidas"
+          className="group rounded-2xl border border-border/80 bg-white p-4 sm:p-5 shadow-2xs transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary/40"
+        >
           <div className="flex items-center justify-between">
-            <span className="text-xs text-ink-muted font-medium">Tenidas Convocadas</span>
+            <span className="text-xs text-ink-muted font-medium group-hover:text-primary transition-colors">Tenidas Convocadas</span>
             <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-500/10 text-amber-700">
               <CalendarDays className="h-4 w-4" />
             </div>
           </div>
           <p className="mt-2 font-serif text-2xl font-bold text-ink">{stats.upcomingMeetingsCount}</p>
           <span className="text-[11px] text-ink-muted mt-0.5 block">Próximos trabajos litúrgicos</span>
-        </div>
+        </Link>
 
       </div>
     </div>
