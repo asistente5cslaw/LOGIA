@@ -50,12 +50,10 @@ export const AppIconSelectorModal: React.FC<AppIconSelectorModalProps> = ({
   const [isIOS, setIsIOS] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
   const [installMessage, setInstallMessage] = useState('');
-  const [iconChangedSinceOpen, setIconChangedSinceOpen] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       setSelectedIcon(getSelectedLodgeIcon());
-      setIconChangedSinceOpen(false);
       setInstallPrompt(getDeferredInstallPrompt());
       const userAgent = window.navigator.userAgent.toLowerCase();
       setIsIOS(/iphone|ipad|ipod/.test(userAgent) || (userAgent.includes('macintosh') && navigator.maxTouchPoints > 1));
@@ -85,23 +83,12 @@ export const AppIconSelectorModal: React.FC<AppIconSelectorModalProps> = ({
   if (!isOpen) return null;
 
   const handleSelectIcon = (iconId: LodgeIconOption) => {
-    const previousIcon = getSelectedLodgeIcon();
     setSelectedIcon(iconId);
     applyLodgeIcon(iconId);
-    setIconChangedSinceOpen(iconId !== previousIcon);
   };
 
   const handleSaveAndInstall = async () => {
     applyLodgeIcon(selectedIcon);
-
-    // beforeinstallprompt pertenece al manifiesto que estaba activo al cargar
-    // la página. Recargamos una vez para que Chrome/Windows regenere el prompt
-    // usando el manifiesto del icono recién elegido.
-    if (iconChangedSinceOpen && !isIOS) {
-      sessionStorage.setItem('reopen_icon_selector', 'true');
-      window.location.reload();
-      return;
-    }
 
     if (isInstalled) {
       setInstallMessage('La plataforma ya está instalada como aplicación en este dispositivo.');
