@@ -405,6 +405,28 @@ class PushNotificationService {
     }
   }
 
+  public async isCurrentDeviceRegistered(): Promise<boolean> {
+    try {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
+      const registration = this.swRegistration || await this.initServiceWorker();
+      const subscription = await registration?.pushManager.getSubscription();
+      const endpoint = subscription?.endpoint;
+      if (!endpoint) return false;
+
+      const { supabase, isSupabaseConfigured } = await import('@/lib/supabase');
+      if (!isSupabaseConfigured()) return false;
+      const { data, error } = await supabase
+        .from('push_subscriptions')
+        .select('id, enabled')
+        .eq('endpoint', endpoint)
+        .maybeSingle();
+      if (error) throw error;
+      return Boolean(data && data.enabled !== false);
+    } catch {
+      return false;
+    }
+  }
+
   public async sendPushToAll(payload: PushNotificationPayload): Promise<{ sent: number; removed: number }> {
     const { supabase, isSupabaseConfigured } = await import('@/lib/supabase');
     if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
@@ -482,8 +504,22 @@ class PushNotificationService {
   public async removePushDevice(subscriptionId: string): Promise<void> {
     const { supabase, isSupabaseConfigured } = await import('@/lib/supabase');
     if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    const { data: target, error: targetError } = await supabase
+      .from('push_subscriptions')
+      .select('id, endpoint')
+      .eq('id', subscriptionId)
+      .maybeSingle();
+    if (targetError) throw targetError;
     const { error } = await supabase.from('push_subscriptions').delete().eq('id', subscriptionId);
     if (error) throw error;
+
+    const registration = this.swRegistration || await this.initServiceWorker();
+    const localSubscription = await registration?.pushManager.getSubscription();
+    if (target?.endpoint && localSubscription && localSubscription.endpoint === target.endpoint) {
+      await localSubscription.unsubscribe();
+      localStorage.setItem('lodge_notifications_enabled', 'false');
+      this.notifyListeners();
+    }
   }
 
   public async sendTestPushToUser(email: string): Promise<{ sent: number; removed: number }> {

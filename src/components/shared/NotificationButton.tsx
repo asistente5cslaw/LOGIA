@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 export function NotificationButton() {
   const navigate = useNavigate();
   const [permission, setPermission] = useState<NotificationPermission>('default');
+  const [isRegistered, setIsRegistered] = useState<boolean | null>(null);
   const [isSupported, setIsSupported] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [notifications, setNotifications] = useState<LodgeNotificationItem[]>([]);
@@ -16,6 +17,7 @@ export function NotificationButton() {
   useEffect(() => {
     setIsSupported(pushNotificationService.isSupported());
     setPermission(pushNotificationService.getPermission());
+    void pushNotificationService.isCurrentDeviceRegistered().then(setIsRegistered);
     void pushNotificationService.loadNotifications().then((items) => {
       setNotifications(items);
       setUnreadCount(items.filter((item) => !item.read).length);
@@ -23,6 +25,7 @@ export function NotificationButton() {
 
     const unsubscribe = pushNotificationService.subscribe(() => {
       setPermission(pushNotificationService.getPermission());
+      void pushNotificationService.isCurrentDeviceRegistered().then(setIsRegistered);
       setNotifications(pushNotificationService.getNotifications());
       setUnreadCount(pushNotificationService.getUnreadCount());
     });
@@ -35,6 +38,7 @@ export function NotificationButton() {
     setPermission(res);
     if (res === 'granted') {
       const registered = await pushNotificationService.registerCurrentDevice();
+      setIsRegistered(registered);
       if (registered) {
         toast.success('Notificaciones activadas y dispositivo registrado.');
       } else {
@@ -44,12 +48,6 @@ export function NotificationButton() {
       toast.error('Permiso de notificaciones denegado en tu navegador');
     }
   };
-
-  useEffect(() => {
-    if (permission === 'granted') {
-      pushNotificationService.registerCurrentDevice().catch(() => undefined);
-    }
-  }, [permission]);
 
   const handleMarkAllAsRead = () => {
     pushNotificationService.markAllAsReadAndClear();
@@ -71,7 +69,7 @@ export function NotificationButton() {
 
   if (!isSupported) return null;
 
-  const isGranted = permission === 'granted';
+  const isGranted = permission === 'granted' && isRegistered === true;
 
   return (
     <div className="relative">
