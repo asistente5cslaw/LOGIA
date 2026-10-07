@@ -1,5 +1,5 @@
 // Service Worker para Notificaciones Push de Logia Unión Fraternal No. 21
-const CACHE_NAME = 'logia-uf21-v4';
+const CACHE_NAME = 'logia-uf21-v5';
 const APP_SHELL = [
   '/',
   '/manifest.webmanifest',
@@ -71,6 +71,17 @@ self.addEventListener('push', (event) => {
       const dedupeCache = await caches.open('logia-push-dedupe-v1');
       if (await dedupeCache.match(dedupeKey)) return;
       await dedupeCache.put(dedupeKey, new Response(String(Date.now())));
+      const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      clients.forEach((client) => client.postMessage({
+        type: 'LOGIA_PUSH_RECEIVED',
+        payload: {
+          title,
+          body: options.body,
+          url: options.data.url,
+          tag: options.tag,
+          type: data.type || 'aviso',
+        },
+      }));
       return self.registration.showNotification(title, options);
     })()
   );

@@ -62,6 +62,7 @@ function urlBase64ToUint8Array(value: string): Uint8Array {
 
 class PushNotificationService {
   private swRegistration: ServiceWorkerRegistration | null = null;
+  private serviceWorkerMessageBound = false;
   private lastRegistrationError = '';
   private readonly LOGO_PATH = '/logo-uf21.png';
   private listeners: (() => void)[] = [];
@@ -232,6 +233,13 @@ class PushNotificationService {
     try {
       const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
       this.swRegistration = reg;
+      if (!this.serviceWorkerMessageBound) {
+        navigator.serviceWorker.addEventListener('message', (event: MessageEvent) => {
+          if (event.data?.type !== 'LOGIA_PUSH_RECEIVED' || !event.data.payload) return;
+          this.addNotification(event.data.payload as PushNotificationPayload);
+        });
+        this.serviceWorkerMessageBound = true;
+      }
       return reg;
     } catch (err) {
       console.warn('No se pudo registrar sw.js:', err);
