@@ -337,19 +337,7 @@ class PushNotificationService {
     const { supabase, isSupabaseConfigured } = await import('@/lib/supabase');
     if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
     const { data, error } = await supabase.functions.invoke('send-push-notification', { body: payload });
-    if (error) {
-      let detail = error.message || 'Error desconocido en la Edge Function.';
-      const context = (error as { context?: Response }).context;
-      if (context) {
-        try {
-          const body = await context.clone().json() as { error?: string };
-          if (body.error) detail = body.error;
-        } catch {
-          // Conserva el mensaje original cuando la respuesta no sea JSON.
-        }
-      }
-      throw new Error(detail);
-    }
+    if (error) throw error;
     return { sent: Number(data?.sent || 0), removed: Number(data?.removed || 0) };
   }
 
