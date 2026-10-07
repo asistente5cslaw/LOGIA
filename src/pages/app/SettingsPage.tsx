@@ -822,8 +822,9 @@ export function SettingsPage() {
           </div>
 
           {selectedPushUserId && selectedPushDevices.length > 0 && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" role="dialog" aria-modal="true" aria-labelledby="push-devices-title">
-              <div className="w-full max-w-2xl rounded-2xl border border-border bg-surface shadow-2xl">
+            <div className="fixed left-0 top-0 z-[100] h-[100dvh] w-[100vw] overflow-y-auto bg-black/55 p-3 sm:p-6" role="dialog" aria-modal="true" aria-labelledby="push-devices-title">
+              <div className="mx-auto flex min-h-full w-full items-center justify-center">
+              <div className="w-full max-w-2xl overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl">
                 <div className="flex items-start justify-between border-b border-border px-5 py-4">
                   <div>
                     <h3 id="push-devices-title" className="font-serif text-xl font-bold text-ink">Dispositivos push</h3>
@@ -833,7 +834,7 @@ export function SettingsPage() {
                 </div>
                 <div className="max-h-[65vh] overflow-y-auto px-5">
                   {selectedPushDevices.map((device) => (
-                    <div key={device.subscriptionId} className="flex flex-col gap-3 border-b border-border/60 py-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div key={device.subscriptionId} className="grid gap-3 border-b border-border/60 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                           <p className="font-semibold text-ink">{device.deviceLabel}</p>
@@ -843,11 +844,11 @@ export function SettingsPage() {
                         </div>
                         <p className="mt-1 text-[11px] text-ink-muted">Registrado: {new Date(device.registeredAt).toLocaleString('es-PA')}</p>
                       </div>
-                      <div className="grid w-full grid-cols-1 gap-2 sm:w-auto sm:grid-cols-3">
-                        <button type="button" onClick={() => void handleTogglePushDevice(device)} className="flex min-h-[36px] items-center gap-2 rounded-lg border border-border px-3 text-xs font-semibold text-ink hover:bg-surface-container">
+                      <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:justify-end">
+                        <button type="button" onClick={() => void handleTogglePushDevice(device)} className="flex min-h-[36px] items-center justify-center gap-2 rounded-lg border border-border px-3 text-xs font-semibold text-ink hover:bg-surface-container">
                           <Power className="h-3.5 w-3.5" /> {device.enabled ? 'Deshabilitar' : 'Habilitar'}
                         </button>
-                        <button type="button" onClick={() => void handleDeletePushDevice(device)} className="flex min-h-[36px] items-center gap-2 rounded-lg border border-error/30 px-3 text-xs font-semibold text-error hover:bg-error/5">
+                        <button type="button" onClick={() => void handleDeletePushDevice(device)} className="flex min-h-[36px] items-center justify-center gap-2 rounded-lg border border-error/30 px-3 text-xs font-semibold text-error hover:bg-error/5">
                           <Trash2 className="h-3.5 w-3.5" /> Eliminar
                         </button>
                         <button
@@ -855,7 +856,7 @@ export function SettingsPage() {
                           disabled={!device.enabled || sendingPushTo === device.subscriptionId}
                           onClick={() => void handleSendTestPush(device, true)}
                           aria-label={`Enviar prueba únicamente a ${device.deviceLabel}`}
-                          className="flex min-h-[36px] items-center justify-center gap-2 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary-pressed disabled:cursor-not-allowed disabled:opacity-60"
+                          className="col-span-2 flex min-h-[36px] items-center justify-center gap-2 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary-pressed disabled:cursor-not-allowed disabled:opacity-60 sm:col-span-1"
                         >
                           <Send className="h-3.5 w-3.5" />
                           {sendingPushTo === device.subscriptionId ? 'Enviando…' : 'Enviar prueba aquí'}
@@ -867,6 +868,7 @@ export function SettingsPage() {
                 <div className="flex justify-end px-5 py-4">
                   <button type="button" onClick={() => setSelectedPushUserId(null)} className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary-pressed">Cerrar</button>
                 </div>
+              </div>
               </div>
             </div>
           )}
