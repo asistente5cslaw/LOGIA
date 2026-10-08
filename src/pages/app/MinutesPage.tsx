@@ -53,7 +53,6 @@ export function MinutesPage() {
   const [formStatus, setFormStatus] = useState<MinuteStatus>('borrador');
   const [formNotes, setFormNotes] = useState('');
   const [formPdfFile, setFormPdfFile] = useState<File | null>(null);
-  const [notifyPushOnPublish, setNotifyPushOnPublish] = useState(true);
 
   // Correcciones
   const [newComment, setNewComment] = useState('');
@@ -190,12 +189,14 @@ export function MinutesPage() {
     setFormStatus('borrador');
     setFormNotes('');
     setFormPdfFile(null);
-    setNotifyPushOnPublish(true);
     setShowMinuteModal(true);
   };
 
   const handleSaveMinute = async (e: React.FormEvent) => {
     e.preventDefault();
+    const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+    const pushToAll = submitter?.value === 'push';
+    const statusToSave = pushToAll && formStatus === 'borrador' ? 'circulada' : formStatus;
     try {
       const savedMinute = await minuteService.saveMinute(
         {
@@ -208,7 +209,7 @@ export function MinutesPage() {
           meetingDate: formMeetingDate,
           degree: formDegree,
           segmentId: formSegmentId || undefined,
-          status: formStatus,
+          status: statusToSave,
           eventId: formEventId || undefined,
           eventTitle: formEventTitle || undefined,
           notes: formNotes.trim(),
@@ -220,16 +221,24 @@ export function MinutesPage() {
         await minuteService.uploadPdf(savedMinute.id, formPdfFile);
       }
 
-      const shouldNotify = notifyPushOnPublish && savedMinute.status !== 'borrador' && (!editingMinute || editingMinute.status === 'borrador');
+      const shouldNotify = pushToAll || (savedMinute.status !== 'borrador' && (!editingMinute || editingMinute.status === 'borrador'));
+      let pushSent = false;
       if (shouldNotify) {
         try {
           await pushNotificationService.notifyNewMinute(savedMinute.title, savedMinute.formatNumber, savedMinute.degree);
+          pushSent = true;
         } catch (notificationError) {
           console.warn('El acta se guardó, pero no se pudo enviar la notificación push:', notificationError);
         }
       }
 
-      toast.success(editingMinute ? 'Acta actualizada' : 'Acta creada con numeración consecutiva');
+      toast.success(
+        pushToAll && pushSent
+          ? 'Acta guardada y notificación push enviada'
+          : editingMinute
+            ? 'Acta actualizada'
+            : 'Acta creada con numeración consecutiva'
+      );
       setShowMinuteModal(false);
       loadData();
     } catch {
@@ -721,16 +730,6 @@ ${formDescription.trim()}${notes}`;
           </div>
 
           <div className="flex flex-wrap justify-end gap-2.5 pt-3 border-t border-border">
-            <label className="mr-auto flex min-h-[44px] w-full sm:w-auto items-center gap-2 text-xs font-semibold text-ink cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={notifyPushOnPublish}
-                onChange={(event) => setNotifyPushOnPublish(event.target.checked)}
-                className="h-4 w-4 rounded border-border text-primary focus:ring-primary/20"
-              />
-              <Bell className="h-3.5 w-3.5 text-primary" />
-              <span>Notificar por push al publicar</span>
-            </label>
             {canManageMinutes && (
               <a
                 href={convocationService.generateMailtoUrl(
@@ -752,6 +751,16 @@ ${formDescription.trim()}${notes}`;
                 Correo
               </a>
             )}
+            {canManageMinutes && (
+              <button
+                type="submit"
+                value="push"
+                className="flex min-h-[44px] items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/5 px-4 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
+              >
+                <Bell className="h-3.5 w-3.5" />
+                Push a todos
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setShowMinuteModal(false)}
@@ -761,6 +770,7 @@ ${formDescription.trim()}${notes}`;
             </button>
             <button
               type="submit"
+              value="save"
               className="min-h-[44px] px-6 rounded-xl bg-primary text-xs font-semibold text-primary-foreground hover:bg-primary-pressed shadow-sm transition-all"
             >
               Guardar Trazado
