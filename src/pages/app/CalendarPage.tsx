@@ -85,7 +85,7 @@ function googleCalendarUrl(event: LodgeEvent): string {
       if (twelveHour[3] === 'PM' && hour !== 12) hour += 12;
       return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
     }
-    const twentyFourHour = raw.match(/^(\d{1,2}):(\d{2})$/);
+    const twentyFourHour = raw.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
     if (!twentyFourHour) return null;
     const hour = Number(twentyFourHour[1]);
     const minute = Number(twentyFourHour[2]);
@@ -104,7 +104,10 @@ function googleCalendarUrl(event: LodgeEvent): string {
 
   const startDateTime = dateToGoogleDateTime(event.startDate, event.startTime);
   const endDateTime = dateToGoogleDateTime(event.endDate || event.startDate, event.endTime || event.startTime);
-  const isTimedEvent = !event.isAllDay && Boolean(startDateTime && endDateTime);
+  // Si existen horas válidas, priorizarlas aunque un registro antiguo tenga
+  // isAllDay marcado incorrectamente. Solo se trata como día completo cuando
+  // realmente no hay horas guardadas.
+  const isTimedEvent = Boolean(startDateTime && endDateTime);
   const start = isTimedEvent ? startDateTime! : dateToGoogleDay(event.startDate);
   const end = isTimedEvent ? endDateTime! : nextGoogleDay(event.endDate || event.startDate);
   const params = new URLSearchParams({
@@ -119,10 +122,6 @@ function googleCalendarUrl(event: LodgeEvent): string {
     ].filter(Boolean).join('\n\n'),
   });
   return `https://www.google.com/calendar/render?${params.toString()}`;
-}
-
-function openGoogleCalendar(event: LodgeEvent): void {
-  window.location.assign(googleCalendarUrl(event));
 }
 
 export function CalendarPage() {
@@ -776,10 +775,8 @@ export function CalendarPage() {
                         {ev.status !== 'cancelada' && (
                           <a
                             href={googleCalendarUrl(ev)}
-                            onClick={(event) => {
-                              event.preventDefault();
-                              openGoogleCalendar(ev);
-                            }}
+                            target="_blank"
+                            rel="noopener noreferrer"
                             className="flex items-center gap-1 rounded bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
                           >
                             <CalendarPlus className="h-3.5 w-3.5" /> Google Calendar
@@ -915,10 +912,8 @@ export function CalendarPage() {
                     {ev.status !== 'cancelada' && (
                       <a
                         href={googleCalendarUrl(ev)}
-                        onClick={(event) => {
-                          event.preventDefault();
-                          openGoogleCalendar(ev);
-                        }}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="flex flex-row items-center gap-1.5 rounded-xl bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors cursor-pointer"
                       >
                         <CalendarPlus className="h-3.5 w-3.5 shrink-0" />
