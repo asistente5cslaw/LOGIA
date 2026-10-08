@@ -277,23 +277,15 @@ export function MinutesPage() {
   };
 
   const generateMinuteEmailBody = (minute: Minute): string => {
-    const pdfLine = minute.pdfFileName
-      ? `Se adjunta el acta en formato PDF: “${minute.pdfFileName}”.`
-      : 'El acta se encuentra disponible en la plataforma.';
+    return `Estimados Hermanos:
 
-    return `S.·. F.·. U.·.
-
-Estimados Hermanos:
-
-Adjunto encontrarán el acta ${minute.formatNumber} de la reunión del ${formatDateSpanish(minute.meetingDate)} en ${minute.degree} grado.
-${pdfLine}
+Por este medio les remito adjunta el acta ${minute.formatNumber} de la reunión del ${formatDateSpanish(minute.meetingDate)} en ${minute.degree} grado.
 
 Agradecemos nos hagan llegar sus comentarios y ajustes.
 
 El acta deberá ser sometida a aprobación en la siguiente tenida.
 
-Fraternalmente,
-La Secretaría del Taller`;
+Se adjunta el PDF del acta.`;
   };
 
   return (

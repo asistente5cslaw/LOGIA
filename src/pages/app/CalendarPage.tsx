@@ -518,7 +518,7 @@ export function CalendarPage() {
     try {
       await convocationService.sendEmailWithPdf({
         subject: `Convocatoria: ${convocationEvent.title}`,
-        bodyText: convocationService.generateEmailBody(convocationEvent, convocationText),
+        bodyText: convocationService.generateEmailBody(convocationEvent),
         recipientEmails: members.filter((member) => member.isActive).map((member) => member.email),
         pdfPath: convocationEvent.convocationPdfUrl,
         pdfFileName: convocationEvent.convocationPdfFileName,

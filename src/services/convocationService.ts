@@ -51,7 +51,7 @@ Fraternalmente,
 La Secretaría del Taller`;
   },
 
-  generateEmailBody(event: LodgeEvent, officialText: string): string {
+  generateEmailBody(event: LodgeEvent): string {
     const activityLabel = event.eventCategory === 'tenida' ? 'tenida' : 'reunión';
 
     return `Estimados Hermanos:
@@ -60,7 +60,7 @@ Por este medio les remito adjunta la convocatoria oficial para nuestra próxima 
 
 Agradecemos revisar el documento adjunto y tomar nota de la fecha, hora, lugar y demás indicaciones allí señaladas.
 
-${officialText}`;
+Se adjunta el PDF de la convocatoria.`;
   },
 
   filterRecipientsByDegree(members: Member[], degreeRequired: MasonicDegree): Member[] {
