@@ -16,6 +16,7 @@ import {
 import { AppleEmoji } from '@/components/shared/AppleEmoji';
 import { formatDateTimeSpanish } from '@/lib/dateUtils';
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
+import { toast } from 'sonner';
 
 export function DashboardPage() {
   const { user, userRoleName } = useAuth();
@@ -25,6 +26,10 @@ export function DashboardPage() {
   const [ownMemberId, setOwnMemberId] = useState<string | null>(null);
   const [excuseDrafts, setExcuseDrafts] = useState<Record<string, string>>({});
   const [savingExcuseEventId, setSavingExcuseEventId] = useState<string | null>(null);
+  const [homeAttendanceStatus, setHomeAttendanceStatus] = useState<'presente' | 'excusa' | 'ausente' | null>(null);
+  const [showHomeExcuse, setShowHomeExcuse] = useState(false);
+  const [homeExcuseDraft, setHomeExcuseDraft] = useState('');
+  const [savingHomeAttendance, setSavingHomeAttendance] = useState(false);
   const [stats, setStats] = useState({
     activeCount: 0,
     upcomingMeetingsCount: 0,
@@ -44,11 +49,21 @@ export function DashboardPage() {
       setEvents(evList);
       setConflicts(conflictList);
 
+      const upcomingNext = evList
+        .filter((event) => event.status !== 'cancelada' && new Date(event.startDate) >= new Date(Date.now() - 86400000))
+        .slice(0, 1)[0];
+
       const ownMemberId = user?.memberId || memList.find(
         (member) => member.email.toLowerCase() === user?.email?.toLowerCase()
       )?.id;
       setOwnMemberId(ownMemberId || null);
       if (ownMemberId) {
+        if (upcomingNext?.status === 'convocada') {
+          const records = await attendanceService.getAttendanceForEvent(upcomingNext.id, { memberId: ownMemberId });
+          setHomeAttendanceStatus(records.find((record) => record.memberId === ownMemberId)?.status || null);
+        } else {
+          setHomeAttendanceStatus(null);
+        }
         const pendingExcuses = await attendanceService.getPendingExcusesForMember(ownMemberId);
         const pendingIds = new Set(pendingExcuses.map((item) => item.eventId));
         setPendingExcuseEvents(evList.filter(
@@ -56,6 +71,7 @@ export function DashboardPage() {
         ));
       } else {
         setPendingExcuseEvents([]);
+        setHomeAttendanceStatus(null);
       }
 
       const activeCount = memList.filter((m) => m.isActive).length;
@@ -113,6 +129,44 @@ export function DashboardPage() {
       console.error('Error guardando excusa desde el inicio:', error);
     } finally {
       setSavingExcuseEventId(null);
+    }
+  };
+
+  const handleHomeAttendance = async (status: 'presente' | 'excusa') => {
+    if (!ownMemberId || !nextMeeting || nextMeeting.status !== 'convocada') return;
+    setSavingHomeAttendance(true);
+    try {
+      await attendanceService.saveAttendanceBatch(
+        nextMeeting.id,
+        [{ memberId: ownMemberId, status }],
+        { id: user?.id, email: user?.email }
+      );
+      setHomeAttendanceStatus(status);
+      setShowHomeExcuse(status === 'excusa');
+      toast.success(status === 'presente' ? 'Asistencia confirmada.' : 'Excusa registrada. Puedes explicar el motivo abajo.');
+    } catch {
+      toast.error('No se pudo registrar tu respuesta.');
+    } finally {
+      setSavingHomeAttendance(false);
+    }
+  };
+
+  const handleSaveHomeExcuse = async () => {
+    if (!ownMemberId || !nextMeeting || !homeExcuseDraft.trim()) return;
+    setSavingHomeAttendance(true);
+    try {
+      await attendanceService.saveMemberExcuse(nextMeeting.id, ownMemberId, homeExcuseDraft, {
+        id: user?.id,
+        email: user?.email,
+      });
+      setShowHomeExcuse(false);
+      setHomeExcuseDraft('');
+      toast.success('Tu explicación de la excusa fue guardada.');
+      void loadDashboardData();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo guardar la explicación.');
+    } finally {
+      setSavingHomeAttendance(false);
     }
   };
 
@@ -228,6 +282,51 @@ export function DashboardPage() {
                   <span className="truncate">{nextMeeting.location}</span>
                 </div>
               </div>
+
+              {nextMeeting.status === 'convocada' && ownMemberId && (
+                <div className="mt-3 rounded-xl border border-primary/15 bg-primary/5 p-3">
+                  <p className="text-xs font-semibold text-ink">¿Confirmas tu asistencia?</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void handleHomeAttendance('presente')}
+                      disabled={savingHomeAttendance}
+                      className={`min-h-[36px] rounded-lg px-3 text-xs font-semibold transition-colors disabled:opacity-60 ${homeAttendanceStatus === 'presente' ? 'bg-success text-white' : 'border border-success/30 bg-white text-success hover:bg-success/10'}`}
+                    >
+                      {homeAttendanceStatus === 'presente' ? 'Asistencia confirmada' : 'Confirmar asistencia'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleHomeAttendance('excusa')}
+                      disabled={savingHomeAttendance}
+                      className={`min-h-[36px] rounded-lg px-3 text-xs font-semibold transition-colors disabled:opacity-60 ${homeAttendanceStatus === 'excusa' ? 'bg-amber-600 text-white' : 'border border-amber-300 bg-white text-amber-700 hover:bg-amber-50'}`}
+                    >
+                      {homeAttendanceStatus === 'excusa' ? 'Excusa seleccionada' : 'Presentar excusa'}
+                    </button>
+                  </div>
+                  {homeAttendanceStatus === 'excusa' && (
+                    <div className="mt-2">
+                      <textarea
+                        value={homeExcuseDraft}
+                        onChange={(event) => setHomeExcuseDraft(event.target.value)}
+                        placeholder="Escribe el motivo de tu excusa..."
+                        rows={2}
+                        className="w-full resize-y rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs text-ink outline-none placeholder:text-ink-muted focus:border-amber-500 focus:ring-2 focus:ring-amber-200"
+                      />
+                      <div className="mt-2 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => void handleSaveHomeExcuse()}
+                          disabled={!homeExcuseDraft.trim() || savingHomeAttendance}
+                          className="min-h-[34px] rounded-lg bg-amber-700 px-3 text-xs font-semibold text-white hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Guardar excusa
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="self-start sm:self-center shrink-0">
