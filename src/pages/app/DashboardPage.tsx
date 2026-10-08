@@ -59,7 +59,10 @@ export function DashboardPage() {
       setOwnMemberId(ownMemberId || null);
       if (ownMemberId) {
         if (upcomingNext?.status === 'convocada') {
-          const records = await attendanceService.getAttendanceForEvent(upcomingNext.id, { memberId: ownMemberId });
+          const segmentId = upcomingNext.degreeSegments?.[0]?.id;
+          const records = segmentId
+            ? await attendanceService.getAttendanceForEvent(upcomingNext.id, segmentId, { memberId: ownMemberId })
+            : [];
           const savedStatus = records.find((record) => record.memberId === ownMemberId)?.status;
           setHomeAttendanceStatus(savedStatus === 'presente' || savedStatus === 'excusa' ? savedStatus : null);
         } else {
@@ -116,7 +119,10 @@ export function DashboardPage() {
 
     setSavingExcuseEventId(eventId);
     try {
-      await attendanceService.saveMemberExcuse(eventId, ownMemberId, reason, {
+      const event = events.find((candidate) => candidate.id === eventId);
+      const segmentId = event?.degreeSegments?.[0]?.id;
+      if (!segmentId) throw new Error('La tenida todavía no tiene un tramo de grado configurado.');
+      await attendanceService.saveMemberExcuse(eventId, segmentId, ownMemberId, reason, {
         id: user?.id,
         email: user?.email,
       });
@@ -138,14 +144,17 @@ export function DashboardPage() {
     const nextStatus = homeAttendanceStatus === status ? 'ausente' : status;
     setSavingHomeAttendance(true);
     try {
+      const segmentId = nextMeeting.degreeSegments?.[0]?.id;
+      if (!segmentId) throw new Error('La tenida todavía no tiene un tramo de grado configurado.');
       if (nextStatus === 'ausente') {
-        await attendanceService.clearMemberAttendance(nextMeeting.id, ownMemberId, {
+        await attendanceService.clearMemberAttendance(nextMeeting.id, segmentId, ownMemberId, {
           id: user?.id,
           email: user?.email,
         });
       } else {
         await attendanceService.saveAttendanceBatch(
           nextMeeting.id,
+          segmentId,
           [{ memberId: ownMemberId, status: nextStatus }],
           { id: user?.id, email: user?.email }
         );
@@ -170,7 +179,9 @@ export function DashboardPage() {
     if (!ownMemberId || !nextMeeting || !homeExcuseDraft.trim()) return;
     setSavingHomeAttendance(true);
     try {
-      await attendanceService.saveMemberExcuse(nextMeeting.id, ownMemberId, homeExcuseDraft, {
+      const segmentId = nextMeeting.degreeSegments?.[0]?.id;
+      if (!segmentId) throw new Error('La tenida todavía no tiene un tramo de grado configurado.');
+      await attendanceService.saveMemberExcuse(nextMeeting.id, segmentId, ownMemberId, homeExcuseDraft, {
         id: user?.id,
         email: user?.email,
       });

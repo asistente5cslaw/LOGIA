@@ -85,10 +85,8 @@ export const memberService = {
     const { error } = await supabase
       .from('members')
       .update({
-        identity_verified: identity.identityVerified ?? false,
-        identity_status: identity.identityStatus || 'pending',
+        identity_status: identity.identityStatus === 'rejected' ? 'rejected' : 'pending',
         selfie_url: identity.selfieUrl || null,
-        identity_validated_at: identity.identityValidatedAt || new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
       .eq('id', memberId);
@@ -100,18 +98,21 @@ export const memberService = {
     if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
 
     let membersFromDatabase: Member[] = [];
-    let query = includeIdentity
-      ? supabase.from('members').select('*')
-      : supabase.from('members').select('id, first_name, last_name, email, phone, role_id, degree, condition, mother_lodge, initiation_date, passing_date, raising_date, diploma_number, passport_number, other_bodies, avatar_url, joined_at, is_active, deleted_at, identity_verified, identity_status, identity_validated_at, identity_validated_by, identity_notes, created_at, updated_at');
-      if (!includeDeleted) {
-        query = query.is('deleted_at', null);
-      }
-      if (!includeInactive) {
-        query = query.eq('is_active', true);
-      }
+    if (includeIdentity) {
+      const { data, error } = await supabase.rpc('get_sensitive_members', {
+        p_include_inactive: includeInactive,
+        p_include_deleted: includeDeleted,
+      });
+      if (error) throw error;
+      if (data) membersFromDatabase = data.map(mapSupabaseMember);
+    } else {
+      let query = supabase.from('member_directory').select('*');
+      if (!includeDeleted) query = query.is('deleted_at', null);
+      if (!includeInactive) query = query.eq('is_active', true);
       const { data, error } = await query.order('last_name', { ascending: true });
       if (error) throw error;
       if (data) membersFromDatabase = data.map(mapSupabaseMember);
+    }
 
 
     // Los registros creados por Auth que todavía no estén vinculados aparecen

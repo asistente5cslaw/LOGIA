@@ -44,17 +44,18 @@ self.addEventListener('push', (event) => {
     data = { body: event.data ? event.data.text() : '' };
   }
 
-  const title = data.title || 'Logia Unión Fraternal No. 21';
+  const title = String(data.title || 'Logia Unión Fraternal No. 21').slice(0, 160);
+  const safeTarget = typeof data.url === 'string' && data.url.startsWith('/') && !data.url.startsWith('//')
+    ? data.url.slice(0, 301) : '/app/calendar';
   const options = {
-    body: data.body || 'Tienes un nuevo mensaje o convocatoria fraternal.',
+    body: String(data.body || 'Tienes un nuevo mensaje o convocatoria fraternal.').slice(0, 2000),
     icon: '/logo-uf21.png',
     badge: '/logo-uf21.png',
-    image: data.image || undefined,
-    tag: data.tag || 'logia-notif-' + Date.now(),
+    tag: String(data.tag || 'logia-notif-' + Date.now()).slice(0, 80),
     renotify: true,
     vibrate: [200, 100, 200],
     data: {
-      url: data.url || '/app/calendar',
+      url: safeTarget,
       timestamp: Date.now(),
     },
     actions: data.actions || [
@@ -95,7 +96,10 @@ self.addEventListener('notificationclick', (event) => {
     return;
   }
 
-  const targetUrl = event.notification.data?.url || '/';
+  const targetUrl = typeof event.notification.data?.url === 'string'
+    && event.notification.data.url.startsWith('/')
+    && !event.notification.data.url.startsWith('//')
+    ? event.notification.data.url : '/';
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {

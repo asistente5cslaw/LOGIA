@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { User, Mail, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { LodgeLogo } from '@/components/shared/LodgeLogo';
+import { pendingRegistration } from '@/services/pendingRegistration';
 
 const registerSchema = z
   .object({
@@ -49,14 +50,16 @@ export function RegisterPage() {
   };
 
   const onSubmit = (values: RegisterFormValues) => {
-    // Guardar temporalmente en sessionStorage para la validación con selfie
+    // La contraseña no debe persistirse en Web Storage: cualquier script con
+    // acceso al origen podría leerla. Se conserva solo en memoria durante el
+    // flujo de registro de esta pestaña.
+    pendingRegistration.setPassword(values.password);
     sessionStorage.setItem(
       'logia_reg_pending',
       JSON.stringify({
         firstName: values.firstName.trim(),
         lastName: values.lastName.trim(),
         email: values.email.trim(),
-        password: values.password,
       })
     );
     navigate('/registro/identidad');

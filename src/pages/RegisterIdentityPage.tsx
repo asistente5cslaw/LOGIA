@@ -7,12 +7,12 @@ import type { BiometricValidationResult } from '@/services/identityService';
 import { memberService } from '@/services/memberService';
 import { Shield, AlertCircle, Loader2 } from 'lucide-react';
 import { pushNotificationService } from '@/services/pushNotificationService';
+import { pendingRegistration } from '@/services/pendingRegistration';
 
 interface PendingRegistration {
   firstName: string;
   lastName: string;
   email: string;
-  password: string;
   invitationCode?: string;
 }
 
@@ -30,7 +30,13 @@ export function RegisterIdentityPage() {
       return;
     }
     try {
-      setPendingData(JSON.parse(raw));
+      const parsed = JSON.parse(raw) as PendingRegistration;
+      if (!parsed.firstName || !parsed.lastName || !parsed.email || !pendingRegistration.getPassword()) {
+        pendingRegistration.clear();
+        navigate('/registro', { replace: true });
+        return;
+      }
+      setPendingData(parsed);
     } catch {
       navigate('/registro', { replace: true });
     }
@@ -38,6 +44,12 @@ export function RegisterIdentityPage() {
 
   const handleValidated = async (result: BiometricValidationResult) => {
     if (!pendingData) return;
+    const password = pendingRegistration.getPassword();
+    if (!password) {
+      setRegistrationError('El proceso expiró por seguridad. Inicia el registro nuevamente.');
+      navigate('/registro', { replace: true });
+      return;
+    }
     if (result.status === 'rejected') return;
 
     setIsFinalizing(true);
@@ -47,7 +59,7 @@ export function RegisterIdentityPage() {
       // 1. Crear el usuario en el sistema de autenticación
       const registeredUser = await authService.register(
         pendingData.email,
-        pendingData.password,
+        password,
         pendingData.firstName,
         pendingData.lastName,
         pendingData.invitationCode
@@ -73,7 +85,7 @@ export function RegisterIdentityPage() {
       }
 
       // 3. Iniciar sesión automáticamente
-      await login(pendingData.email, pendingData.password);
+      await login(pendingData.email, password);
 
       // Avisar únicamente a Venerables y Secretarios; un fallo del push no invalida el registro.
       try {
@@ -90,6 +102,7 @@ export function RegisterIdentityPage() {
 
       // 4. Limpiar datos temporales
       sessionStorage.removeItem('logia_reg_pending');
+      pendingRegistration.clear();
 
       // 5. Redirigir de inmediato al interior de la aplicación
       navigate('/app', { replace: true });

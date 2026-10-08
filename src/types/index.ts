@@ -128,6 +128,16 @@ export interface MasonicBody {
 export type EventStatus = 'programada' | 'convocada' | 'celebrada' | 'cancelada';
 export type EventCategory = 'tenida' | 'reunion_masonica' | 'reunion_fraternal' | 'otro';
 
+export interface EventDegreeSegment {
+  id: string;
+  eventId: string;
+  degree: MasonicDegree;
+  sequence: number;
+  startTime?: string;
+  endTime?: string;
+  createdAt: string;
+}
+
 export interface LodgeEvent {
   id: string;
   title: string;
@@ -154,6 +164,7 @@ export interface LodgeEvent {
   conflictJustification?: string;
   conflictApprovedBy?: string;
   conflictApprovedAt?: string;
+  degreeSegments?: EventDegreeSegment[];
 }
 
 export interface EventConflict {
@@ -191,6 +202,7 @@ export interface Minute {
   status: MinuteStatus;
   eventId?: string; // ID de la tenida / convocatoria asociada
   eventTitle?: string; // Título de la tenida asociada
+  segmentId?: string; // Tramo de grado de la tenida asociada
   volume?: string; // Tomo
   folio?: string; // Folio
   notes?: string;
@@ -211,6 +223,7 @@ export type AttendanceStatus = 'presente' | 'excusa' | 'ausente';
 export interface AttendanceRecord {
   id: string;
   eventId: string;
+  segmentId?: string;
   memberId: string;
   status: AttendanceStatus;
   updatedBy: string;
@@ -239,6 +252,7 @@ export interface LodgeSettings {
   regularMeetingDays: string;
   templeAddress: string;
   contactEmail: string;
+  secretaryEmail: string;
   currentVenerableMaster?: string;
   currentSecretary?: string;
   privacyPolicyUrl?: string;

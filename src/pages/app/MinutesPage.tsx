@@ -24,6 +24,7 @@ import { useAppleDialog } from '@/components/shared/AppleDialog';
 import { formatDateSpanish } from '@/lib/dateUtils';
 import { toast } from 'sonner';
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
+import { pushNotificationService } from '@/services/pushNotificationService';
 
 export function MinutesPage() {
   const { user, hasPermission } = useAuth();
@@ -47,6 +48,7 @@ export function MinutesPage() {
   const [formDescription, setFormDescription] = useState('');
   const [formMeetingDate, setFormMeetingDate] = useState(new Date().toISOString().split('T')[0]);
   const [formDegree, setFormDegree] = useState<MasonicDegree>('aprendiz');
+  const [formSegmentId, setFormSegmentId] = useState('');
   const [formStatus, setFormStatus] = useState<MinuteStatus>('borrador');
   const [formNotes, setFormNotes] = useState('');
   const [formPdfFile, setFormPdfFile] = useState<File | null>(null);
@@ -150,13 +152,16 @@ export function MinutesPage() {
     setFormEventId(eventId);
     if (!eventId) {
       setFormEventTitle('');
+      setFormSegmentId('');
       return;
     }
     const found = events.find((e) => e.id === eventId);
     if (found) {
       setFormEventTitle(found.title);
       setFormMeetingDate(found.startDate);
-      setFormDegree(found.degreeRequired);
+      const firstSegment = found.degreeSegments?.[0];
+      setFormDegree(firstSegment?.degree || found.degreeRequired);
+      setFormSegmentId(firstSegment?.id || '');
       const dateLabel = formatDateSpanish(found.startDate);
       const naturalDateLabel = dateLabel.charAt(0).toLowerCase() + dateLabel.slice(1);
       if (!formTitle || formTitle.startsWith('Trazado de')) {
@@ -179,6 +184,7 @@ export function MinutesPage() {
     setFormDescription('A la Gloria del Gran Arquitecto del Universo...\n\nEn el Oriente de Panamá, reunidos los hermanos en el Gran Templo Masónico...');
     setFormMeetingDate(new Date().toISOString().split('T')[0]);
     setFormDegree('aprendiz');
+    setFormSegmentId('');
     setFormStatus('borrador');
     setFormNotes('');
     setFormPdfFile(null);
@@ -198,6 +204,7 @@ export function MinutesPage() {
           description: formDescription.trim(),
           meetingDate: formMeetingDate,
           degree: formDegree,
+          segmentId: formSegmentId || undefined,
           status: formStatus,
           eventId: formEventId || undefined,
           eventTitle: formEventTitle || undefined,
@@ -208,6 +215,15 @@ export function MinutesPage() {
 
       if (formPdfFile) {
         await minuteService.uploadPdf(savedMinute.id, formPdfFile);
+      }
+
+      const shouldNotify = savedMinute.status !== 'borrador' && (!editingMinute || editingMinute.status === 'borrador');
+      if (shouldNotify) {
+        try {
+          await pushNotificationService.notifyNewMinute(savedMinute.title, savedMinute.formatNumber, savedMinute.degree);
+        } catch (notificationError) {
+          console.warn('El acta se guardó, pero no se pudo enviar la notificación push:', notificationError);
+        }
       }
 
       toast.success(editingMinute ? 'Acta actualizada' : 'Acta creada con numeración consecutiva');
@@ -245,6 +261,13 @@ export function MinutesPage() {
         { ...min, status: newStatus },
         { id: user?.id, email: user?.email, name: user?.displayName }
       );
+      if (min.status === 'borrador' && newStatus !== 'borrador') {
+        try {
+          await pushNotificationService.notifyNewMinute(min.title, min.formatNumber, min.degree);
+        } catch (notificationError) {
+          console.warn('El acta se actualizó, pero no se pudo enviar la notificación push:', notificationError);
+        }
+      }
       toast.success(`Acta actualizada a estado: ${newStatus}`);
       if (selectedMinute?.id === min.id) {
         setSelectedMinute({ ...selectedMinute, status: newStatus });
@@ -621,6 +644,23 @@ ${formDescription.trim()}${notes}`;
             options={meetingOptions}
             searchable={true}
           />
+
+          {formEventId && (events.find((event) => event.id === formEventId)?.degreeSegments?.length || 0) > 0 && (
+            <AppleSelect<MasonicDegree>
+              label="Tramo / grado del acta"
+              value={formDegree}
+              onChange={(degree) => {
+                setFormDegree(degree);
+                const segment = events.find((event) => event.id === formEventId)?.degreeSegments?.find((item) => item.degree === degree);
+                setFormSegmentId(segment?.id || '');
+              }}
+              options={(events.find((event) => event.id === formEventId)?.degreeSegments || []).map((segment) => ({
+                value: segment.degree,
+                label: segment.degree === 'aprendiz' ? 'Primer grado — Aprendiz' : segment.degree === 'companero' ? 'Segundo grado — Compañero' : 'Tercer grado — Maestro',
+                description: `Acta correspondiente al tramo ${segment.sequence} de la misma tenida`,
+              }))}
+            />
+          )}
 
           <div className="rounded-lg border border-border bg-surface-container-low px-3 py-2.5 text-xs text-ink-secondary">
             {formEventId ? (

@@ -145,35 +145,18 @@ export const identityService = {
       };
     }
 
-    // Si hay un proveedor externo configurado con API Key real (ej. Onfido, Persona)
+    // Una API key en el frontend no demuestra que exista una validación. Las
+    // claves y la llamada al proveedor deben vivir en una Edge Function/backend;
+    // hasta que exista esa integración, nunca aprobamos automáticamente.
     if (this.isExternalProviderConfigured()) {
-      try {
-        // En una implementación con endpoint remoto backend/edge function:
-        // const response = await fetch('/api/verify-biometrics', { method: 'POST', body: ... })
-        return {
-          status: 'approved',
-          livenessScore: 0.96,
-          provider: this.getProviderName(),
-          isExternalConfigured: true,
-          message: 'Identidad verificada exitosamente por el proveedor biométrico.',
-          metadata: {
-            analyzedAt: new Date().toISOString(),
-            ...analysis,
-          },
-        };
-      } catch {
-        return {
-          status: 'pending',
-          livenessScore: 0.5,
-          provider: this.getProviderName(),
-          isExternalConfigured: true,
-          message: 'Error al conectar con el proveedor externo. Validación pendiente de revisión manual.',
-          metadata: {
-            analyzedAt: new Date().toISOString(),
-            ...analysis,
-          },
-        };
-      }
+      return {
+        status: 'pending',
+        livenessScore: 0.5,
+        provider: this.getProviderName(),
+        isExternalConfigured: true,
+        message: 'El proveedor biométrico está configurado, pero la validación segura del servidor aún no está disponible. Revisión manual pendiente.',
+        metadata: { analyzedAt: new Date().toISOString(), ...analysis },
+      };
     }
 
     // REGLA CRÍTICA: Si el proveedor externo no está configurado,

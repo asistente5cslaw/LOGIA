@@ -13,16 +13,18 @@ const notifyAttendanceChanged = (eventId: string) => {
 export const attendanceService = {
   async getAttendanceForEvent(
     eventId: string,
+    segmentId: string,
     viewer?: { canViewExcuseReasons?: boolean; memberId?: string }
   ): Promise<AttendanceRecord[]> {
     if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
     {
-        const { data, error } = await supabase.from('attendance').select('*').eq('event_id', eventId);
+        const { data, error } = await supabase.from('attendance').select('*').eq('event_id', eventId).eq('segment_id', segmentId);
         if (error) throw error;
         if (data) {
           return data.map((d) => ({
             id: d.id,
             eventId: d.event_id,
+            segmentId: d.segment_id,
             memberId: d.member_id,
             status: d.status,
             updatedBy: d.updated_by,
@@ -75,6 +77,7 @@ export const attendanceService = {
 
   async saveAttendanceBatch(
     eventId: string,
+    segmentId: string,
     records: { memberId: string; status: AttendanceStatus; excuseReason?: string }[],
     user: { id?: string; email?: string }
   ): Promise<void> {
@@ -82,6 +85,7 @@ export const attendanceService = {
     const updatedRecords: AttendanceRecord[] = records.map((r) => ({
       id: `att-${eventId}-${r.memberId}`,
       eventId,
+      segmentId,
       memberId: r.memberId,
       status: r.status,
       updatedBy: user.id || 'sistema',
@@ -92,6 +96,7 @@ export const attendanceService = {
     {
         const upsertPayload = updatedRecords.map((r) => ({
           event_id: r.eventId,
+          segment_id: r.segmentId,
           member_id: r.memberId,
           status: r.status,
           ...(r.status === 'excusa' && r.excuseReason?.trim()
@@ -102,7 +107,7 @@ export const attendanceService = {
           updated_by: r.updatedBy,
           updated_at: r.updatedAt,
         }));
-        const { error } = await supabase.from('attendance').upsert(upsertPayload, { onConflict: 'event_id,member_id' });
+        const { error } = await supabase.from('attendance').upsert(upsertPayload, { onConflict: 'event_id,segment_id,member_id' });
         if (error) throw error;
     }
 
@@ -115,6 +120,7 @@ export const attendanceService = {
 
   async saveMemberExcuse(
     eventId: string,
+    segmentId: string,
     memberId: string,
     reason: string,
     user: { id?: string; email?: string }
@@ -127,6 +133,7 @@ export const attendanceService = {
       .from('attendance')
       .select('excuse_submitted_at')
       .eq('event_id', eventId)
+      .eq('segment_id', segmentId)
       .eq('member_id', memberId)
       .maybeSingle();
     if (currentError) throw currentError;
@@ -138,13 +145,14 @@ export const attendanceService = {
 
     const { error } = await supabase.from('attendance').upsert({
       event_id: eventId,
+      segment_id: segmentId,
       member_id: memberId,
       status: 'excusa',
       excuse_reason: cleanReason,
       excuse_submitted_at: submittedAt || new Date().toISOString(),
       updated_by: user.id || null,
       updated_at: new Date().toISOString(),
-    }, { onConflict: 'event_id,member_id' });
+    }, { onConflict: 'event_id,segment_id,member_id' });
     if (error) throw error;
 
     await auditService.log('REGISTRO_EXCUSA', 'attendance', eventId, user, {
@@ -156,6 +164,7 @@ export const attendanceService = {
 
   async clearMemberAttendance(
     eventId: string,
+    segmentId: string,
     memberId: string,
     user: { id?: string; email?: string }
   ): Promise<void> {
@@ -164,6 +173,7 @@ export const attendanceService = {
       .from('attendance')
       .delete()
       .eq('event_id', eventId)
+      .eq('segment_id', segmentId)
       .eq('member_id', memberId);
     if (error) throw error;
 

@@ -6,10 +6,11 @@ export interface PushNotificationPayload {
   body: string;
   url?: string;
   tag?: string;
-  type?: 'convocatoria' | 'trazado' | 'aviso' | 'nuevo_registro' | 'identidad_reenviada';
+  type?: 'convocatoria' | 'trazado' | 'aviso' | 'nuevo_registro' | 'identidad_reenviada' | 'nueva_acta';
   recipientRoles?: string[];
   recipientEmails?: string[];
   subscriptionId?: string;
+  minuteDegree?: 'aprendiz' | 'companero' | 'maestro';
 }
 
 export interface LodgeNotificationItem {
@@ -20,7 +21,7 @@ export interface LodgeNotificationItem {
   time: string;
   timestamp: number;
   read: boolean;
-  type: 'convocatoria' | 'trazado' | 'aviso' | 'nuevo_registro' | 'identidad_reenviada';
+  type: 'convocatoria' | 'trazado' | 'aviso' | 'nuevo_registro' | 'identidad_reenviada' | 'nueva_acta';
 }
 
 export interface PushSubscriber {
@@ -580,6 +581,22 @@ class PushNotificationService {
       tag: `identidad-reenviada-${email.toLowerCase()}`,
       type: 'identidad_reenviada',
       recipientRoles: ['sec', 'adm'],
+    });
+  }
+
+  /** Notifica un acta publicada únicamente a usuarios autorizados por grado. */
+  public async notifyNewMinute(
+    title: string,
+    formatNumber: string,
+    degree: 'aprendiz' | 'companero' | 'maestro',
+  ): Promise<{ sent: number; removed: number }> {
+    return this.sendPushToAll({
+      title: 'Nueva acta disponible',
+      body: `${formatNumber} · ${title}`,
+      url: '/app/actas',
+      tag: `nueva-acta-${formatNumber}`,
+      type: 'nueva_acta',
+      minuteDegree: degree,
     });
   }
 

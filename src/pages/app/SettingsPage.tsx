@@ -45,7 +45,7 @@ function roleCategoryLabel(category: 'dignatario' | 'oficial' | 'general'): stri
 }
 
 export function SettingsPage() {
-  const { user, hasPermission, isSecretaryOrVM } = useAuth();
+  const { user, isSecretaryOrVM } = useAuth();
 
   const [activeTab, setActiveTab] = useState<
     'visita' | 'configuracion' | 'permisos' | 'invitaciones' | 'notificaciones' | 'respaldo' | 'auditoria'
@@ -75,7 +75,7 @@ export function SettingsPage() {
   const [overwriteDuplicates, setOverwriteDuplicates] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
 
-  const canConfigure = hasPermission('configure_lodge') || isSecretaryOrVM;
+  const canConfigure = user?.profile?.roleId === 'adm';
   const canManagePush = user?.email?.trim().toLowerCase() === 'asistente4@castillosucre.com';
 
   const loadPushSubscribers = async () => {
@@ -176,6 +176,10 @@ export function SettingsPage() {
   useEffect(() => {
     if (activeTab === 'notificaciones') void loadPushSubscribers();
   }, [activeTab]);
+
+  useEffect(() => {
+    if (canConfigure && activeTab === 'notificaciones') setActiveTab('configuracion');
+  }, [activeTab, canConfigure]);
 
   const handleToggleChecklistItem = async (item: OfficialVisitChecklistItem) => {
     if (!canConfigure) {
@@ -296,9 +300,14 @@ export function SettingsPage() {
 
       {/* Selector de Sección Inteligente estilo Apple */}
       {(() => {
-        const settingsTabs = canManagePush
-          ? [{ id: 'notificaciones' as const, label: 'PUSH', shortLabel: 'PUSH', icon: Bell }]
-          : [];
+        const settingsTabs = [
+          ...(canConfigure
+            ? [{ id: 'configuracion' as const, label: 'CONFIGURACIÓN', shortLabel: 'CONFIG.', icon: Settings }]
+            : []),
+          ...(canManagePush
+            ? [{ id: 'notificaciones' as const, label: 'PUSH', shortLabel: 'PUSH', icon: Bell }]
+            : []),
+        ];
 
         return (
           <div className="pb-1 border-b border-border">
@@ -546,6 +555,20 @@ export function SettingsPage() {
                 onChange={(e) => setLodgeSettings({ ...lodgeSettings, contactEmail: e.target.value })}
                 className="min-h-[40px] rounded-lg border border-border bg-surface px-3 text-sm text-ink outline-none focus:border-primary"
               />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-ink">Correo Institucional de Secretaría</label>
+              <input
+                type="email"
+                value={lodgeSettings.secretaryEmail}
+                onChange={(e) => setLodgeSettings({ ...lodgeSettings, secretaryEmail: e.target.value })}
+                placeholder="secretaria@unionfraternal21.org"
+                className="min-h-[40px] rounded-lg border border-border bg-surface px-3 text-sm text-ink outline-none focus:border-primary"
+              />
+              <p className="text-[11px] text-ink-muted">
+                Pertenece al cargo de Secretaría, no a una cuenta personal. Puede cambiarse cuando cambie el secretario.
+              </p>
             </div>
 
             <div className="pt-3 border-t border-border flex justify-end">

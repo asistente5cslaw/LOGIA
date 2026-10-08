@@ -5,7 +5,7 @@ import { memberService } from '@/services/memberService';
 import { convocationService } from '@/services/convocationService';
 import { getBodyById } from '@/data/bodiesData';
 import { PageHeader } from '@/components/shared/PageHeader';
-import type { LodgeEvent, MasonicBodyId, EventStatus, EventCategory, Member, InstitutionalRoleCode } from '@/types';
+import type { LodgeEvent, MasonicBodyId, EventStatus, EventCategory, Member, InstitutionalRoleCode, MasonicDegree } from '@/types';
 import { institutionalRoles } from '@/data/rolesData';
 import {
   Calendar as CalendarIcon,
@@ -170,6 +170,7 @@ export function CalendarPage() {
   const [formTitle, setFormTitle] = useState('');
   const [formBodyId, setFormBodyId] = useState<MasonicBodyId>('uf21');
   const [formRole, setFormRole] = useState<InstitutionalRoleCode>('apr');
+  const [formDegrees, setFormDegrees] = useState<MasonicDegree[]>(['aprendiz']);
   const [formStartDate, setFormStartDate] = useState(selectedDateStr);
   const [formEndDate, setFormEndDate] = useState('');
   const [formStartTime, setFormStartTime] = useState('19:30');
@@ -242,11 +243,26 @@ export function CalendarPage() {
     });
   }, [filteredEvents, selectedDateStr]);
 
+  // Cuando no hay trabajos en el día seleccionado, mostrar las siguientes
+  // reuniones futuras para que el panel siga siendo útil.
+  const upcomingMeetings = useMemo(() => {
+    const today = new Date().toISOString().split('T')[0];
+    return filteredEvents
+      .filter((ev) => ev.isMeeting && ev.status !== 'cancelada' && ev.startDate >= today)
+      .sort((a, b) => {
+        const dateCompare = a.startDate.localeCompare(b.startDate);
+        if (dateCompare !== 0) return dateCompare;
+        return (a.startTime || '').localeCompare(b.startTime || '');
+      })
+      .slice(0, 3);
+  }, [filteredEvents]);
+
   const openNewEventModal = () => {
     setEditingEvent(null);
     setFormTitle('');
     setFormBodyId('uf21');
     setFormRole('apr');
+    setFormDegrees(['aprendiz']);
     setFormStartDate(selectedDateStr);
     setFormEndDate('');
     setFormStartTime('19:30');
@@ -264,6 +280,7 @@ export function CalendarPage() {
     setFormTitle(ev.title);
     setFormBodyId(ev.bodyId);
     setFormRole(ev.roleRequired || (ev.degreeRequired === 'maestro' ? 'mae' : ev.degreeRequired === 'companero' ? 'comp' : 'apr'));
+    setFormDegrees(ev.degreeSegments?.length ? ev.degreeSegments.map((segment) => segment.degree) : [ev.degreeRequired]);
     setFormStartDate(ev.startDate);
     setFormEndDate(ev.endDate || '');
     setFormStartTime(ev.startTime || '19:30');
@@ -284,11 +301,23 @@ export function CalendarPage() {
       return;
     }
 
+    const primaryDegree: MasonicDegree = formDegrees.includes('aprendiz')
+      ? 'aprendiz'
+      : formDegrees.includes('companero')
+        ? 'companero'
+        : 'maestro';
     const candidate: LodgeEvent = {
       id: editingEvent ? editingEvent.id : `ev-${Date.now()}`,
       title: formTitle.trim(),
       bodyId: formBodyId,
-      degreeRequired: formRole === 'mae' ? 'maestro' : formRole === 'comp' ? 'companero' : 'aprendiz',
+      degreeRequired: primaryDegree,
+      degreeSegments: formDegrees.map((degree, index) => ({
+        id: `draft-${degree}`,
+        eventId: editingEvent?.id || '',
+        degree,
+        sequence: index + 1,
+        createdAt: new Date().toISOString(),
+      })),
       roleRequired: formRole,
       startDate: formStartDate,
       endDate: formEndDate ? formEndDate : undefined,
@@ -326,7 +355,8 @@ export function CalendarPage() {
     }
 
     try {
-      await eventService.saveEvent(candidate, { id: user?.id, email: user?.email, name: user?.displayName });
+      const { savedEvent } = await eventService.saveEvent(candidate, { id: user?.id, email: user?.email, name: user?.displayName });
+      await eventService.replaceDegreeSegments(savedEvent.id, formDegrees);
       toast.success(editingEvent ? 'Actividad actualizada exitosamente' : 'Actividad agendada exitosamente');
       setShowEventModal(false);
       loadData();
@@ -399,11 +429,12 @@ export function CalendarPage() {
     }
 
     try {
-      await eventService.saveEvent(
+      const { savedEvent } = await eventService.saveEvent(
         pendingCandidate,
         { id: user?.id, email: user?.email, name: user?.displayName },
         conflictJustification.trim()
       );
+      await eventService.replaceDegreeSegments(savedEvent.id, pendingCandidate.degreeSegments?.map((segment) => segment.degree) || [pendingCandidate.degreeRequired]);
       toast.warning('Evento guardado con conflicto registrado en auditoría.');
       setShowConflictModal(false);
       setPendingCandidate(null);
@@ -724,8 +755,12 @@ export function CalendarPage() {
           <div>
             <div className="flex items-center justify-between border-b border-border pb-3">
               <div>
-                <h3 className="font-serif text-lg font-bold text-ink">Trabajos del Día</h3>
-                <p className="text-xs text-ink-secondary">{formatDateSpanish(selectedDateStr)}</p>
+                <h3 className="font-serif text-lg font-bold text-ink">
+                  {selectedDayEvents.length > 0 ? 'Trabajos del Día' : 'Próximas reuniones'}
+                </h3>
+                <p className="text-xs text-ink-secondary">
+                  {selectedDayEvents.length > 0 ? formatDateSpanish(selectedDateStr) : 'Las siguientes actividades programadas'}
+                </p>
               </div>
               <span className="rounded-full bg-surface-container px-2.5 py-0.5 text-xs font-semibold text-primary">
                 {selectedDayEvents.length} actividad(es)
@@ -733,13 +768,36 @@ export function CalendarPage() {
             </div>
 
             <div className="mt-4 space-y-3">
-              {selectedDayEvents.length === 0 ? (
-                <div className="py-12 text-center text-ink-muted text-xs">
-                  No hay tenidas agendadas para esta fecha.
+                {selectedDayEvents.length === 0 ? (
+                <div className="space-y-3">
+                  {upcomingMeetings.length > 0 ? upcomingMeetings.map((ev) => {
+                    const body = getBodyById(ev.bodyId);
+                    return (
+                      <button
+                        key={ev.id}
+                        type="button"
+                        onClick={() => setSelectedDateStr(ev.startDate)}
+                        className="w-full rounded-lg border border-border p-3 text-left bg-surface-container-low/50 hover:border-primary/40 transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <AppleEmoji name={body.appleEmoji} size={20} className="shrink-0" />
+                          <span className="text-[10px] font-bold text-ink-secondary uppercase tracking-wider">{body.shortName}</span>
+                          <span className="ml-auto text-[10px] font-semibold text-primary">{formatDateSpanish(ev.startDate)}</span>
+                        </div>
+                        <h4 className="mt-2 font-serif text-sm font-bold text-ink leading-snug">{ev.title}</h4>
+                        <p className="mt-1 flex items-center gap-1.5 text-xs text-ink-secondary">
+                          <Clock className="h-3.5 w-3.5 text-gold" />
+                          {ev.isAllDay ? 'Día completo' : formatTimeRange12(ev.startTime, ev.endTime)}
+                        </p>
+                      </button>
+                    );
+                  }) : (
+                    <div className="py-8 text-center text-ink-muted text-xs">No hay próximas reuniones agendadas.</div>
+                  )}
                   {canManageEvents && (
                     <button
                       onClick={openNewEventModal}
-                      className="mt-3 block mx-auto text-xs text-primary font-medium hover:underline"
+                      className="mt-1 block mx-auto text-xs text-primary font-medium hover:underline"
                     >
                       + Agendar una actividad aquí
                     </button>
@@ -857,16 +915,43 @@ export function CalendarPage() {
       <Modal
         isOpen={showMobileDayModal}
         onClose={() => setShowMobileDayModal(false)}
-        title="Trabajos del Día"
-        subtitle={formatDateSpanish(selectedDateStr)}
+        title={selectedDayEvents.length > 0 ? 'Trabajos del Día' : 'Próximas reuniones'}
+        subtitle={selectedDayEvents.length > 0 ? formatDateSpanish(selectedDateStr) : 'Las siguientes actividades programadas'}
         maxWidth="md"
       >
         <div className="space-y-3 py-1">
           {selectedDayEvents.length === 0 ? (
-            <div className="py-8 text-center text-ink-muted text-xs space-y-3">
-              <AppleEmoji name="temple" size={32} className="mx-auto" />
-              <p className="font-medium text-ink">No hay tenidas agendadas para esta fecha.</p>
-              <p className="text-[11px] text-ink-muted">El taller se encuentra a cubierto en este día.</p>
+            <div className="space-y-3">
+              {upcomingMeetings.length > 0 ? upcomingMeetings.map((ev) => {
+                const body = getBodyById(ev.bodyId);
+                return (
+                  <button
+                    key={ev.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedDateStr(ev.startDate);
+                      setShowMobileDayModal(false);
+                    }}
+                    className="w-full rounded-2xl border border-border p-4 text-left bg-surface-container-low/40 shadow-2xs"
+                  >
+                    <div className="flex items-center gap-2">
+                      <AppleEmoji name={body.appleEmoji} size={22} className="shrink-0" />
+                      <span className="text-xs font-bold text-ink-secondary uppercase tracking-wider">{body.shortName}</span>
+                      <span className="ml-auto text-[10px] font-semibold text-primary">{formatDateSpanish(ev.startDate)}</span>
+                    </div>
+                    <h4 className="mt-2 font-serif text-base font-bold text-ink leading-snug">{ev.title}</h4>
+                    <p className="mt-1 flex items-center gap-2 text-xs text-ink-secondary">
+                      <Clock className="h-3.5 w-3.5 text-primary shrink-0" />
+                      {ev.isAllDay ? 'Día completo' : formatTimeRange12(ev.startTime, ev.endTime)}
+                    </p>
+                  </button>
+                );
+              }) : (
+                <div className="py-8 text-center text-ink-muted text-xs">
+                  <AppleEmoji name="temple" size={32} className="mx-auto mb-3" />
+                  No hay próximas reuniones agendadas.
+                </div>
+              )}
               {canManageEvents && (
                 <button
                   type="button"
@@ -877,7 +962,7 @@ export function CalendarPage() {
                   className="inline-flex min-h-[38px] items-center gap-1.5 rounded-xl bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary-pressed transition-colors cursor-pointer"
                 >
                   <Plus className="h-4 w-4" />
-                  <span>Agendar actividad aquí</span>
+                  <span>Agendar actividad</span>
                 </button>
               )}
             </div>
@@ -1047,6 +1132,38 @@ export function CalendarPage() {
               }))}
             />
           </div>
+
+          {formEventCategory === 'tenida' && (
+            <div className="rounded-xl border border-border bg-surface-container/40 p-3.5">
+              <p className="text-xs font-semibold text-ink">Grados que tendrá la misma tenida</p>
+              <p className="mt-1 text-[11px] text-ink-secondary">
+                Se mantendrá una sola convocatoria y podrán redactarse actas separadas para cada tramo.
+              </p>
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                {([
+                  ['aprendiz', 'Primer grado'],
+                  ['companero', 'Segundo grado'],
+                  ['maestro', 'Tercer grado'],
+                ] as const).map(([degree, label]) => (
+                  <label key={degree} className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs font-medium text-ink cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formDegrees.includes(degree)}
+                      onChange={(event) => {
+                        setFormDegrees((current) => {
+                          if (event.target.checked) return [...current, degree];
+                          if (current.length === 1) return current;
+                          return current.filter((item) => item !== degree);
+                        });
+                      }}
+                      className="h-4 w-4 rounded border-border text-primary focus:ring-primary/20"
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
 
           <AppleSelect<EventStatus>
             label="Estado de la actividad *"

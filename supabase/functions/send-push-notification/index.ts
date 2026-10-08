@@ -1,10 +1,18 @@
 import webpush from 'npm:web-push@3.6.7';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const corsHeaders = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' };
+const allowedOrigin = Deno.env.get('APP_ORIGIN') || 'https://logia-xi.vercel.app';
+const corsHeaders = (origin: string | null) => ({
+  'Access-Control-Allow-Origin': origin === allowedOrigin ? allowedOrigin : 'null',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  Vary: 'Origin',
+});
 
 Deno.serve(async (request) => {
-  if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  const headers = corsHeaders(request.headers.get('Origin'));
+  if (request.method === 'OPTIONS') return new Response('ok', { headers });
+  if (request.method !== 'POST') return response({ error: 'Método no permitido' }, 405, headers);
   try {
     const authHeader = request.headers.get('Authorization');
     if (!authHeader) throw new Error('No autenticado');
@@ -12,27 +20,44 @@ Deno.serve(async (request) => {
     const { data: { user } } = await admin.auth.getUser(authHeader.replace('Bearer ', ''));
     if (!user) return response({ error: 'No autenticado' }, 401);
 
+    const { data: rateAllowed, error: rateError } = await admin.rpc('consume_function_rate_limit', {
+      p_user_id: user.id,
+      p_action: 'send_push_notification',
+      p_window_seconds: 600,
+      p_limit: 10,
+    });
+    if (rateError) throw rateError;
+    if (!rateAllowed) return response({ error: 'Límite temporal alcanzado. Intenta nuevamente más tarde.' }, 429, headers);
+
     const { data: profile } = await admin.from('profiles').select('technical_role, role_id, access_disabled').eq('id', user.id).maybeSingle();
     if (profile?.access_disabled) return response({ error: 'Cuenta deshabilitada' }, 403);
-    const requestPayload = await request.json() as {
+    const rawBody = await request.text();
+    if (rawBody.length > 32_000) return response({ error: 'Solicitud demasiado grande' }, 413, headers);
+    const requestPayload = JSON.parse(rawBody) as {
       recipientRoles?: string[];
       recipientEmails?: string[];
       subscriptionId?: string;
+      minuteDegree?: 'aprendiz' | 'companero' | 'maestro';
       type?: string;
       [key: string]: unknown;
     };
     const isNewRegistrationNotice = requestPayload.type === 'nuevo_registro';
     const isIdentityResubmission = requestPayload.type === 'identidad_reenviada';
-    const allowed = profile && ['admin', 'secretary'].includes(profile.technical_role) || profile?.role_id === 'vm' || profile?.role_id === 'sec';
-    if (!allowed && !isNewRegistrationNotice && !isIdentityResubmission) return response({ error: 'No autorizado' }, 403);
+    const isNewMinuteNotice = requestPayload.type === 'nueva_acta';
+    const elevated = Boolean(profile && !profile.access_disabled && (['admin', 'secretary'].includes(profile.technical_role) || profile.role_id === 'vm' || profile.role_id === 'sec'));
+    const selfServiceNotice = Boolean(profile && !profile.access_disabled && profile.technical_role === 'member' && (isNewRegistrationNotice || isIdentityResubmission));
+    if (!elevated && !selfServiceNotice) return response({ error: 'No autorizado' }, 403, headers);
 
     webpush.setVapidDetails(
       Deno.env.get('VAPID_SUBJECT') || 'mailto:secretaria@unionfraternal21.org',
       Deno.env.get('VAPID_PUBLIC_KEY')!,
       Deno.env.get('VAPID_PRIVATE_KEY')!,
     );
-    const { recipientRoles, recipientEmails, subscriptionId, ...notificationPayload } = requestPayload;
-    const payload = JSON.stringify(notificationPayload);
+    const { recipientRoles, recipientEmails, subscriptionId, minuteDegree, ...notificationPayload } = requestPayload;
+    const title = String(notificationPayload.title || 'Nueva notificación').slice(0, 160);
+    const body = String(notificationPayload.body || '').slice(0, 2000);
+    const safeUrl = typeof notificationPayload.url === 'string' && /^\/(?!\/)[^\s]{0,300}$/.test(notificationPayload.url) ? notificationPayload.url : null;
+    const payload = JSON.stringify({ ...notificationPayload, title, body, url: safeUrl });
     let subscriptionsQuery = admin.from('push_subscriptions').select('id, endpoint, expiration_time, p256dh, auth, user_id').eq('enabled', true);
     let notificationRecipientIds: string[] = [];
     if (subscriptionId) {
@@ -46,6 +71,40 @@ Deno.serve(async (request) => {
       if (!targetSubscription) return response({ sent: 0, removed: 0 });
       notificationRecipientIds = [targetSubscription.user_id];
       subscriptionsQuery = subscriptionsQuery.eq('id', subscriptionId);
+    } else if (isNewMinuteNotice) {
+      if (!minuteDegree || !['aprendiz', 'companero', 'maestro'].includes(minuteDegree)) {
+        return response({ error: 'El grado del acta es obligatorio' }, 400, headers);
+      }
+      const { data: profiles, error: profilesError } = await admin
+        .from('profiles')
+        .select('id, member_id, role_id, technical_role, identity_verified, access_disabled')
+        .eq('identity_verified', true)
+        .or('access_disabled.eq.false,access_disabled.is.null');
+      if (profilesError) throw profilesError;
+
+      const memberIds = (profiles || []).map((profile) => profile.member_id).filter(Boolean);
+      const { data: members, error: membersError } = memberIds.length > 0
+        ? await admin.from('members').select('id, degree, is_active, deleted_at').in('id', memberIds)
+        : { data: [], error: null };
+      if (membersError) throw membersError;
+
+      const memberById = new Map((members || []).map((member) => [member.id, member]));
+      const allowedDegrees = minuteDegree === 'aprendiz'
+        ? new Set(['aprendiz'])
+        : minuteDegree === 'companero'
+          ? new Set(['aprendiz', 'companero'])
+          : new Set(['aprendiz', 'companero', 'maestro']);
+      const elevatedRoles = new Set(['admin', 'secretary', 'dignitary']);
+      const elevatedRoleIds = new Set(['adm', 'sec', 'vm', 'ora']);
+      notificationRecipientIds = (profiles || [])
+        .filter((profile) => {
+          if (elevatedRoles.has(profile.technical_role) || elevatedRoleIds.has(profile.role_id)) return true;
+          const member = profile.member_id ? memberById.get(profile.member_id) : null;
+          return Boolean(member && member.is_active && !member.deleted_at && allowedDegrees.has(member.degree));
+        })
+        .map((profile) => profile.id);
+      if (notificationRecipientIds.length === 0) return response({ sent: 0, removed: 0 });
+      subscriptionsQuery = subscriptionsQuery.in('user_id', notificationRecipientIds);
     } else if (isNewRegistrationNotice) {
       const { data: recipients, error: recipientsError } = await admin
         .from('profiles')
@@ -94,10 +153,10 @@ Deno.serve(async (request) => {
       const { error: notificationError } = await admin.from('push_notifications').insert(
         notificationRecipientIds.map((userId) => ({
           user_id: userId,
-          title: String(notificationPayload.title || 'Nueva notificación'),
-          body: String(notificationPayload.body || ''),
-          url: notificationPayload.url ? String(notificationPayload.url) : null,
-          tag: notificationPayload.tag ? String(notificationPayload.tag) : null,
+          title,
+          body,
+          url: safeUrl,
+          tag: notificationPayload.tag ? String(notificationPayload.tag).slice(0, 80) : null,
           type: notificationPayload.type ? String(notificationPayload.type) : 'aviso',
         })),
       );
@@ -119,12 +178,12 @@ Deno.serve(async (request) => {
         }
       }
     }
-    return response({ sent, removed, recipients: notificationRecipientIds.length });
-  } catch (error) {
-    return response({ error: error instanceof Error ? error.message : 'Error enviando push' }, 500);
+    return response({ sent, removed, recipients: notificationRecipientIds.length }, 200, headers);
+  } catch {
+    return response({ error: 'No se pudo procesar la notificación' }, 500, headers);
   }
 });
 
-function response(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+function response(body: unknown, status = 200, headers = corsHeaders(null)) {
+  return new Response(JSON.stringify(body), { status, headers: { ...headers, 'Content-Type': 'application/json' } });
 }

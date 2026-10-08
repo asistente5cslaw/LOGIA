@@ -68,7 +68,8 @@ export function AppLayout() {
   const visibleMobileNavItems = isIdentityRestricted
     ? mobileNavItems.filter((item) => item.to === '/app')
     : mobileNavItems;
-  const canAccessSettings = user?.email?.trim().toLowerCase() === 'asistente4@castillosucre.com';
+  // Ajustes pertenece al cargo Administrador, no a un correo personal fijo.
+  const canAccessSettings = user?.profile?.roleId === 'adm';
 
   useEffect(() => {
     if (sessionStorage.getItem('reopen_icon_selector') === 'true') {

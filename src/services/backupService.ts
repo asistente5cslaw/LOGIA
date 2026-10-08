@@ -26,10 +26,30 @@ export interface ImportPreview {
   parsedData?: BackupData;
 }
 
+function sanitizeBackupMember(member: Member): Member {
+  return {
+    ...member,
+    // Los respaldos operativos no deben convertirse en una copia de
+    // pasaportes, diplomas, selfies ni notas de identidad.
+    diplomaNumber: undefined,
+    passportNumber: undefined,
+    otherBodies: [],
+    selfieUrl: undefined,
+    identityNotes: undefined,
+    identityValidatedBy: undefined,
+    identityValidatedAt: undefined,
+  };
+}
+
+const MAX_BACKUP_JSON_BYTES = 10 * 1024 * 1024;
+const MAX_BACKUP_MEMBERS = 2000;
+const MAX_BACKUP_EVENTS = 5000;
+const MAX_BACKUP_MINUTES = 5000;
+
 export const backupService = {
   async generateFullJsonBackup(user: { id?: string; email?: string }): Promise<string> {
     const [members, events, minutes, lodgeSettings, checklist] = await Promise.all([
-      memberService.getAllMembers(true),
+      memberService.getAllMembers(true, false, true),
       eventService.getAllEvents(),
       minuteService.getAllMinutes(),
       officialVisitService.getLodgeSettings(),
@@ -40,7 +60,7 @@ export const backupService = {
       version: '1.0.0',
       exportedAt: new Date().toISOString(),
       lodgeSettings,
-      members,
+      members: members.map(sanitizeBackupMember),
       events,
       minutes,
       checklist,
@@ -88,6 +108,17 @@ export const backupService = {
 
   async previewImportJson(jsonText: string): Promise<ImportPreview> {
     try {
+      if (new TextEncoder().encode(jsonText).byteLength > MAX_BACKUP_JSON_BYTES) {
+        return {
+          valid: false,
+          errors: ['El respaldo supera el tamaño máximo de 10 MB.'],
+          membersCount: 0,
+          eventsCount: 0,
+          minutesCount: 0,
+          newMembers: 0,
+          duplicateMembers: 0,
+        };
+      }
       const data = JSON.parse(jsonText);
       const errors: string[] = [];
 
@@ -102,6 +133,15 @@ export const backupService = {
       }
       if (!Array.isArray(data.minutes)) {
         errors.push('El archivo no contiene un arreglo válido de actas.');
+      }
+      if (Array.isArray(data.members) && data.members.length > MAX_BACKUP_MEMBERS) {
+        errors.push(`El respaldo supera el máximo de ${MAX_BACKUP_MEMBERS} miembros.`);
+      }
+      if (Array.isArray(data.events) && data.events.length > MAX_BACKUP_EVENTS) {
+        errors.push(`El respaldo supera el máximo de ${MAX_BACKUP_EVENTS} eventos.`);
+      }
+      if (Array.isArray(data.minutes) && data.minutes.length > MAX_BACKUP_MINUTES) {
+        errors.push(`El respaldo supera el máximo de ${MAX_BACKUP_MINUTES} actas.`);
       }
 
       if (errors.length > 0) {
@@ -160,6 +200,9 @@ export const backupService = {
     overwriteDuplicates: boolean,
     user: { id?: string; email?: string }
   ): Promise<{ importedMembers: number; importedEvents: number; importedMinutes: number }> {
+    if (backup.members.length > MAX_BACKUP_MEMBERS || backup.events.length > MAX_BACKUP_EVENTS || backup.minutes.length > MAX_BACKUP_MINUTES) {
+      throw new Error('El respaldo supera los límites permitidos para restauración.');
+    }
     const currentMembers = await memberService.getAllMembers(true);
     const existingEmails = new Set(currentMembers.map((m) => m.email.toLowerCase()));
 

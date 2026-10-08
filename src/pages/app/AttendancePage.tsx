@@ -36,6 +36,7 @@ export function AttendancePage() {
   const { user, hasPermission } = useAuth();
   const [meetings, setMeetings] = useState<LodgeEvent[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<string>('');
+  const [selectedSegmentId, setSelectedSegmentId] = useState<string>('');
   const [members, setMembers] = useState<Member[]>([]);
   const [attendanceMap, setAttendanceMap] = useState<Record<string, AttendanceStatus>>({});
   const [excuseReasons, setExcuseReasons] = useState<Record<string, string>>({});
@@ -82,10 +83,11 @@ export function AttendancePage() {
     }
   };
 
-  const loadAttendanceForSelected = async (eventId: string, currentMembers: Member[]) => {
+  const loadAttendanceForSelected = async (eventId: string, segmentId: string, currentMembers: Member[]) => {
+    if (!segmentId) return;
     try {
       const [records, visList] = await Promise.all([
-        attendanceService.getAttendanceForEvent(eventId, {
+        attendanceService.getAttendanceForEvent(eventId, segmentId, {
           canViewExcuseReasons,
           memberId: currentMembers.find((member) => isOwnMember(member))?.id,
         }),
@@ -121,7 +123,7 @@ export function AttendancePage() {
   useRealtimeRefresh(() => {
     void loadInitial();
     if (selectedEventId && !hasUnsavedChanges) {
-      void loadAttendanceForSelected(selectedEventId, members);
+      void loadAttendanceForSelected(selectedEventId, selectedSegmentId, members);
     }
   });
 
@@ -131,21 +133,22 @@ export function AttendancePage() {
     if (!selectedEventId) {
       setAttendanceMap({});
       setVisitors([]);
+      setSelectedSegmentId('');
       return;
     }
 
-    void loadAttendanceForSelected(selectedEventId, members);
-  }, [selectedEventId, members, hasUnsavedChanges]);
+    void loadAttendanceForSelected(selectedEventId, selectedSegmentId, members);
+  }, [selectedEventId, selectedSegmentId, members, hasUnsavedChanges]);
 
   // Mantiene los contadores y estados sincronizados entre dispositivos aunque
   // el canal realtime tarde o no esté disponible en el navegador.
   useEffect(() => {
-    if (!selectedEventId || members.length === 0 || hasUnsavedChanges) return undefined;
+    if (!selectedEventId || !selectedSegmentId || members.length === 0 || hasUnsavedChanges) return undefined;
     const intervalId = window.setInterval(() => {
-      void loadAttendanceForSelected(selectedEventId, members);
+      void loadAttendanceForSelected(selectedEventId, selectedSegmentId, members);
     }, 5000);
     return () => window.clearInterval(intervalId);
-  }, [selectedEventId, members, hasUnsavedChanges]);
+  }, [selectedEventId, selectedSegmentId, members, hasUnsavedChanges]);
 
   const selectedEvent = useMemo(() => {
     return meetings.find((m) => m.id === selectedEventId);
@@ -185,7 +188,7 @@ export function AttendancePage() {
       setExcuseDraft(excuseReasons[memberId] || '');
     }
 
-    if (!selectedEventId) return;
+    if (!selectedEventId || !selectedSegmentId) return;
     setIsSaving(true);
     try {
       const records = Object.entries(nextMap).map(([currentMemberId, currentStatus]) => ({
@@ -195,7 +198,7 @@ export function AttendancePage() {
           ? undefined
           : excuseReasons[currentMemberId],
       }));
-      await attendanceService.saveAttendanceBatch(selectedEventId, records, {
+      await attendanceService.saveAttendanceBatch(selectedEventId, selectedSegmentId, records, {
         id: user?.id,
         email: user?.email,
       });
@@ -218,7 +221,7 @@ export function AttendancePage() {
   };
 
   const handleSaveAttendance = async () => {
-    if (!selectedEventId) return;
+    if (!selectedEventId || !selectedSegmentId) return;
     setIsSaving(true);
     try {
       const records = Object.entries(attendanceMap).map(([memberId, status]) => ({
@@ -227,7 +230,7 @@ export function AttendancePage() {
         excuseReason: excuseReasons[memberId],
       }));
 
-      await attendanceService.saveAttendanceBatch(selectedEventId, records, {
+      await attendanceService.saveAttendanceBatch(selectedEventId, selectedSegmentId, records, {
         id: user?.id,
         email: user?.email,
       });
@@ -255,9 +258,9 @@ export function AttendancePage() {
 
   const handleSaveExcuse = async (memberId: string) => {
     const member = members.find((candidate) => candidate.id === memberId);
-    if (!selectedEventId || !member || !isOwnMember(member) || !excuseDraft.trim()) return;
+    if (!selectedEventId || !selectedSegmentId || !member || !isOwnMember(member) || !excuseDraft.trim()) return;
     try {
-      await attendanceService.saveMemberExcuse(selectedEventId, memberId, excuseDraft, {
+      await attendanceService.saveMemberExcuse(selectedEventId, selectedSegmentId, memberId, excuseDraft, {
         id: user?.id,
         email: user?.email,
       });
@@ -369,6 +372,8 @@ export function AttendancePage() {
             value={selectedEventId}
             onChange={(val) => {
               setHasUnsavedChanges(false);
+              const selected = meetings.find((meeting) => meeting.id === val);
+              setSelectedSegmentId(selected?.degreeSegments?.[0]?.id || '');
               setSelectedEventId(val);
             }}
             placeholder="Elige una actividad para registrar asistencia..."
@@ -379,6 +384,23 @@ export function AttendancePage() {
               icon: <AppleEmoji name={getBodyById(m.bodyId).appleEmoji} size={16} />
             }))}
           />
+          {selectedEvent && (selectedEvent.degreeSegments?.length || 0) > 0 && (
+            <div className="mt-3">
+              <AppleSelect
+                value={selectedSegmentId}
+                onChange={(val) => {
+                  setHasUnsavedChanges(false);
+                  setSelectedSegmentId(val);
+                }}
+                label="Tramo / grado de la asistencia"
+                options={(selectedEvent.degreeSegments || []).map((segment) => ({
+                  value: segment.id,
+                  label: segment.degree === 'aprendiz' ? 'Primer grado — Aprendiz' : segment.degree === 'companero' ? 'Segundo grado — Compañero' : 'Tercer grado — Maestro',
+                  description: `Tramo ${segment.sequence} de la misma tenida`,
+                }))}
+              />
+            </div>
+          )}
           {selectedEvent && (
             <div className="pt-2 flex items-center justify-between text-xs text-ink-secondary">
               <span>Lugar: <strong className="text-ink">{selectedEvent.location}</strong></span>

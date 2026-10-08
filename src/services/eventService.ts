@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import type { LodgeEvent, EventConflict, MasonicBodyId, InstitutionalRoleCode, MasonicDegree, EventCategory } from '@/types';
+import type { LodgeEvent, EventConflict, EventDegreeSegment, MasonicBodyId, InstitutionalRoleCode, MasonicDegree, EventCategory } from '@/types';
 import { auditService } from './auditService';
 
 function roleFromLegacyDegree(degree: MasonicDegree): InstitutionalRoleCode {
@@ -29,6 +29,44 @@ function getEventTimeRange(event: LodgeEvent): { startMs: number; endMs: number 
 }
 
 export const eventService = {
+  async getDegreeSegments(eventIds?: string[]): Promise<EventDegreeSegment[]> {
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    let query = supabase.from('event_degree_segments').select('*').order('sequence', { ascending: true });
+    if (eventIds?.length) query = query.in('event_id', eventIds);
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data || []).map((d) => ({
+      id: d.id,
+      eventId: d.event_id,
+      degree: d.degree as MasonicDegree,
+      sequence: d.sequence,
+      startTime: d.start_time || undefined,
+      endTime: d.end_time || undefined,
+      createdAt: d.created_at,
+    }));
+  },
+
+  async replaceDegreeSegments(eventId: string, degrees: MasonicDegree[]): Promise<EventDegreeSegment[]> {
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    const ordered = Array.from(new Set(degrees));
+    if (ordered.length === 0) throw new Error('La tenida debe tener al menos un grado.');
+    const { error: deleteError } = await supabase.from('event_degree_segments').delete().eq('event_id', eventId);
+    if (deleteError) throw deleteError;
+    const { data, error } = await supabase.from('event_degree_segments').insert(
+      ordered.map((degree, index) => ({ event_id: eventId, degree, sequence: index + 1 }))
+    ).select('*');
+    if (error) throw error;
+    return (data || []).map((d) => ({
+      id: d.id,
+      eventId: d.event_id,
+      degree: d.degree as MasonicDegree,
+      sequence: d.sequence,
+      startTime: d.start_time || undefined,
+      endTime: d.end_time || undefined,
+      createdAt: d.created_at,
+    }));
+  },
+
   async getAllEvents(filterBodyId?: MasonicBodyId): Promise<LodgeEvent[]> {
     if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
     let query = supabase.from('events').select('*').is('deleted_at', null);
@@ -36,6 +74,7 @@ export const eventService = {
     const { data, error } = await query.order('start_date', { ascending: true });
     if (error) throw error;
     if (data) {
+      const segments = await this.getDegreeSegments(data.map((d) => d.id));
       return data.map((d) => ({
             id: d.id,
             title: d.title,
@@ -61,6 +100,7 @@ export const eventService = {
             createdBy: d.created_by,
             createdAt: d.created_at,
             updatedAt: d.updated_at,
+            degreeSegments: segments.filter((segment) => segment.eventId === d.id),
           }));
     }
     return [];
