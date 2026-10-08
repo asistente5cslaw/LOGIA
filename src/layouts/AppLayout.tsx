@@ -361,7 +361,7 @@ export function AppLayout() {
             </button>
             <div className="flex items-center gap-2">
               <span className="font-serif text-sm font-medium text-ink-secondary">
-                R.·. L.·. L.·. Unión Fraternal No. 21
+                R.·. L.·. L.·. S.·. Unión Fraternal No. 21
               </span>
               <span className="text-xs text-ink-muted">• G.·. L.·. P.·.</span>
             </div>
