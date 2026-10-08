@@ -1431,9 +1431,21 @@ export function CalendarPage() {
                 <a
                   href={convocationService.generateMailtoUrl(
                     `Convocatoria: ${convocationEvent.title}`,
-                    convocationService.generateEmailBody(convocationEvent, convocationText),
+                    convocationService.generateEmailBody(convocationEvent, convocationText || convocationService.generateOfficialText(convocationEvent)),
                     members.filter((member) => member.isActive).map((member) => member.email)
                   )}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    const body = convocationService.generateEmailBody(
+                      convocationEvent,
+                      convocationText || convocationService.generateOfficialText(convocationEvent)
+                    );
+                    window.location.assign(convocationService.generateMailtoUrl(
+                      `Convocatoria: ${convocationEvent.title}`,
+                      body,
+                      members.filter((member) => member.isActive).map((member) => member.email)
+                    ));
+                  }}
                   className="flex min-h-[40px] items-center gap-1.5 rounded-lg border border-info/30 bg-info/10 px-3 text-xs font-semibold text-info hover:bg-info/20 transition-colors"
                 >
                   <Mail className="h-4 w-4" />
