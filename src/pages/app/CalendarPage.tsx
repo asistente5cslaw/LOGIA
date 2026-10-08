@@ -64,23 +64,49 @@ function eventKindLabel(event: Pick<LodgeEvent, 'eventCategory'>): string {
 }
 
 function googleCalendarUrl(event: LodgeEvent): string {
-  const dateToGoogleDay = (value: string) => value.replace(/-/g, '');
-  const nextGoogleDay = (value: string) => {
-    const next = new Date(`${value}T12:00:00`);
-    next.setDate(next.getDate() + 1);
-    return next.toISOString().slice(0, 10).replace(/-/g, '');
+  const normalizeDate = (value: string): string => {
+    const match = String(value || '').match(/^(\d{4}-\d{2}-\d{2})/);
+    return match?.[1] || new Date().toISOString().slice(0, 10);
   };
-  const dateToGoogleDateTime = (date: string, time = '00:00') =>
-    new Date(`${date}T${time}:00`).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+  const dateToGoogleDay = (value: string) => normalizeDate(value).replace(/-/g, '');
+  const nextGoogleDay = (value: string) => {
+    const next = new Date(`${normalizeDate(value)}T12:00:00`);
+    next.setDate(next.getDate() + 1);
+    return Number.isNaN(next.getTime()) ? dateToGoogleDay(value) : next.toISOString().slice(0, 10).replace(/-/g, '');
+  };
+  const normalizeTime = (value?: string): string | null => {
+    const raw = String(value || '').trim().toUpperCase();
+    const twelveHour = raw.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/);
+    if (twelveHour) {
+      let hour = Number(twelveHour[1]);
+      const minute = Number(twelveHour[2]);
+      if (hour < 1 || hour > 12 || minute > 59) return null;
+      if (twelveHour[3] === 'AM' && hour === 12) hour = 0;
+      if (twelveHour[3] === 'PM' && hour !== 12) hour += 12;
+      return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+    }
+    const twentyFourHour = raw.match(/^(\d{1,2}):(\d{2})$/);
+    if (!twentyFourHour) return null;
+    const hour = Number(twentyFourHour[1]);
+    const minute = Number(twentyFourHour[2]);
+    return hour <= 23 && minute <= 59
+      ? `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+      : null;
+  };
+  const dateToGoogleDateTime = (date: string, time?: string): string | null => {
+    const normalizedTime = normalizeTime(time);
+    if (!normalizedTime) return null;
+    const parsed = new Date(`${normalizeDate(date)}T${normalizedTime}:00`);
+    return Number.isNaN(parsed.getTime())
+      ? null
+      : parsed.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+  };
 
-  const isAllDay = event.isAllDay || !event.startTime;
-  const start = isAllDay
-    ? dateToGoogleDay(event.startDate)
-    : dateToGoogleDateTime(event.startDate, event.startTime);
-  const endDate = event.endDate || event.startDate;
-  const end = isAllDay
-    ? nextGoogleDay(endDate)
-    : dateToGoogleDateTime(endDate, event.endTime || event.startTime || '23:59');
+  const startDateTime = dateToGoogleDateTime(event.startDate, event.startTime);
+  const endDateTime = dateToGoogleDateTime(event.endDate || event.startDate, event.endTime || event.startTime);
+  const isTimedEvent = !event.isAllDay && Boolean(startDateTime && endDateTime);
+  const start = isTimedEvent ? startDateTime! : dateToGoogleDay(event.startDate);
+  const end = isTimedEvent ? endDateTime! : nextGoogleDay(event.endDate || event.startDate);
   const params = new URLSearchParams({
     action: 'TEMPLATE',
     text: event.title,
