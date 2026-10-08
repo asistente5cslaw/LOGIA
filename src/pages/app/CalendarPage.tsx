@@ -215,7 +215,7 @@ export function CalendarPage() {
   // Filtrado de eventos
   const filteredEvents = useMemo(() => {
     if (searchParams.get('tipo') !== 'reuniones') return events;
-    return events.filter((event) => event.eventCategory === 'reunion_masonica' || event.eventCategory === 'reunion_fraternal');
+    return events.filter((event) => event.eventCategory !== 'tenida');
   }, [events, searchParams]);
 
   // Navegación mensual
@@ -253,11 +253,7 @@ export function CalendarPage() {
   const upcomingActivities = useMemo(() => {
     const today = new Date().toISOString().split('T')[0];
     return filteredEvents
-      .filter((ev) => (
-        ev.eventCategory === 'tenida'
-        || ev.eventCategory === 'reunion_masonica'
-        || ev.eventCategory === 'reunion_fraternal'
-      ) && ev.status !== 'cancelada' && ev.startDate >= today)
+      .filter((ev) => ev.status !== 'cancelada' && ev.startDate >= today)
       .sort((a, b) => {
         const dateCompare = a.startDate.localeCompare(b.startDate);
         if (dateCompare !== 0) return dateCompare;

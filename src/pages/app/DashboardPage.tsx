@@ -86,7 +86,7 @@ export function DashboardPage() {
         (e) => e.eventCategory === 'tenida' && e.status !== 'cancelada' && e.startDate >= today
       ).length;
       const upcomingReunionsCount = evList.filter(
-        (e) => (e.eventCategory === 'reunion_masonica' || e.eventCategory === 'reunion_fraternal')
+        (e) => e.eventCategory !== 'tenida'
           && e.status !== 'cancelada' && e.startDate >= today
       ).length;
       const approvedMinutesCount = minList.filter(
@@ -118,9 +118,8 @@ export function DashboardPage() {
   const upcomingTenidas = events
     .filter((event) => event.eventCategory === 'tenida' && event.status !== 'cancelada' && event.startDate >= today)
     .sort((a, b) => `${a.startDate}T${a.startTime || ''}`.localeCompare(`${b.startDate}T${b.startTime || ''}`));
-  const upcomingReunions = events
-    .filter((event) => (event.eventCategory === 'reunion_masonica' || event.eventCategory === 'reunion_fraternal')
-      && event.status !== 'cancelada' && event.startDate >= today)
+  const upcomingActivities = events
+    .filter((event) => event.status !== 'cancelada' && event.startDate >= today)
     .sort((a, b) => `${a.startDate}T${a.startTime || ''}`.localeCompare(`${b.startDate}T${b.startTime || ''}`))
     .slice(0, 3);
 
@@ -403,25 +402,25 @@ export function DashboardPage() {
         </div>
       )}
 
-      {/* Próximas reuniones, separadas de las tenidas rituales */}
+      {/* Próximas tenidas y reuniones */}
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h2 className="font-serif text-lg font-bold text-ink">Próximas reuniones</h2>
-            <p className="text-xs text-ink-muted">Encuentros masónicos y fraternales próximos</p>
+            <h2 className="font-serif text-lg font-bold text-ink">Próximas actividades</h2>
+            <p className="text-xs text-ink-muted">Tenidas y reuniones programadas</p>
           </div>
-          <Link to="/app/calendario?tipo=reuniones" className="text-xs font-semibold text-primary hover:underline">
+          <Link to="/app/calendario" className="text-xs font-semibold text-primary hover:underline">
             Ver todas
           </Link>
         </div>
-        {upcomingReunions.length > 0 ? (
+        {upcomingActivities.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {upcomingReunions.map((event) => {
+            {upcomingActivities.map((event) => {
               const body = getBodyById(event.bodyId);
               return (
                 <Link
                   key={event.id}
-                  to="/app/calendario?tipo=reuniones"
+                  to="/app/calendario"
                   className="group rounded-2xl border border-border/80 bg-white p-4 shadow-2xs transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
                 >
                   <div className="flex items-center gap-2">
@@ -433,7 +432,9 @@ export function DashboardPage() {
                     {formatDateTimeSpanish(event.startDate, event.startTime)}
                   </p>
                   <p className="mt-1 truncate text-[11px] text-ink-muted">
-                    {event.eventCategory === 'reunion_masonica' ? 'Reunión Masónica' : 'Reunión Fraternal'}
+                    {event.eventCategory === 'tenida'
+                      ? 'Tenida'
+                      : event.eventCategory === 'reunion_masonica' ? 'Reunión Masónica' : 'Reunión Fraternal'}
                   </p>
                 </Link>
               );
@@ -441,7 +442,7 @@ export function DashboardPage() {
           </div>
         ) : (
           <div className="rounded-2xl border border-dashed border-border bg-white p-5 text-center text-xs text-ink-muted">
-            No hay reuniones próximas agendadas.
+            No hay tenidas ni reuniones próximas agendadas.
           </div>
         )}
       </section>
