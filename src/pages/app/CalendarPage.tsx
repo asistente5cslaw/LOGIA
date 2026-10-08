@@ -1431,7 +1431,7 @@ export function CalendarPage() {
                 <a
                   href={convocationService.generateMailtoUrl(
                     `Convocatoria: ${convocationEvent.title}`,
-                    convocationService.generateEmailBody(convocationEvent),
+                    convocationService.generateEmailBody(convocationEvent, convocationText),
                     members.filter((member) => member.isActive).map((member) => member.email)
                   )}
                   className="flex min-h-[40px] items-center gap-1.5 rounded-lg border border-info/30 bg-info/10 px-3 text-xs font-semibold text-info hover:bg-info/20 transition-colors"
