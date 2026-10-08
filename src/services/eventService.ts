@@ -313,6 +313,20 @@ export const eventService = {
     return data.signedUrl;
   },
 
+  async deleteConvocationPdf(eventId: string, pdfPath?: string): Promise<void> {
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    if (pdfPath && !/^https?:\/\//i.test(pdfPath)) {
+      const { error: storageError } = await supabase.storage.from('convocation-pdfs').remove([pdfPath]);
+      if (storageError) throw storageError;
+    }
+    const { error } = await supabase.from('events').update({
+      convocation_pdf_url: null,
+      convocation_pdf_file_name: null,
+      convocation_pdf_file_size: null,
+    }).eq('id', eventId);
+    if (error) throw error;
+  },
+
   async deleteEvent(id: string, user: { id?: string; email?: string }): Promise<void> {
     if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
     const { data, error } = await supabase

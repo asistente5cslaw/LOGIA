@@ -2,6 +2,7 @@ import type { LodgeEvent, Member, MasonicDegree } from '@/types';
 import { institutionalRoles } from '@/data/rolesData';
 import { getBodyById } from '@/data/bodiesData';
 import { formatDateSpanish, formatTime12 } from '@/lib/dateUtils';
+import { supabase } from '@/lib/supabase';
 
 export interface ConvocationDraft {
   eventId: string;
@@ -89,5 +90,16 @@ ${officialText}`;
     const encodedSubject = encodeURIComponent(subject);
     const encodedBody = encodeURIComponent(bodyText);
     return `mailto:?cc=${encodeURIComponent(ccList)}&subject=${encodedSubject}&body=${encodedBody}`;
+  },
+
+  async sendEmailWithPdf(payload: {
+    subject: string;
+    bodyText: string;
+    recipientEmails: string[];
+    pdfPath?: string;
+    pdfFileName?: string;
+  }): Promise<void> {
+    const { error } = await supabase.functions.invoke('send-convocation-email', { body: payload });
+    if (error) throw error;
   },
 };

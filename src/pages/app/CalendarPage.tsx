@@ -163,6 +163,8 @@ export function CalendarPage() {
   const [convocationPdfViewerUrl, setConvocationPdfViewerUrl] = useState<string | null>(null);
   const [isLoadingConvocationPdf, setIsLoadingConvocationPdf] = useState(false);
   const [isUploadingConvocationPdf, setIsUploadingConvocationPdf] = useState(false);
+  const [isDeletingConvocationPdf, setIsDeletingConvocationPdf] = useState(false);
+  const [isSendingConvocationEmail, setIsSendingConvocationEmail] = useState(false);
 
   // Formulario nuevo evento
   const [formTitle, setFormTitle] = useState('');
@@ -483,6 +485,49 @@ export function CalendarPage() {
       toast.error(error instanceof Error ? error.message : 'No se pudo cargar el PDF de la convocatoria.');
     } finally {
       setIsUploadingConvocationPdf(false);
+    }
+  };
+
+  const handleDeleteConvocationPdf = async () => {
+    if (!convocationEvent?.convocationPdfUrl) return;
+    const confirmed = await showConfirm({
+      title: 'Eliminar PDF de convocatoria',
+      message: '¿Confirmas que deseas eliminar este PDF? También dejará de aparecer como adjunto en los correos.',
+      confirmText: 'Eliminar PDF',
+      cancelText: 'Cancelar',
+      type: 'warning',
+    });
+    if (!confirmed) return;
+    setIsDeletingConvocationPdf(true);
+    try {
+      await eventService.deleteConvocationPdf(convocationEvent.id, convocationEvent.convocationPdfUrl);
+      setConvocationEvent({ ...convocationEvent, convocationPdfUrl: undefined, convocationPdfFileName: undefined, convocationPdfFileSize: undefined });
+      setConvocationPdfViewerUrl(null);
+      toast.success('PDF de la convocatoria eliminado.');
+      void loadData();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo eliminar el PDF.');
+    } finally {
+      setIsDeletingConvocationPdf(false);
+    }
+  };
+
+  const handleSendConvocationEmail = async () => {
+    if (!convocationEvent) return;
+    setIsSendingConvocationEmail(true);
+    try {
+      await convocationService.sendEmailWithPdf({
+        subject: `Convocatoria: ${convocationEvent.title}`,
+        bodyText: convocationService.generateEmailBody(convocationEvent, convocationText),
+        recipientEmails: members.filter((member) => member.isActive).map((member) => member.email),
+        pdfPath: convocationEvent.convocationPdfUrl,
+        pdfFileName: convocationEvent.convocationPdfFileName,
+      });
+      toast.success('Correo enviado con el PDF adjunto.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo enviar el correo con el PDF.');
+    } finally {
+      setIsSendingConvocationEmail(false);
     }
   };
 
@@ -1339,9 +1384,20 @@ export function CalendarPage() {
                   </div>
                 )}
                 {convocationEvent.convocationPdfUrl && (
-                  <p className="text-[11px] font-medium text-success">
-                    PDF cargado: {convocationEvent.convocationPdfFileName || 'convocatoria.pdf'}
-                  </p>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-[11px] font-medium text-success">
+                      PDF cargado: {convocationEvent.convocationPdfFileName || 'convocatoria.pdf'}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => void handleDeleteConvocationPdf()}
+                      disabled={isDeletingConvocationPdf}
+                      className="inline-flex items-center gap-1 rounded-lg border border-destructive/30 bg-destructive/5 px-2.5 py-1.5 text-[11px] font-semibold text-destructive disabled:opacity-60"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      {isDeletingConvocationPdf ? 'Eliminando…' : 'Eliminar PDF'}
+                    </button>
+                  </div>
                 )}
               </div>
             )}
@@ -1374,17 +1430,15 @@ export function CalendarPage() {
                   WhatsApp
                 </a>
 
-                <a
-                  href={convocationService.generateMailtoUrl(
-                    `Convocatoria: ${convocationEvent.title}`,
-                    convocationService.generateEmailBody(convocationEvent, convocationText),
-                    members.filter((m) => m.isActive).map((m) => m.email)
-                  )}
+                <button
+                  type="button"
+                  onClick={() => void handleSendConvocationEmail()}
+                  disabled={isSendingConvocationEmail}
                   className="flex min-h-[40px] items-center gap-1.5 rounded-lg border border-info/30 bg-info/10 px-3 text-xs font-semibold text-info hover:bg-info/20 transition-colors"
                 >
                   <Mail className="h-4 w-4" />
-                  Correo
-                </a>
+                  {isSendingConvocationEmail ? 'Enviando…' : 'Correo con PDF'}
+                </button>
 
                 <button
                   type="button"
