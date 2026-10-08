@@ -177,10 +177,6 @@ export function SettingsPage() {
     if (activeTab === 'notificaciones') void loadPushSubscribers();
   }, [activeTab]);
 
-  useEffect(() => {
-    if (canConfigure && activeTab === 'notificaciones') setActiveTab('configuracion');
-  }, [activeTab, canConfigure]);
-
   const handleToggleChecklistItem = async (item: OfficialVisitChecklistItem) => {
     if (!canConfigure) {
       toast.error('No tienes permisos para modificar el checklist de inspección.');

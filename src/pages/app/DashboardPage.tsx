@@ -118,13 +118,12 @@ export function DashboardPage() {
   const upcomingTenidas = events
     .filter((event) => event.eventCategory === 'tenida' && event.status !== 'cancelada' && event.startDate >= today)
     .sort((a, b) => `${a.startDate}T${a.startTime || ''}`.localeCompare(`${b.startDate}T${b.startTime || ''}`));
-  const upcomingActivities = events
-    .filter((event) => event.status !== 'cancelada' && event.startDate >= today)
-    .sort((a, b) => `${a.startDate}T${a.startTime || ''}`.localeCompare(`${b.startDate}T${b.startTime || ''}`))
-    .slice(0, 3);
-
   const nextMeeting = upcomingTenidas.find((event) => event.status === 'convocada') || upcomingTenidas[0];
   const nextMeetingBody = nextMeeting ? getBodyById(nextMeeting.bodyId) : null;
+  const upcomingActivities = events
+    .filter((event) => event.status !== 'cancelada' && event.startDate >= today && event.id !== nextMeeting?.id)
+    .sort((a, b) => `${a.startDate}T${a.startTime || ''}`.localeCompare(`${b.startDate}T${b.startTime || ''}`))
+    .slice(0, 3);
 
   const handleSaveDashboardExcuse = async (eventId: string) => {
     const reason = excuseDrafts[eventId]?.trim();
