@@ -165,7 +165,6 @@ export function CalendarPage() {
   const [isUploadingConvocationPdf, setIsUploadingConvocationPdf] = useState(false);
   const [isDeletingConvocationPdf, setIsDeletingConvocationPdf] = useState(false);
   const [confirmingConvocationPdfDeletion, setConfirmingConvocationPdfDeletion] = useState(false);
-  const [isSendingConvocationEmail, setIsSendingConvocationEmail] = useState(false);
 
   // Formulario nuevo evento
   const [formTitle, setFormTitle] = useState('');
@@ -503,25 +502,6 @@ export function CalendarPage() {
       toast.error(error instanceof Error ? error.message : 'No se pudo eliminar el PDF.');
     } finally {
       setIsDeletingConvocationPdf(false);
-    }
-  };
-
-  const handleSendConvocationEmail = async () => {
-    if (!convocationEvent) return;
-    setIsSendingConvocationEmail(true);
-    try {
-      await convocationService.sendEmailWithPdf({
-        subject: `Convocatoria: ${convocationEvent.title}`,
-        bodyText: convocationService.generateEmailBody(convocationEvent),
-        recipientEmails: members.filter((member) => member.isActive).map((member) => member.email),
-        pdfPath: convocationEvent.convocationPdfUrl,
-        pdfFileName: convocationEvent.convocationPdfFileName,
-      });
-      toast.success('Correo enviado con el PDF adjunto.');
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'No se pudo enviar el correo con el PDF.');
-    } finally {
-      setIsSendingConvocationEmail(false);
     }
   };
 
@@ -1448,15 +1428,17 @@ export function CalendarPage() {
                   WhatsApp
                 </a>
 
-                <button
-                  type="button"
-                  onClick={() => void handleSendConvocationEmail()}
-                  disabled={isSendingConvocationEmail}
+                <a
+                  href={convocationService.generateMailtoUrl(
+                    `Convocatoria: ${convocationEvent.title}`,
+                    convocationService.generateEmailBody(convocationEvent),
+                    members.filter((member) => member.isActive).map((member) => member.email)
+                  )}
                   className="flex min-h-[40px] items-center gap-1.5 rounded-lg border border-info/30 bg-info/10 px-3 text-xs font-semibold text-info hover:bg-info/20 transition-colors"
                 >
                   <Mail className="h-4 w-4" />
-                  {isSendingConvocationEmail ? 'Enviando…' : 'Correo con PDF'}
-                </button>
+                  Correo
+                </a>
 
                 <button
                   type="button"
