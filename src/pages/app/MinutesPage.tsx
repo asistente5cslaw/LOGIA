@@ -15,6 +15,7 @@ import {
   Trash2,
   CalendarDays,
   Mail,
+  Bell,
 } from 'lucide-react';
 import { Modal } from '@/components/shared/Modal';
 import { AppleSelect, type AppleSelectOption } from '@/components/shared/AppleSelect';
@@ -52,6 +53,7 @@ export function MinutesPage() {
   const [formStatus, setFormStatus] = useState<MinuteStatus>('borrador');
   const [formNotes, setFormNotes] = useState('');
   const [formPdfFile, setFormPdfFile] = useState<File | null>(null);
+  const [notifyPushOnPublish, setNotifyPushOnPublish] = useState(true);
 
   // Correcciones
   const [newComment, setNewComment] = useState('');
@@ -188,6 +190,7 @@ export function MinutesPage() {
     setFormStatus('borrador');
     setFormNotes('');
     setFormPdfFile(null);
+    setNotifyPushOnPublish(true);
     setShowMinuteModal(true);
   };
 
@@ -217,7 +220,7 @@ export function MinutesPage() {
         await minuteService.uploadPdf(savedMinute.id, formPdfFile);
       }
 
-      const shouldNotify = savedMinute.status !== 'borrador' && (!editingMinute || editingMinute.status === 'borrador');
+      const shouldNotify = notifyPushOnPublish && savedMinute.status !== 'borrador' && (!editingMinute || editingMinute.status === 'borrador');
       if (shouldNotify) {
         try {
           await pushNotificationService.notifyNewMinute(savedMinute.title, savedMinute.formatNumber, savedMinute.degree);
@@ -717,7 +720,17 @@ ${formDescription.trim()}${notes}`;
             {formPdfFile && <p className="mt-2 text-[11px] font-medium text-success">PDF seleccionado: {formPdfFile.name}</p>}
           </div>
 
-          <div className="flex justify-end gap-2.5 pt-3 border-t border-border">
+          <div className="flex flex-wrap justify-end gap-2.5 pt-3 border-t border-border">
+            <label className="mr-auto flex min-h-[44px] w-full sm:w-auto items-center gap-2 text-xs font-semibold text-ink cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={notifyPushOnPublish}
+                onChange={(event) => setNotifyPushOnPublish(event.target.checked)}
+                className="h-4 w-4 rounded border-border text-primary focus:ring-primary/20"
+              />
+              <Bell className="h-3.5 w-3.5 text-primary" />
+              <span>Notificar por push al publicar</span>
+            </label>
             {canManageMinutes && (
               <a
                 href={convocationService.generateMailtoUrl(
@@ -733,7 +746,7 @@ ${formDescription.trim()}${notes}`;
                     members.filter((m) => m.isActive).map((m) => m.email)
                   ));
                 }}
-                className="mr-auto flex min-h-[44px] items-center gap-1.5 rounded-xl border border-info/30 bg-info/10 px-4 text-xs font-semibold text-info hover:bg-info/20 transition-colors"
+                className="flex min-h-[44px] items-center gap-1.5 rounded-xl border border-info/30 bg-info/10 px-4 text-xs font-semibold text-info hover:bg-info/20 transition-colors"
               >
                 <Mail className="h-3.5 w-3.5" />
                 Correo
