@@ -1009,7 +1009,7 @@ export function CalendarPage() {
         onClose={() => setShowEventModal(false)}
         title={editingEvent ? 'Modificar actividad' : 'Agendar nueva actividad'}
         subtitle="Completa los datos de la actividad masónica en el templo"
-        maxWidth="lg"
+        maxWidth="2xl"
       >
         <form onSubmit={handleSaveEvent} noValidate className="space-y-4">
           <AppleInput
