@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { eventService } from '@/services/eventService';
 import { memberService } from '@/services/memberService';
 import { attendanceService } from '@/services/attendanceService';
+import { getBodyById } from '@/data/bodiesData';
 import { PageHeader } from '@/components/shared/PageHeader';
 import type { LodgeEvent, Member, AttendanceStatus, VisitorAttendance, MasonicDegree } from '@/types';
 import {
@@ -71,8 +72,10 @@ export function AttendancePage() {
         eventService.getAllEvents(),
         memberService.getAllMembers(false),
       ]);
-      const meetingEvents = evList.filter((e) => e.isMeeting && e.status !== 'cancelada');
-      setMeetings(meetingEvents);
+      // La asistencia también aplica a reuniones informales y actividades de
+      // otros cuerpos masónicos; solo se excluyen las actividades canceladas.
+      const attendanceEvents = evList.filter((e) => e.status !== 'cancelada');
+      setMeetings(attendanceEvents);
       setMembers(memList);
     } catch {
       toast.error('Error al cargar datos de asistencia');
@@ -342,10 +345,10 @@ export function AttendancePage() {
           </div>
           <div>
             <h4 className="font-serif text-sm font-bold text-ink">
-              No hay Tenidas agendadas en el Calendario
+              No hay actividades agendadas en el Calendario
             </h4>
             <p className="text-xs text-ink-muted max-w-md mx-auto mt-1">
-              Para registrar la asistencia de los hermanos, primero programa una tenida ritual en el Calendario Masónico.
+              Para registrar la asistencia de los hermanos, primero programa una actividad en el Calendario Masónico.
             </p>
           </div>
           <button
@@ -360,7 +363,7 @@ export function AttendancePage() {
       ) : (
         <div className="rounded-2xl border border-border bg-white p-4 sm:p-5 shadow-xs space-y-2">
           <label className="text-xs font-semibold text-ink block">
-            Selecciona la Tenida a registrar:
+            Selecciona la actividad a registrar:
           </label>
           <AppleSelect
             value={selectedEventId}
@@ -368,12 +371,12 @@ export function AttendancePage() {
               setHasUnsavedChanges(false);
               setSelectedEventId(val);
             }}
-            placeholder="Elige una tenida para registrar asistencia..."
+            placeholder="Elige una actividad para registrar asistencia..."
             options={meetings.map((m) => ({
               value: m.id,
               label: `${formatDateSpanish(m.startDate)} ${m.startTime ? `(${formatTime12(m.startTime)})` : ''} — ${m.title}`,
               badge: m.status,
-              icon: <AppleEmoji name="temple" size={16} />
+              icon: <AppleEmoji name={getBodyById(m.bodyId).appleEmoji} size={16} />
             }))}
           />
           {selectedEvent && (
@@ -393,7 +396,7 @@ export function AttendancePage() {
           </div>
           <div>
             <h4 className="font-serif text-base font-bold text-ink">
-              Ninguna tenida seleccionada
+              Ninguna actividad seleccionada
             </h4>
             <p className="text-xs text-ink-muted max-w-md mx-auto mt-1">
               Por favor selecciona en la lista desplegable superior la reunión o actividad masónica para registrar la asistencia y los QQ.·. HH.·. visitantes.
