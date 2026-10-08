@@ -10,7 +10,20 @@ import { convocationService } from '@/services/convocationService';
 import { authService } from '@/services/authService';
 import { auditService } from '@/services/auditService';
 import { supabase } from '@/lib/supabase';
+import { masonicDegreeForRole } from '@/domain/masonicDegree';
 import type { LodgeEvent, Minute, Member, AttendanceRecord, OfficialVisitChecklistItem } from '@/types';
+
+describe('Equivalencia de grados masónicos', () => {
+  it('asigna Aprendiz al primer grado, Compañero al segundo y Maestro o superior al tercero', () => {
+    expect(masonicDegreeForRole('apr')).toBe('aprendiz');
+    expect(masonicDegreeForRole('her')).toBe('aprendiz');
+    expect(masonicDegreeForRole('comp')).toBe('companero');
+
+    for (const role of ['mae', 'pm', 'vm', 'sec', 'tes', 'vig', 'adm', 'mc', 'vmi'] as const) {
+      expect(masonicDegreeForRole(role)).toBe('maestro');
+    }
+  });
+});
 
 describe('1. Roles Institucionales y Permisos', () => {
   it('debe contener los roles institucionales requeridos', () => {

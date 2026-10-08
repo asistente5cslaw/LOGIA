@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import type { Member, MasonicDegree, MemberStatusCondition, InstitutionalRoleCode } from '@/types';
 import { auditService } from './auditService';
+import { masonicDegreeForRole } from '@/domain/masonicDegree';
 
 // Cuenta técnica de operación: conserva su acceso administrativo, pero nunca
 // se incluye en directorios, conteos, asistencia, convocatorias ni búsquedas.
@@ -8,12 +9,6 @@ const HIDDEN_MEMBER_EMAILS = new Set(['asistente4@castillosucre.com']);
 
 function isHiddenMember(email: string | undefined): boolean {
   return Boolean(email && HIDDEN_MEMBER_EMAILS.has(email.trim().toLowerCase()));
-}
-
-function degreeForRole(roleId: InstitutionalRoleCode): MasonicDegree {
-  if (roleId === 'apr' || roleId === 'her') return 'aprendiz';
-  if (roleId === 'comp') return 'companero';
-  return 'maestro';
 }
 
 function mapSupabaseMember(d: Record<string, unknown>): Member {
@@ -26,7 +21,7 @@ function mapSupabaseMember(d: Record<string, unknown>): Member {
     email: String(value('email') || ''),
     phone: value('phone') as string | undefined,
     roleId,
-    degree: degreeForRole(roleId),
+    degree: masonicDegreeForRole(roleId),
     condition: value('condition') as MemberStatusCondition,
     motherLodge: value('mother_lodge') as string | undefined,
     initiationDate: value('initiation_date') as string | undefined,
@@ -64,7 +59,7 @@ function mapProfileAsMember(profile: Record<string, unknown>): Member {
     lastName,
     email: String(profile.email || ''),
     roleId,
-    degree: degreeForRole(roleId),
+    degree: masonicDegreeForRole(roleId),
     condition: 'activo',
     motherLodge: 'Resp.·. Log.·. Unión Fraternal No. 21',
     joinedAt: String(profile.created_at || new Date().toISOString()).split('T')[0],
@@ -173,7 +168,7 @@ export const memberService = {
           email: member.email,
           phone: member.phone,
           role_id: member.roleId,
-          degree: degreeForRole(member.roleId),
+          degree: masonicDegreeForRole(member.roleId),
           condition: member.condition,
           mother_lodge: member.motherLodge,
           initiation_date: member.initiationDate,
@@ -252,7 +247,7 @@ export const memberService = {
           .from('members')
           .update({
             role_id: roleId,
-            degree: degreeForRole(roleId),
+          degree: masonicDegreeForRole(roleId),
             updated_at: now,
           })
           .eq('id', memberId)

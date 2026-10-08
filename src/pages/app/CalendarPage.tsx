@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { eventService } from '@/services/eventService';
 import { memberService } from '@/services/memberService';
 import { convocationService } from '@/services/convocationService';
-import { getBodyById } from '@/data/bodiesData';
+import { getBodyById, masonicBodies } from '@/data/bodiesData';
 import { PageHeader } from '@/components/shared/PageHeader';
 import type { LodgeEvent, MasonicBodyId, EventStatus, EventCategory, Member, InstitutionalRoleCode, MasonicDegree } from '@/types';
 import { institutionalRoles } from '@/data/rolesData';
@@ -1158,6 +1158,18 @@ export function CalendarPage() {
             value={formTitle}
             onChange={(e) => setFormTitle(e.target.value)}
             placeholder="Ej. Tenida Ordinaria de Primer Grado y Recepción"
+          />
+
+          <AppleSelect<MasonicBodyId>
+            label="Cuerpo masónico *"
+            value={formBodyId}
+            onChange={setFormBodyId}
+            options={masonicBodies.map((body) => ({
+              value: body.id,
+              label: body.shortName,
+              description: body.description,
+              icon: <AppleEmoji name={body.appleEmoji} size={16} />,
+            }))}
           />
 
           <div className="grid grid-cols-1 gap-3.5">

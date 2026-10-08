@@ -49,7 +49,7 @@ export const masonicBodies: MasonicBody[] = [
   {
     id: 'shriners',
     name: 'Abou Saad Shriners',
-    shortName: 'Shriners',
+    shortName: 'ABU / Shriners',
     symbol: 'Media Luna',
     appleEmoji: 'moon',
     color: '#B83A28', // Crimson Red
