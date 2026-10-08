@@ -646,12 +646,13 @@ class PushNotificationService {
   }
 
   /**
-   * Notificación protocolar para convocatorias y tenidas
+   * Notificación protocolar para convocatorias y reuniones.
+   * Solo las actividades con categoría "tenida" deben pasar ese texto.
    */
-  public async notifyConvocation(title: string, date: string, time: string, location: string): Promise<boolean> {
+  public async notifyConvocation(title: string, date: string, time: string, location: string, activityLabel = 'Reunión'): Promise<boolean> {
     return this.sendNotification({
       title: `Convocatoria: ${title}`,
-      body: `Tenida programada para el ${formatPushDateTime(date, time || '19:30')} en ${location}.`,
+      body: `${activityLabel} programada para el ${formatPushDateTime(date, time || '19:30')} en ${location}.`,
       url: '/app/calendario',
       tag: `convocatoria-${Date.now()}`,
       type: 'convocatoria',

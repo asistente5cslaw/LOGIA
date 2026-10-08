@@ -60,7 +60,8 @@ export function DashboardPage() {
       if (ownMemberId) {
         if (upcomingNext?.status === 'convocada') {
           const records = await attendanceService.getAttendanceForEvent(upcomingNext.id, { memberId: ownMemberId });
-          setHomeAttendanceStatus(records.find((record) => record.memberId === ownMemberId)?.status || null);
+          const savedStatus = records.find((record) => record.memberId === ownMemberId)?.status;
+          setHomeAttendanceStatus(savedStatus === 'presente' || savedStatus === 'excusa' ? savedStatus : null);
         } else {
           setHomeAttendanceStatus(null);
         }
@@ -134,16 +135,30 @@ export function DashboardPage() {
 
   const handleHomeAttendance = async (status: 'presente' | 'excusa') => {
     if (!ownMemberId || !nextMeeting || nextMeeting.status !== 'convocada') return;
+    const nextStatus = homeAttendanceStatus === status ? 'ausente' : status;
     setSavingHomeAttendance(true);
     try {
-      await attendanceService.saveAttendanceBatch(
-        nextMeeting.id,
-        [{ memberId: ownMemberId, status }],
-        { id: user?.id, email: user?.email }
+      if (nextStatus === 'ausente') {
+        await attendanceService.clearMemberAttendance(nextMeeting.id, ownMemberId, {
+          id: user?.id,
+          email: user?.email,
+        });
+      } else {
+        await attendanceService.saveAttendanceBatch(
+          nextMeeting.id,
+          [{ memberId: ownMemberId, status: nextStatus }],
+          { id: user?.id, email: user?.email }
+        );
+      }
+      setHomeAttendanceStatus(nextStatus === 'ausente' ? null : nextStatus);
+      setShowHomeExcuse(nextStatus === 'excusa');
+      toast.success(
+        nextStatus === 'presente'
+          ? 'Asistencia confirmada.'
+          : nextStatus === 'excusa'
+          ? 'Excusa registrada. Puedes explicar el motivo abajo.'
+          : 'Respuesta retirada. Quedaste pendiente de responder.'
       );
-      setHomeAttendanceStatus(status);
-      setShowHomeExcuse(status === 'excusa');
-      toast.success(status === 'presente' ? 'Asistencia confirmada.' : 'Excusa registrada. Puedes explicar el motivo abajo.');
     } catch {
       toast.error('No se pudo registrar tu respuesta.');
     } finally {

@@ -3,6 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { minuteService } from '@/services/minuteService';
 import { memberService } from '@/services/memberService';
 import { eventService } from '@/services/eventService';
+import { convocationService } from '@/services/convocationService';
 import { PageHeader } from '@/components/shared/PageHeader';
 import type { Minute, MinuteStatus, MasonicDegree, Member, LodgeEvent } from '@/types';
 import {
@@ -13,10 +14,10 @@ import {
   Paperclip,
   Trash2,
   CalendarDays,
+  Mail,
 } from 'lucide-react';
 import { Modal } from '@/components/shared/Modal';
 import { AppleSelect, type AppleSelectOption } from '@/components/shared/AppleSelect';
-import { AppleDatePicker } from '@/components/shared/AppleDatePicker';
 import { AppleInput, AppleTextarea } from '@/components/shared/AppleInput';
 import { AppleEmoji } from '@/components/shared/AppleEmoji';
 import { useAppleDialog } from '@/components/shared/AppleDialog';
@@ -33,6 +34,8 @@ export function MinutesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<MinuteStatus | 'all'>('all');
   const [selectedMinute, setSelectedMinute] = useState<Minute | null>(null);
+  const [pdfViewerUrl, setPdfViewerUrl] = useState<string | null>(null);
+  const [isLoadingPdf, setIsLoadingPdf] = useState(false);
 
   // Modal para redactar/editar acta
   const [showMinuteModal, setShowMinuteModal] = useState(false);
@@ -46,6 +49,7 @@ export function MinutesPage() {
   const [formDegree, setFormDegree] = useState<MasonicDegree>('aprendiz');
   const [formStatus, setFormStatus] = useState<MinuteStatus>('borrador');
   const [formNotes, setFormNotes] = useState('');
+  const [formPdfFile, setFormPdfFile] = useState<File | null>(null);
 
   // Correcciones
   const [newComment, setNewComment] = useState('');
@@ -112,6 +116,14 @@ export function MinutesPage() {
 
   const handleOpenDetail = (min: Minute) => {
     setSelectedMinute(min);
+    setPdfViewerUrl(null);
+    if (min.pdfUrl) {
+      setIsLoadingPdf(true);
+      void minuteService.getPdfViewerUrl(min.pdfUrl)
+        .then(setPdfViewerUrl)
+        .catch(() => toast.error('No se pudo abrir el PDF del acta.'))
+        .finally(() => setIsLoadingPdf(false));
+    }
     if (user?.id) {
       minuteService.markAsRead(min.id, user.id).catch((error) => {
         console.warn('No se pudo registrar la lectura del acta:', error);
@@ -167,13 +179,14 @@ export function MinutesPage() {
     setFormDegree('aprendiz');
     setFormStatus('borrador');
     setFormNotes('');
+    setFormPdfFile(null);
     setShowMinuteModal(true);
   };
 
   const handleSaveMinute = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await minuteService.saveMinute(
+      const savedMinute = await minuteService.saveMinute(
         {
           id: editingMinute ? editingMinute.id : undefined,
           number: editingMinute ? editingMinute.number : undefined,
@@ -190,6 +203,10 @@ export function MinutesPage() {
         },
         { id: user?.id, email: user?.email, name: user?.displayName }
       );
+
+      if (formPdfFile) {
+        await minuteService.uploadPdf(savedMinute.id, formPdfFile);
+      }
 
       toast.success(editingMinute ? 'Acta actualizada' : 'Acta creada con numeración consecutiva');
       setShowMinuteModal(false);
@@ -257,6 +274,26 @@ export function MinutesPage() {
     } catch {
       toast.error('Error al eliminar el acta');
     }
+  };
+
+  const generateMinuteEmailBody = (minute: Minute): string => {
+    const pdfLine = minute.pdfFileName
+      ? `Se adjunta el acta en formato PDF: “${minute.pdfFileName}”.`
+      : 'El acta se encuentra disponible en la plataforma.';
+
+    return `S.·. F.·. U.·.
+
+Estimados Hermanos:
+
+Adjunto encontrarán el acta ${minute.formatNumber} de la reunión del ${formatDateSpanish(minute.meetingDate)} en ${minute.degree} grado.
+${pdfLine}
+
+Agradecemos nos hagan llegar sus comentarios y ajustes.
+
+El acta deberá ser sometida a aprobación en la siguiente tenida.
+
+Fraternalmente,
+La Secretaría del Taller`;
   };
 
   return (
@@ -409,21 +446,27 @@ export function MinutesPage() {
               )}
             </div>
 
-            {/* Adjunto PDF */}
-            <div className="rounded-lg border border-border p-3 flex items-center justify-between text-xs">
+            {/* Visor PDF */}
+            <div className="rounded-lg border border-border p-3 space-y-3 text-xs">
               <div className="flex items-center gap-2">
                 <Paperclip className="h-4 w-4 text-primary" />
                 <span className="font-medium text-ink">
-                  {selectedMinute.pdfFileName || `Acta_${selectedMinute.formatNumber}.pdf`}
+                  {selectedMinute.pdfUrl ? (selectedMinute.pdfFileName || `Acta_${selectedMinute.formatNumber}.pdf`) : 'No hay PDF adjunto'}
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={() => toast.info('Descarga de acta PDF autorizada para tu grado.')}
-                className="text-primary font-semibold hover:underline"
-              >
-                Descargar PDF Seguro
-              </button>
+              {selectedMinute.pdfUrl && (
+                isLoadingPdf ? (
+                  <p className="py-8 text-center text-ink-muted">Cargando visor del PDF…</p>
+                ) : pdfViewerUrl ? (
+                  <iframe
+                    src={pdfViewerUrl}
+                    title={`Visor del acta ${selectedMinute.formatNumber}`}
+                    className="h-[60vh] min-h-[420px] w-full rounded-lg border border-border bg-white"
+                  />
+                ) : (
+                  <p className="py-4 text-center text-destructive">No se pudo cargar el visor.</p>
+                )
+              )}
             </div>
 
             {/* Observaciones y Correcciones */}
@@ -474,6 +517,20 @@ export function MinutesPage() {
                   <Trash2 className="h-3.5 w-3.5" />
                   <span>Eliminar Acta</span>
                 </button>
+              )}
+
+              {canManageMinutes && (
+                <a
+                  href={convocationService.generateMailtoUrl(
+                    `Acta ${selectedMinute.formatNumber} - ${selectedMinute.title}`,
+                    generateMinuteEmailBody(selectedMinute),
+                    members.filter((m) => m.isActive).map((m) => m.email)
+                  )}
+                  className="rounded-xl border border-info/30 bg-info/10 px-3 py-1.5 text-xs font-semibold text-info hover:bg-info/20 transition-colors flex items-center gap-1.5"
+                >
+                  <Mail className="h-3.5 w-3.5" />
+                  Enviar por correo
+                </a>
               )}
 
               {canApproveMinutes && (
@@ -532,23 +589,24 @@ export function MinutesPage() {
         maxWidth="lg"
       >
         <form onSubmit={handleSaveMinute} noValidate className="space-y-4">
-          {/* Selector de Tenida / Convocatoria Asociada */}
+          {/* Selector de reunión agendada */}
           <AppleSelect<string>
-            label="Tenida o Convocatoria Asociada"
+            label="Reunión agendada / Convocatoria asociada"
             value={formEventId}
             onChange={handleSelectMeeting}
             options={meetingOptions}
             searchable={true}
           />
 
-          <div className="grid grid-cols-1 sm:grid-cols-1 gap-3.5">
-            <AppleDatePicker
-              label="Fecha de Tenida *"
-              required
-              value={formMeetingDate}
-              onChange={(val) => setFormMeetingDate(val)}
-            />
-
+          <div className="rounded-lg border border-border bg-surface-container-low px-3 py-2.5 text-xs text-ink-secondary">
+            {formEventId ? (
+              <>
+                <span className="font-semibold text-ink">Fecha, grado y reunión tomados del calendario:</span>{' '}
+                {formatDateSpanish(formMeetingDate)} · {formDegree}
+              </>
+            ) : (
+              <span>Selecciona una reunión agendada para asociar esta acta. Si es un acta independiente, se utilizará la fecha actual.</span>
+            )}
           </div>
 
           <AppleInput
@@ -567,6 +625,33 @@ export function MinutesPage() {
             onChange={(e) => setFormDescription(e.target.value)}
             placeholder="A la Gloria del Gran Arquitecto del Universo... En el Oriente de Panamá, reunidos los hermanos en el Templo..."
           />
+
+          <div className="rounded-xl border border-dashed border-primary/30 bg-primary/5 p-3">
+            <label htmlFor="minute-pdf" className="flex items-center gap-2 text-xs font-semibold text-ink">
+              <Paperclip className="h-4 w-4 text-primary" /> PDF del acta
+            </label>
+            <p className="mt-1 text-[11px] text-ink-muted">Sube el documento PDF para que los miembros autorizados lo vean dentro del sistema. Máximo 15 MB.</p>
+            <input
+              id="minute-pdf"
+              type="file"
+              accept="application/pdf,.pdf"
+              onChange={(event) => {
+                const file = event.target.files?.[0] || null;
+                if (file) {
+                  const validation = minuteService.validatePdfFile(file);
+                  if (!validation.valid) {
+                    toast.error(validation.error);
+                    event.currentTarget.value = '';
+                    setFormPdfFile(null);
+                    return;
+                  }
+                }
+                setFormPdfFile(file);
+              }}
+              className="mt-2 block w-full text-xs text-ink-secondary file:mr-3 file:rounded-lg file:border-0 file:bg-primary file:px-3 file:py-2 file:text-xs file:font-semibold file:text-primary-foreground hover:file:bg-primary-pressed"
+            />
+            {formPdfFile && <p className="mt-2 text-[11px] font-medium text-success">PDF seleccionado: {formPdfFile.name}</p>}
+          </div>
 
           <div className="flex justify-end gap-2.5 pt-3 border-t border-border">
             <button

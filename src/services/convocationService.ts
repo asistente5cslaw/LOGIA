@@ -50,6 +50,19 @@ Fraternalmente,
 La Secretaría del Taller`;
   },
 
+  generateEmailBody(event: LodgeEvent, officialText: string): string {
+    const attachmentLine = event.convocationPdfFileName
+      ? `Se adjunta el archivo PDF “${event.convocationPdfFileName}” para su lectura.`
+      : 'Se comparte la convocatoria oficial para su conocimiento.';
+
+    return `Estimados Hermanos:
+
+Por este medio adjunto la convocatoria para nuestra próxima tenida.
+${attachmentLine}
+
+${officialText}`;
+  },
+
   filterRecipientsByDegree(members: Member[], degreeRequired: MasonicDegree): Member[] {
     const active = members.filter((m) => m.isActive);
     if (degreeRequired === 'aprendiz') {
@@ -70,11 +83,11 @@ La Secretaría del Taller`;
     return `https://wa.me/?text=${encoded}`;
   },
 
-  /** Prepara el enlace mailto usando CCO/BCC para proteger los correos. */
+  /** Prepara el enlace mailto usando CC para que los destinatarios sean visibles. */
   generateMailtoUrl(subject: string, bodyText: string, recipientEmails: string[]): string {
-    const bccList = [...new Set(recipientEmails.map((email) => email.trim().toLowerCase()).filter(Boolean))].join(',');
+    const ccList = [...new Set(recipientEmails.map((email) => email.trim().toLowerCase()).filter(Boolean))].join(',');
     const encodedSubject = encodeURIComponent(subject);
     const encodedBody = encodeURIComponent(bodyText);
-    return `mailto:?bcc=${encodeURIComponent(bccList)}&subject=${encodedSubject}&body=${encodedBody}`;
+    return `mailto:?cc=${encodeURIComponent(ccList)}&subject=${encodedSubject}&body=${encodedBody}`;
   },
 };

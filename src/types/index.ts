@@ -126,6 +126,7 @@ export interface MasonicBody {
 }
 
 export type EventStatus = 'programada' | 'convocada' | 'celebrada' | 'cancelada';
+export type EventCategory = 'tenida' | 'reunion_masonica' | 'reunion_fraternal' | 'otro';
 
 export interface LodgeEvent {
   id: string;
@@ -139,8 +140,12 @@ export interface LodgeEvent {
   endTime?: string; // HH:mm
   isAllDay: boolean;
   isMeeting: boolean; // Tenida vs evento social/administrativo
+  eventCategory?: EventCategory;
   location: string;
   notes?: string;
+  convocationPdfUrl?: string;
+  convocationPdfFileName?: string;
+  convocationPdfFileSize?: number;
   status: EventStatus;
   createdBy: string;
   createdByName?: string;

@@ -226,6 +226,35 @@ export const minuteService = {
     return { valid: true };
   },
 
+  async uploadPdf(minuteId: string, file: File): Promise<{ path: string; fileName: string; fileSize: number }> {
+    const validation = this.validatePdfFile(file);
+    if (!validation.valid) throw new Error(validation.error || 'PDF no válido.');
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+
+    const path = `${minuteId}/${crypto.randomUUID()}.pdf`;
+    const { error: uploadError } = await supabase.storage
+      .from('minutes-pdfs')
+      .upload(path, file, { contentType: 'application/pdf', upsert: false });
+    if (uploadError) throw uploadError;
+
+    const { error: updateError } = await supabase
+      .from('minutes')
+      .update({ pdf_url: path, pdf_file_name: file.name, pdf_file_size: file.size })
+      .eq('id', minuteId);
+    if (updateError) throw updateError;
+    return { path, fileName: file.name, fileSize: file.size };
+  },
+
+  async getPdfViewerUrl(pdfPath: string): Promise<string> {
+    if (/^https?:\/\//i.test(pdfPath)) return pdfPath;
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    const { data, error } = await supabase.storage
+      .from('minutes-pdfs')
+      .createSignedUrl(pdfPath, 60 * 60);
+    if (error) throw error;
+    return data.signedUrl;
+  },
+
   async deleteMinute(id: string, user: { id?: string; email?: string }): Promise<void> {
     if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
     {

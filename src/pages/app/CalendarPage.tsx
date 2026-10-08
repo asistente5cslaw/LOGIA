@@ -5,7 +5,7 @@ import { memberService } from '@/services/memberService';
 import { convocationService } from '@/services/convocationService';
 import { getBodyById } from '@/data/bodiesData';
 import { PageHeader } from '@/components/shared/PageHeader';
-import type { LodgeEvent, MasonicBodyId, EventStatus, Member, InstitutionalRoleCode } from '@/types';
+import type { LodgeEvent, MasonicBodyId, EventStatus, EventCategory, Member, InstitutionalRoleCode } from '@/types';
 import { institutionalRoles } from '@/data/rolesData';
 import {
   Calendar as CalendarIcon,
@@ -20,6 +20,7 @@ import {
   Check,
   Share2,
   Mail,
+  FileText,
   FileEdit,
   Trash2,
   CalendarClock,
@@ -47,8 +48,19 @@ const eventStatusOptions: AppleSelectOption<EventStatus>[] = [
   { value: 'cancelada', label: 'Cancelada', description: 'Actividad suspendida' },
 ];
 
+const eventCategoryOptions: AppleSelectOption<EventCategory>[] = [
+  { value: 'tenida', label: 'Tenida', description: 'Trabajo ritual de la Logia', icon: <AppleEmoji name="temple" size={16} /> },
+  { value: 'reunion_masonica', label: 'Reunión Masónica', description: 'Encuentro masónico no ritual', icon: <AppleEmoji name="handshake" size={16} /> },
+  { value: 'reunion_fraternal', label: 'Reunión Fraternal', description: 'Actividad de convivencia fraternal', icon: <AppleEmoji name="members" size={16} /> },
+  { value: 'otro', label: 'Otros', description: 'Otra actividad de la Logia', icon: <AppleEmoji name="calendar" size={16} /> },
+];
+
 function eventStatusLabel(status: EventStatus): string {
   return status === 'celebrada' ? 'Culminada' : status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+function eventKindLabel(event: Pick<LodgeEvent, 'eventCategory'>): string {
+  return event.eventCategory === 'tenida' ? 'Tenida' : 'Reunión';
 }
 
 function googleCalendarUrl(event: LodgeEvent): string {
@@ -80,7 +92,11 @@ function googleCalendarUrl(event: LodgeEvent): string {
       'Logia Unión Fraternal No. 21',
     ].filter(Boolean).join('\n\n'),
   });
-  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+  return `https://www.google.com/calendar/render?${params.toString()}`;
+}
+
+function openGoogleCalendar(event: LodgeEvent): void {
+  window.location.assign(googleCalendarUrl(event));
 }
 
 export function CalendarPage() {
@@ -113,10 +129,15 @@ export function CalendarPage() {
 
   // Modal de Convocatoria
   const [showConvocationModal, setShowConvocationModal] = useState(false);
+  const [showConvocationPdfViewer, setShowConvocationPdfViewer] = useState(false);
   const [convocationEvent, setConvocationEvent] = useState<LodgeEvent | null>(null);
   const [convocationText, setConvocationText] = useState('');
   const [copied, setCopied] = useState(false);
   const [isSendingPush, setIsSendingPush] = useState(false);
+  const [convocationPdfFile, setConvocationPdfFile] = useState<File | null>(null);
+  const [convocationPdfViewerUrl, setConvocationPdfViewerUrl] = useState<string | null>(null);
+  const [isLoadingConvocationPdf, setIsLoadingConvocationPdf] = useState(false);
+  const [isUploadingConvocationPdf, setIsUploadingConvocationPdf] = useState(false);
 
   // Formulario nuevo evento
   const [formTitle, setFormTitle] = useState('');
@@ -127,7 +148,7 @@ export function CalendarPage() {
   const [formStartTime, setFormStartTime] = useState('19:30');
   const [formEndTime, setFormEndTime] = useState('21:30');
   const [formIsAllDay, setFormIsAllDay] = useState(false);
-  const [formIsMeeting, setFormIsMeeting] = useState(true);
+  const [formEventCategory, setFormEventCategory] = useState<EventCategory>('tenida');
   const [formLocation, setFormLocation] = useState('');
   const [formNotes, setFormNotes] = useState('');
   const [formStatus, setFormStatus] = useState<EventStatus>('programada');
@@ -204,7 +225,7 @@ export function CalendarPage() {
     setFormStartTime('19:30');
     setFormEndTime('21:30');
     setFormIsAllDay(false);
-    setFormIsMeeting(true);
+    setFormEventCategory('tenida');
     setFormLocation(configuredTempleAddress);
     setFormNotes('');
     setFormStatus('programada');
@@ -221,7 +242,7 @@ export function CalendarPage() {
     setFormStartTime(ev.startTime || '19:30');
     setFormEndTime(ev.endTime || '21:30');
     setFormIsAllDay(ev.isAllDay);
-    setFormIsMeeting(ev.isMeeting);
+    setFormEventCategory(ev.eventCategory || (ev.isMeeting ? 'tenida' : 'otro'));
     setFormLocation(ev.location);
     setFormNotes(ev.notes || '');
     setFormStatus(ev.status);
@@ -247,7 +268,8 @@ export function CalendarPage() {
       startTime: formIsAllDay ? undefined : formStartTime,
       endTime: formIsAllDay ? undefined : formEndTime,
       isAllDay: formIsAllDay,
-      isMeeting: formIsMeeting,
+      isMeeting: formEventCategory === 'tenida',
+      eventCategory: formEventCategory,
       location: formLocation.trim(),
       notes: formNotes.trim(),
       status: formStatus,
@@ -278,7 +300,7 @@ export function CalendarPage() {
 
     try {
       await eventService.saveEvent(candidate, { id: user?.id, email: user?.email, name: user?.displayName });
-      toast.success(editingEvent ? 'Evento actualizado exitosamente' : 'Tenida agendada exitosamente');
+      toast.success(editingEvent ? 'Actividad actualizada exitosamente' : 'Actividad agendada exitosamente');
       setShowEventModal(false);
       loadData();
     } catch {
@@ -297,9 +319,10 @@ export function CalendarPage() {
       if (notifyCancellationPush) {
         setIsSendingCancellationPush(true);
         try {
+          const kind = eventKindLabel(pendingCancellation);
           await pushNotificationService.sendPushToAll({
-            title: `Tenida cancelada: ${pendingCancellation.title}`,
-            body: `La tenida del ${formatPushDateTime(pendingCancellation.startDate, pendingCancellation.startTime || '19:30')} ha sido cancelada.`,
+            title: `${kind} cancelada: ${pendingCancellation.title}`,
+            body: `La ${kind.toLowerCase()} del ${formatPushDateTime(pendingCancellation.startDate, pendingCancellation.startTime || '19:30')} ha sido cancelada.`,
             url: '/app/calendario',
             tag: `cancelacion-${pendingCancellation.id}`,
             type: 'aviso',
@@ -311,16 +334,18 @@ export function CalendarPage() {
 
       const activeEmails = members.filter((m) => m.isActive).map((m) => m.email);
       if (notifyCancellationWhatsApp) {
+        const kind = eventKindLabel(pendingCancellation).toLowerCase();
         window.open(
-          convocationService.generateWhatsAppUrl(undefined, `Aviso: la tenida “${pendingCancellation.title}” ha sido cancelada.`),
+          convocationService.generateWhatsAppUrl(undefined, `Aviso: la ${kind} “${pendingCancellation.title}” ha sido cancelada.`),
           '_blank',
           'noopener,noreferrer'
         );
       }
       if (notifyCancellationEmail) {
+        const kind = eventKindLabel(pendingCancellation).toLowerCase();
         window.location.href = convocationService.generateMailtoUrl(
           `Cancelación: ${pendingCancellation.title}`,
-          `Se informa que la tenida “${pendingCancellation.title}” ha sido cancelada.`,
+          `Se informa que la ${kind} “${pendingCancellation.title}” ha sido cancelada.`,
           activeEmails
         );
       }
@@ -393,10 +418,64 @@ export function CalendarPage() {
 
   const openConvocation = (ev: LodgeEvent) => {
     setConvocationEvent(ev);
+    setConvocationPdfFile(null);
+    setConvocationPdfViewerUrl(null);
     const text = convocationService.generateOfficialText(ev);
     setConvocationText(text);
     setCopied(false);
     setShowConvocationModal(true);
+    if (ev.convocationPdfUrl) {
+      setIsLoadingConvocationPdf(true);
+      void eventService.getConvocationPdfViewerUrl(ev.convocationPdfUrl)
+        .then(setConvocationPdfViewerUrl)
+        .catch(() => toast.error('No se pudo abrir el PDF de la convocatoria.'))
+        .finally(() => setIsLoadingConvocationPdf(false));
+    }
+  };
+
+  const handleUploadConvocationPdf = async () => {
+    if (!convocationEvent || !convocationPdfFile) return;
+    const validation = eventService.validateConvocationPdfFile(convocationPdfFile);
+    if (!validation.valid) {
+      toast.error(validation.error);
+      return;
+    }
+    setIsUploadingConvocationPdf(true);
+    try {
+      const metadata = await eventService.uploadConvocationPdf(convocationEvent.id, convocationPdfFile);
+      const updatedEvent = {
+        ...convocationEvent,
+        convocationPdfUrl: metadata.path,
+        convocationPdfFileName: metadata.fileName,
+        convocationPdfFileSize: metadata.fileSize,
+      };
+      setConvocationEvent(updatedEvent);
+      setConvocationPdfFile(null);
+      setConvocationPdfViewerUrl(await eventService.getConvocationPdfViewerUrl(metadata.path));
+      toast.success('PDF de la convocatoria cargado correctamente.');
+      void loadData();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo cargar el PDF de la convocatoria.');
+    } finally {
+      setIsUploadingConvocationPdf(false);
+    }
+  };
+
+  const handleOpenConvocationPdf = async (ev: LodgeEvent) => {
+    if (!ev.convocationPdfUrl) return;
+    setConvocationEvent(ev);
+    setConvocationPdfViewerUrl(null);
+    setIsLoadingConvocationPdf(true);
+    setShowConvocationModal(false);
+    try {
+      setConvocationPdfViewerUrl(await eventService.getConvocationPdfViewerUrl(ev.convocationPdfUrl));
+    } catch {
+      toast.error('No se pudo abrir el PDF de la convocatoria.');
+      return;
+    } finally {
+      setIsLoadingConvocationPdf(false);
+    }
+    setShowConvocationPdfViewer(true);
   };
 
   const handleConvocationStatusChange = async (status: EventStatus) => {
@@ -449,9 +528,10 @@ export function CalendarPage() {
     if (!convocationEvent) return;
     setIsSendingPush(true);
     try {
+      const kind = eventKindLabel(convocationEvent);
       const result = await pushNotificationService.sendPushToAll({
         title: `Convocatoria: ${convocationEvent.title}`,
-        body: `Tenida programada para el ${formatPushDateTime(convocationEvent.startDate, convocationEvent.startTime || '19:30')} en ${convocationEvent.location}.`,
+        body: `${kind} programada para el ${formatPushDateTime(convocationEvent.startDate, convocationEvent.startTime || '19:30')} en ${convocationEvent.location}.`,
         url: '/app/calendario',
         tag: `convocatoria-${convocationEvent.id}`,
         type: 'convocatoria',
@@ -668,13 +748,16 @@ export function CalendarPage() {
                       {/* Botones de acción del evento */}
                       <div className="mt-3 pt-2 border-t border-border flex flex-wrap gap-2">
                         {ev.status !== 'cancelada' && (
-                          <button
-                            type="button"
-                            onClick={() => window.open(googleCalendarUrl(ev), '_blank', 'noopener,noreferrer')}
+                          <a
+                            href={googleCalendarUrl(ev)}
+                            onClick={(event) => {
+                              event.preventDefault();
+                              openGoogleCalendar(ev);
+                            }}
                             className="flex items-center gap-1 rounded bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
                           >
                             <CalendarPlus className="h-3.5 w-3.5" /> Google Calendar
-                          </button>
+                          </a>
                         )}
                         {canManageEvents && (
                           <button
@@ -682,6 +765,15 @@ export function CalendarPage() {
                             className="flex items-center gap-1 rounded bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
                           >
                             <Send className="h-3.5 w-3.5" /> Convocatoria
+                          </button>
+                        )}
+                        {ev.convocationPdfUrl && (
+                          <button
+                            type="button"
+                            onClick={() => void handleOpenConvocationPdf(ev)}
+                            className="flex items-center gap-1 rounded border border-primary/30 bg-primary/5 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
+                          >
+                            <FileText className="h-3.5 w-3.5" /> Ver convocatoria PDF
                           </button>
                         )}
                         {canManageEvents && ev.status === 'cancelada' && (
@@ -795,14 +887,17 @@ export function CalendarPage() {
                   {/* Botones de acción del evento */}
                   <div className="mt-3 pt-2.5 border-t border-border flex flex-wrap gap-2">
                     {ev.status !== 'cancelada' && (
-                      <button
-                        type="button"
-                        onClick={() => window.open(googleCalendarUrl(ev), '_blank', 'noopener,noreferrer')}
+                      <a
+                        href={googleCalendarUrl(ev)}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          openGoogleCalendar(ev);
+                        }}
                         className="flex flex-row items-center gap-1.5 rounded-xl bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors cursor-pointer"
                       >
                         <CalendarPlus className="h-3.5 w-3.5 shrink-0" />
                         <span>Google Calendar</span>
-                      </button>
+                      </a>
                     )}
                     {canManageEvents && (
                       <button
@@ -815,6 +910,16 @@ export function CalendarPage() {
                       >
                         <Send className="h-3.5 w-3.5 shrink-0" />
                         <span>Convocatoria</span>
+                      </button>
+                    )}
+                    {ev.convocationPdfUrl && (
+                      <button
+                        type="button"
+                        onClick={() => void handleOpenConvocationPdf(ev)}
+                        className="flex flex-row items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors cursor-pointer"
+                      >
+                        <FileText className="h-3.5 w-3.5 shrink-0" />
+                        <span>Ver convocatoria PDF</span>
                       </button>
                     )}
                     {canManageEvents && ev.status === 'cancelada' && (
@@ -876,7 +981,7 @@ export function CalendarPage() {
       <Modal
         isOpen={showEventModal}
         onClose={() => setShowEventModal(false)}
-        title={editingEvent ? 'Modificar Tenida' : 'Agendar Nueva Tenida'}
+        title={editingEvent ? 'Modificar actividad' : 'Agendar nueva actividad'}
         subtitle="Completa los datos de la actividad masónica en el templo"
         maxWidth="lg"
       >
@@ -925,6 +1030,13 @@ export function CalendarPage() {
             />
           </div>
 
+          <AppleSelect<EventCategory>
+            label="Tipo de actividad *"
+            value={formEventCategory}
+            onChange={setFormEventCategory}
+            options={eventCategoryOptions}
+          />
+
           <div className="flex items-center gap-6 py-1">
             <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-ink select-none">
               <input
@@ -934,15 +1046,6 @@ export function CalendarPage() {
                 className="h-4 w-4 rounded-md border-border text-primary focus:ring-primary/20 cursor-pointer"
               />
               Día completo
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-ink select-none">
-              <input
-                type="checkbox"
-                checked={formIsMeeting}
-                onChange={(e) => setFormIsMeeting(e.target.checked)}
-                className="h-4 w-4 rounded-md border-border text-primary focus:ring-primary/20 cursor-pointer"
-              />
-              Es Tenida Ritual
             </label>
           </div>
 
@@ -1175,6 +1278,53 @@ export function CalendarPage() {
               options={eventStatusOptions}
             />
 
+            {canManageEvents && (
+              <div className="rounded-xl border border-dashed border-primary/35 bg-primary/5 p-3 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-semibold text-ink">PDF de la convocatoria</p>
+                    <p className="text-[11px] text-ink-muted">Carga la convocatoria oficial para que los miembros la vean en el sistema.</p>
+                  </div>
+                  <FileText className="h-5 w-5 text-primary shrink-0" />
+                </div>
+                <input
+                  id="convocation-pdf-upload"
+                  type="file"
+                  accept="application/pdf,.pdf"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] || null;
+                    if (!file) return;
+                    const validation = eventService.validateConvocationPdfFile(file);
+                    if (!validation.valid) {
+                      toast.error(validation.error);
+                      event.target.value = '';
+                      return;
+                    }
+                    setConvocationPdfFile(file);
+                  }}
+                  className="block w-full text-xs text-ink-secondary file:mr-3 file:rounded-lg file:border-0 file:bg-primary file:px-3 file:py-2 file:text-xs file:font-semibold file:text-primary-foreground hover:file:bg-primary-pressed"
+                />
+                {convocationPdfFile && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <span className="truncate text-ink-secondary">Seleccionado: {convocationPdfFile.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => void handleUploadConvocationPdf()}
+                      disabled={isUploadingConvocationPdf}
+                      className="rounded-lg bg-primary px-3 py-2 font-semibold text-primary-foreground disabled:opacity-60"
+                    >
+                      {isUploadingConvocationPdf ? 'Cargando…' : 'Guardar PDF'}
+                    </button>
+                  </div>
+                )}
+                {convocationEvent.convocationPdfUrl && (
+                  <p className="text-[11px] font-medium text-success">
+                    PDF cargado: {convocationEvent.convocationPdfFileName || 'convocatoria.pdf'}
+                  </p>
+                )}
+              </div>
+            )}
+
             <textarea
               rows={9}
               value={convocationText}
@@ -1206,7 +1356,7 @@ export function CalendarPage() {
                 <a
                   href={convocationService.generateMailtoUrl(
                     `Convocatoria: ${convocationEvent.title}`,
-                    convocationText,
+                    convocationService.generateEmailBody(convocationEvent, convocationText),
                     members.filter((m) => m.isActive).map((m) => m.email)
                   )}
                   className="flex min-h-[40px] items-center gap-1.5 rounded-lg border border-info/30 bg-info/10 px-3 text-xs font-semibold text-info hover:bg-info/20 transition-colors"
@@ -1239,6 +1389,26 @@ export function CalendarPage() {
               )}
             </div>
           </div>
+        )}
+      </Modal>
+
+      <Modal
+        isOpen={showConvocationPdfViewer && Boolean(convocationEvent)}
+        onClose={() => setShowConvocationPdfViewer(false)}
+        title="Convocatoria PDF"
+        subtitle={convocationEvent?.convocationPdfFileName || convocationEvent?.title}
+        maxWidth="xl"
+      >
+        {isLoadingConvocationPdf ? (
+          <div className="flex min-h-[55vh] items-center justify-center text-sm text-ink-muted">Cargando PDF…</div>
+        ) : convocationPdfViewerUrl ? (
+          <iframe
+            src={convocationPdfViewerUrl}
+            title="Visor de convocatoria PDF"
+            className="h-[70vh] min-h-[420px] w-full rounded-lg border border-border bg-white"
+          />
+        ) : (
+          <div className="py-12 text-center text-sm text-ink-muted">No se pudo cargar el PDF.</div>
         )}
       </Modal>
     </div>

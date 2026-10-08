@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import type { LodgeEvent, EventConflict, MasonicBodyId, InstitutionalRoleCode, MasonicDegree } from '@/types';
+import type { LodgeEvent, EventConflict, MasonicBodyId, InstitutionalRoleCode, MasonicDegree, EventCategory } from '@/types';
 import { auditService } from './auditService';
 
 function roleFromLegacyDegree(degree: MasonicDegree): InstitutionalRoleCode {
@@ -48,8 +48,12 @@ export const eventService = {
             endTime: d.end_time,
             isAllDay: d.is_all_day,
             isMeeting: d.is_meeting,
+            eventCategory: (d.event_category || (d.is_meeting ? 'tenida' : 'otro')) as EventCategory,
             location: d.location,
             notes: d.notes,
+            convocationPdfUrl: d.convocation_pdf_url,
+            convocationPdfFileName: d.convocation_pdf_file_name,
+            convocationPdfFileSize: d.convocation_pdf_file_size,
             status: d.status,
             conflictJustification: d.conflict_justification,
             conflictApprovedBy: d.conflict_approved_by,
@@ -196,8 +200,12 @@ export const eventService = {
           end_time: fullEvent.endTime,
           is_all_day: fullEvent.isAllDay,
           is_meeting: fullEvent.isMeeting,
+          event_category: fullEvent.eventCategory || (fullEvent.isMeeting ? 'tenida' : 'otro'),
           location: fullEvent.location,
           notes: fullEvent.notes,
+          convocation_pdf_url: fullEvent.convocationPdfUrl,
+          convocation_pdf_file_name: fullEvent.convocationPdfFileName,
+          convocation_pdf_file_size: fullEvent.convocationPdfFileSize,
           status: fullEvent.status,
           conflict_justification: fullEvent.conflictJustification,
           conflict_approved_by: fullEvent.conflictApprovedBy,
@@ -256,6 +264,53 @@ export const eventService = {
     const { error } = await supabase.from('events').update({ status }).eq('id', id);
     if (error) throw error;
     await auditService.log('CAMBIO_ESTADO_EVENTO', 'events', id, user, { newStatus: status });
+  },
+
+  validateConvocationPdfFile(file: File): { valid: boolean; error?: string } {
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      return { valid: false, error: 'Solo se permiten archivos PDF.' };
+    }
+    if (file.size > 15 * 1024 * 1024) {
+      return { valid: false, error: 'El PDF no puede superar los 15 MB.' };
+    }
+    return { valid: true };
+  },
+
+  async uploadConvocationPdf(eventId: string, file: File): Promise<{
+    path: string;
+    fileName: string;
+    fileSize: number;
+  }> {
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    const validation = this.validateConvocationPdfFile(file);
+    if (!validation.valid) throw new Error(validation.error);
+
+    const path = `${eventId}/${crypto.randomUUID()}.pdf`;
+    const { error: uploadError } = await supabase.storage
+      .from('convocation-pdfs')
+      .upload(path, file, { contentType: 'application/pdf', upsert: false });
+    if (uploadError) throw uploadError;
+
+    const { error: updateError } = await supabase
+      .from('events')
+      .update({
+        convocation_pdf_url: path,
+        convocation_pdf_file_name: file.name,
+        convocation_pdf_file_size: file.size,
+      })
+      .eq('id', eventId);
+    if (updateError) throw updateError;
+
+    return { path, fileName: file.name, fileSize: file.size };
+  },
+
+  async getConvocationPdfViewerUrl(pdfPath: string): Promise<string> {
+    if (/^https?:\/\//i.test(pdfPath)) return pdfPath;
+    const { data, error } = await supabase.storage
+      .from('convocation-pdfs')
+      .createSignedUrl(pdfPath, 60 * 60);
+    if (error || !data?.signedUrl) throw error || new Error('No se pudo abrir el PDF.');
+    return data.signedUrl;
   },
 
   async deleteEvent(id: string, user: { id?: string; email?: string }): Promise<void> {

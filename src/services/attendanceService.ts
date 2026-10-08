@@ -144,6 +144,22 @@ export const attendanceService = {
     });
   },
 
+  async clearMemberAttendance(
+    eventId: string,
+    memberId: string,
+    user: { id?: string; email?: string }
+  ): Promise<void> {
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    const { error } = await supabase
+      .from('attendance')
+      .delete()
+      .eq('event_id', eventId)
+      .eq('member_id', memberId);
+    if (error) throw error;
+
+    await auditService.log('RETIRAR_RESPUESTA_ASISTENCIA', 'attendance', eventId, user, { memberId });
+  },
+
   async addVisitor(
     visitor: Omit<VisitorAttendance, 'id' | 'createdAt'>,
     user: { id?: string; email?: string }
