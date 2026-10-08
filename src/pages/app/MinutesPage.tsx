@@ -157,12 +157,14 @@ export function MinutesPage() {
       setFormEventTitle(found.title);
       setFormMeetingDate(found.startDate);
       setFormDegree(found.degreeRequired);
+      const dateLabel = formatDateSpanish(found.startDate);
+      const naturalDateLabel = dateLabel.charAt(0).toLowerCase() + dateLabel.slice(1);
       if (!formTitle || formTitle.startsWith('Trazado de')) {
         setFormTitle(`Trazado de ${found.title}`);
       }
       if (!formDescription || formDescription.startsWith('A la Gloria del Gran Arquitecto del Universo...')) {
         setFormDescription(
-          `A la Gloria del Gran Arquitecto del Universo...\n\nEn el Oriente de Panamá, el día ${formatDateSpanish(found.startDate)}, reunidos los hermanos en el ${found.location || 'Gran Templo Masónico'} para celebrar los trabajos de ${found.title}, bajo la dirección del Venerable Maestro.\n\n`
+          `A la Gloria del Gran Arquitecto del Universo...\n\nEn el Oriente de Panamá, el día ${naturalDateLabel}, reunidos los hermanos en el ${found.location || 'Gran Templo Masónico'}, se celebraron los trabajos de ${found.title}, bajo la dirección del Venerable Maestro.\n\n`
         );
       }
     }
@@ -277,6 +279,9 @@ export function MinutesPage() {
   };
 
   const generateMinuteEmailBody = (minute: Minute): string => {
+    const minuteText = minute.description.trim();
+    const notes = minute.notes?.trim() ? `\n\nNotas de Secretaría:\n${minute.notes.trim()}` : '';
+
     return `Estimados Hermanos:
 
 Por este medio les remito adjunta el acta ${minute.formatNumber} de la reunión del ${formatDateSpanish(minute.meetingDate)} en ${minute.degree} grado.
@@ -285,7 +290,9 @@ Agradecemos nos hagan llegar sus comentarios y ajustes.
 
 El acta deberá ser sometida a aprobación en la siguiente tenida.
 
-Se adjunta el PDF del acta.`;
+Se adjunta el PDF del acta.
+
+${minuteText}${notes}`;
   };
 
   return (
@@ -518,6 +525,14 @@ Se adjunta el PDF del acta.`;
                     generateMinuteEmailBody(selectedMinute),
                     members.filter((m) => m.isActive).map((m) => m.email)
                   )}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    window.location.assign(convocationService.generateMailtoUrl(
+                      `Acta ${selectedMinute.formatNumber} - ${selectedMinute.title}`,
+                      generateMinuteEmailBody(selectedMinute),
+                      members.filter((m) => m.isActive).map((m) => m.email)
+                    ));
+                  }}
                   className="rounded-xl border border-info/30 bg-info/10 px-3 py-1.5 text-xs font-semibold text-info hover:bg-info/20 transition-colors flex items-center gap-1.5"
                 >
                   <Mail className="h-3.5 w-3.5" />
