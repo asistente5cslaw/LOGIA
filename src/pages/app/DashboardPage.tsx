@@ -106,7 +106,7 @@ export function DashboardPage() {
     .filter((e) => e.status !== 'cancelada' && new Date(e.startDate) >= new Date(Date.now() - 86400000))
     .slice(0, 3);
 
-  const nextMeeting = upcomingEvents[0];
+  const nextMeeting = upcomingEvents.find((event) => event.status === 'convocada') || upcomingEvents[0];
   const nextMeetingBody = nextMeeting ? getBodyById(nextMeeting.bodyId) : null;
 
   const handleSaveDashboardExcuse = async (eventId: string) => {
