@@ -295,6 +295,23 @@ Se adjunta el PDF del acta.
 ${minuteText}${notes}`;
   };
 
+  const generateDraftMinuteEmailBody = (): string => {
+    const dateLabel = formatDateSpanish(formMeetingDate);
+    const notes = formNotes.trim() ? `\n\nNotas de Secretaría:\n${formNotes.trim()}` : '';
+
+    return `Estimados Hermanos:
+
+Por este medio les remito adjunta el acta de la reunión del ${dateLabel} en ${formDegree} grado.
+
+Agradecemos nos hagan llegar sus comentarios y ajustes.
+
+El acta deberá ser sometida a aprobación en la siguiente tenida.
+
+Se adjunta el PDF del acta.
+
+${formDescription.trim()}${notes}`;
+  };
+
   return (
     <div className="space-y-4 sm:space-y-6 px-4 pt-2.5 pb-6 sm:py-6 md:px-8 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
@@ -661,6 +678,27 @@ ${minuteText}${notes}`;
           </div>
 
           <div className="flex justify-end gap-2.5 pt-3 border-t border-border">
+            {canManageMinutes && (
+              <a
+                href={convocationService.generateMailtoUrl(
+                  `Acta${editingMinute?.formatNumber ? ` ${editingMinute.formatNumber}` : ''} - ${formTitle || 'Reunión'}`,
+                  generateDraftMinuteEmailBody(),
+                  members.filter((m) => m.isActive).map((m) => m.email)
+                )}
+                onClick={(event) => {
+                  event.preventDefault();
+                  window.location.assign(convocationService.generateMailtoUrl(
+                    `Acta${editingMinute?.formatNumber ? ` ${editingMinute.formatNumber}` : ''} - ${formTitle || 'Reunión'}`,
+                    generateDraftMinuteEmailBody(),
+                    members.filter((m) => m.isActive).map((m) => m.email)
+                  ));
+                }}
+                className="mr-auto flex min-h-[44px] items-center gap-1.5 rounded-xl border border-info/30 bg-info/10 px-4 text-xs font-semibold text-info hover:bg-info/20 transition-colors"
+              >
+                <Mail className="h-3.5 w-3.5" />
+                Correo
+              </a>
+            )}
             <button
               type="button"
               onClick={() => setShowMinuteModal(false)}
