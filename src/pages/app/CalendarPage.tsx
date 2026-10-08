@@ -164,6 +164,7 @@ export function CalendarPage() {
   const [isLoadingConvocationPdf, setIsLoadingConvocationPdf] = useState(false);
   const [isUploadingConvocationPdf, setIsUploadingConvocationPdf] = useState(false);
   const [isDeletingConvocationPdf, setIsDeletingConvocationPdf] = useState(false);
+  const [confirmingConvocationPdfDeletion, setConfirmingConvocationPdfDeletion] = useState(false);
   const [isSendingConvocationEmail, setIsSendingConvocationEmail] = useState(false);
 
   // Formulario nuevo evento
@@ -490,19 +491,12 @@ export function CalendarPage() {
 
   const handleDeleteConvocationPdf = async () => {
     if (!convocationEvent?.convocationPdfUrl) return;
-    const confirmed = await showConfirm({
-      title: 'Eliminar PDF de convocatoria',
-      message: '¿Confirmas que deseas eliminar este PDF? También dejará de aparecer como adjunto en los correos.',
-      confirmText: 'Eliminar PDF',
-      cancelText: 'Cancelar',
-      type: 'warning',
-    });
-    if (!confirmed) return;
     setIsDeletingConvocationPdf(true);
     try {
       await eventService.deleteConvocationPdf(convocationEvent.id, convocationEvent.convocationPdfUrl);
       setConvocationEvent({ ...convocationEvent, convocationPdfUrl: undefined, convocationPdfFileName: undefined, convocationPdfFileSize: undefined });
       setConvocationPdfViewerUrl(null);
+      setConfirmingConvocationPdfDeletion(false);
       toast.success('PDF de la convocatoria eliminado.');
       void loadData();
     } catch (error) {
@@ -1390,13 +1384,37 @@ export function CalendarPage() {
                     </p>
                     <button
                       type="button"
-                      onClick={() => void handleDeleteConvocationPdf()}
+                      onClick={() => setConfirmingConvocationPdfDeletion(true)}
                       disabled={isDeletingConvocationPdf}
                       className="inline-flex items-center gap-1 rounded-lg border border-destructive/30 bg-destructive/5 px-2.5 py-1.5 text-[11px] font-semibold text-destructive disabled:opacity-60"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                       {isDeletingConvocationPdf ? 'Eliminando…' : 'Eliminar PDF'}
                     </button>
+                    {confirmingConvocationPdfDeletion && (
+                      <div className="basis-full rounded-lg border border-destructive/25 bg-destructive/5 p-2.5">
+                        <p className="text-[11px] font-semibold text-destructive">
+                          ¿Eliminar este PDF? También dejará de estar disponible como adjunto en los correos.
+                        </p>
+                        <div className="mt-2 flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setConfirmingConvocationPdfDeletion(false)}
+                            className="rounded-lg border border-border bg-white px-2.5 py-1.5 text-[11px] font-semibold text-ink-secondary"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void handleDeleteConvocationPdf()}
+                            disabled={isDeletingConvocationPdf}
+                            className="rounded-lg bg-destructive px-2.5 py-1.5 text-[11px] font-semibold text-white disabled:opacity-60"
+                          >
+                            {isDeletingConvocationPdf ? 'Eliminando…' : 'Confirmar eliminación'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
