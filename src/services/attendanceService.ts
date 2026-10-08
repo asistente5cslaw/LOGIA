@@ -2,6 +2,14 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import type { AttendanceRecord, VisitorAttendance, AttendanceStatus, LodgeEvent } from '@/types';
 import { auditService } from './auditService';
 
+const notifyAttendanceChanged = (eventId: string) => {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('logia:data-changed', {
+      detail: { table: 'attendance', event: 'CHANGE', eventId },
+    }));
+  }
+};
+
 export const attendanceService = {
   async getAttendanceForEvent(
     eventId: string,
@@ -102,6 +110,7 @@ export const attendanceService = {
       total: records.length,
       presentes: records.filter((r) => r.status === 'presente').length,
     });
+    notifyAttendanceChanged(eventId);
   },
 
   async saveMemberExcuse(
@@ -142,6 +151,7 @@ export const attendanceService = {
       memberId,
       reason: cleanReason,
     });
+    notifyAttendanceChanged(eventId);
   },
 
   async clearMemberAttendance(
@@ -158,6 +168,7 @@ export const attendanceService = {
     if (error) throw error;
 
     await auditService.log('RETIRAR_RESPUESTA_ASISTENCIA', 'attendance', eventId, user, { memberId });
+    notifyAttendanceChanged(eventId);
   },
 
   async addVisitor(
