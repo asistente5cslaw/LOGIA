@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { eventService } from '@/services/eventService';
 import { memberService } from '@/services/memberService';
@@ -126,6 +127,7 @@ function googleCalendarUrl(event: LodgeEvent): string {
 
 export function CalendarPage() {
   const { user, hasPermission } = useAuth();
+  const [searchParams] = useSearchParams();
   const { showConfirm } = useAppleDialog();
   const [events, setEvents] = useState<LodgeEvent[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
@@ -211,7 +213,10 @@ export function CalendarPage() {
   });
 
   // Filtrado de eventos
-  const filteredEvents = useMemo(() => events, [events]);
+  const filteredEvents = useMemo(() => {
+    if (searchParams.get('tipo') !== 'reuniones') return events;
+    return events.filter((event) => event.eventCategory === 'reunion_masonica' || event.eventCategory === 'reunion_fraternal');
+  }, [events, searchParams]);
 
   // Navegación mensual
   const nextMonth = () => {

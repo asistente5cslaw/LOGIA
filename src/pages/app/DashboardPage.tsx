@@ -32,7 +32,8 @@ export function DashboardPage() {
   const [savingHomeAttendance, setSavingHomeAttendance] = useState(false);
   const [stats, setStats] = useState({
     activeCount: 0,
-    upcomingMeetingsCount: 0,
+    upcomingTenidasCount: 0,
+    upcomingReunionsCount: 0,
     approvedMinutesCount: 0,
     attendanceRate: 0,
   });
@@ -49,9 +50,11 @@ export function DashboardPage() {
       setEvents(evList);
       setConflicts(conflictList);
 
+      const today = new Date().toISOString().split('T')[0];
       const upcomingNext = evList
-        .filter((event) => event.status !== 'cancelada' && new Date(event.startDate) >= new Date(Date.now() - 86400000))
-        .slice(0, 1)[0];
+        .filter((event) => event.eventCategory === 'tenida' && event.status !== 'cancelada' && event.startDate >= today)
+        .sort((a, b) => `${a.startDate}T${a.startTime || ''}`.localeCompare(`${b.startDate}T${b.startTime || ''}`))
+        .find((event) => event.status === 'convocada');
 
       const ownMemberId = user?.memberId || memList.find(
         (member) => member.email.toLowerCase() === user?.email?.toLowerCase()
@@ -71,7 +74,7 @@ export function DashboardPage() {
         const pendingExcuses = await attendanceService.getPendingExcusesForMember(ownMemberId);
         const pendingIds = new Set(pendingExcuses.map((item) => item.eventId));
         setPendingExcuseEvents(evList.filter(
-          (event) => event.status !== 'cancelada' && pendingIds.has(event.id)
+          (event) => event.eventCategory === 'tenida' && event.status !== 'cancelada' && pendingIds.has(event.id)
         ));
       } else {
         setPendingExcuseEvents([]);
@@ -79,8 +82,12 @@ export function DashboardPage() {
       }
 
       const activeCount = memList.filter((m) => m.isActive).length;
-      const upcomingMeetingsCount = evList.filter(
-        (e) => e.isMeeting && e.status !== 'cancelada' && new Date(e.startDate) >= new Date()
+      const upcomingTenidasCount = evList.filter(
+        (e) => e.eventCategory === 'tenida' && e.status !== 'cancelada' && e.startDate >= today
+      ).length;
+      const upcomingReunionsCount = evList.filter(
+        (e) => (e.eventCategory === 'reunion_masonica' || e.eventCategory === 'reunion_fraternal')
+          && e.status !== 'cancelada' && e.startDate >= today
       ).length;
       const approvedMinutesCount = minList.filter(
         (m) => m.status === 'aprobada' || m.status === 'firmada'
@@ -89,7 +96,8 @@ export function DashboardPage() {
       const attCalc = attendanceService.calculateStatistics(evList, [], activeCount);
       setStats({
         activeCount,
-        upcomingMeetingsCount,
+        upcomingTenidasCount,
+        upcomingReunionsCount,
         approvedMinutesCount,
         attendanceRate: attCalc.averageAttendanceRate || 0,
       });
@@ -106,11 +114,17 @@ export function DashboardPage() {
     void loadDashboardData();
   });
 
-  const upcomingEvents = events
-    .filter((e) => e.status !== 'cancelada' && new Date(e.startDate) >= new Date(Date.now() - 86400000))
+  const today = new Date().toISOString().split('T')[0];
+  const upcomingTenidas = events
+    .filter((event) => event.eventCategory === 'tenida' && event.status !== 'cancelada' && event.startDate >= today)
+    .sort((a, b) => `${a.startDate}T${a.startTime || ''}`.localeCompare(`${b.startDate}T${b.startTime || ''}`));
+  const upcomingReunions = events
+    .filter((event) => (event.eventCategory === 'reunion_masonica' || event.eventCategory === 'reunion_fraternal')
+      && event.status !== 'cancelada' && event.startDate >= today)
+    .sort((a, b) => `${a.startDate}T${a.startTime || ''}`.localeCompare(`${b.startDate}T${b.startTime || ''}`))
     .slice(0, 3);
 
-  const nextMeeting = upcomingEvents.find((event) => event.status === 'convocada') || upcomingEvents[0];
+  const nextMeeting = upcomingTenidas.find((event) => event.status === 'convocada') || upcomingTenidas[0];
   const nextMeetingBody = nextMeeting ? getBodyById(nextMeeting.bodyId) : null;
 
   const handleSaveDashboardExcuse = async (eventId: string) => {
@@ -389,8 +403,51 @@ export function DashboardPage() {
         </div>
       )}
 
+      {/* Próximas reuniones, separadas de las tenidas rituales */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="font-serif text-lg font-bold text-ink">Próximas reuniones</h2>
+            <p className="text-xs text-ink-muted">Encuentros masónicos y fraternales próximos</p>
+          </div>
+          <Link to="/app/calendario?tipo=reuniones" className="text-xs font-semibold text-primary hover:underline">
+            Ver todas
+          </Link>
+        </div>
+        {upcomingReunions.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {upcomingReunions.map((event) => {
+              const body = getBodyById(event.bodyId);
+              return (
+                <Link
+                  key={event.id}
+                  to="/app/calendario?tipo=reuniones"
+                  className="group rounded-2xl border border-border/80 bg-white p-4 shadow-2xs transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+                >
+                  <div className="flex items-center gap-2">
+                    <AppleEmoji name={body.appleEmoji} size={20} className="shrink-0" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-ink-secondary">{body.shortName}</span>
+                  </div>
+                  <h3 className="mt-2 font-serif text-sm font-bold leading-snug text-ink group-hover:text-primary">{event.title}</h3>
+                  <p className="mt-2 text-xs font-medium text-primary">
+                    {formatDateTimeSpanish(event.startDate, event.startTime)}
+                  </p>
+                  <p className="mt-1 truncate text-[11px] text-ink-muted">
+                    {event.eventCategory === 'reunion_masonica' ? 'Reunión Masónica' : 'Reunión Fraternal'}
+                  </p>
+                </Link>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-border bg-white p-5 text-center text-xs text-ink-muted">
+            No hay reuniones próximas agendadas.
+          </div>
+        )}
+      </section>
+
       {/* Resumen Operativo y Cuadro Institucional */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Miembros Activos */}
         <Link
           to="/app/miembros"
@@ -419,8 +476,24 @@ export function DashboardPage() {
               <CalendarDays className="h-4 w-4" />
             </div>
           </div>
-          <p className="mt-2 font-serif text-2xl font-bold text-ink">{stats.upcomingMeetingsCount}</p>
+          <p className="mt-2 font-serif text-2xl font-bold text-ink">{stats.upcomingTenidasCount}</p>
           <span className="text-[11px] text-ink-muted mt-0.5 block">Próximos trabajos litúrgicos</span>
+        </Link>
+
+        {/* Reuniones Programadas */}
+        <Link
+          to="/app/calendario?tipo=reuniones"
+          aria-label="Ver calendario de reuniones"
+          className="group rounded-2xl border border-border/80 bg-white p-4 sm:p-5 shadow-2xs transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary/40"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-ink-muted font-medium group-hover:text-primary transition-colors">Reuniones Próximas</span>
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <CalendarDays className="h-4 w-4" />
+            </div>
+          </div>
+          <p className="mt-2 font-serif text-2xl font-bold text-ink">{stats.upcomingReunionsCount}</p>
+          <span className="text-[11px] text-ink-muted mt-0.5 block">Masónicas y fraternales</span>
         </Link>
 
       </div>
