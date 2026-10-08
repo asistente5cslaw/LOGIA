@@ -23,6 +23,7 @@ import {
   FileEdit,
   Trash2,
   CalendarClock,
+  CalendarPlus,
 } from 'lucide-react';
 import { AppleEmoji } from '@/components/shared/AppleEmoji';
 import { AppleSelect, type AppleSelectOption } from '@/components/shared/AppleSelect';
@@ -48,6 +49,38 @@ const eventStatusOptions: AppleSelectOption<EventStatus>[] = [
 
 function eventStatusLabel(status: EventStatus): string {
   return status === 'celebrada' ? 'Culminada' : status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+function googleCalendarUrl(event: LodgeEvent): string {
+  const dateToGoogleDay = (value: string) => value.replace(/-/g, '');
+  const nextGoogleDay = (value: string) => {
+    const next = new Date(`${value}T12:00:00`);
+    next.setDate(next.getDate() + 1);
+    return next.toISOString().slice(0, 10).replace(/-/g, '');
+  };
+  const dateToGoogleDateTime = (date: string, time = '00:00') =>
+    new Date(`${date}T${time}:00`).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+
+  const isAllDay = event.isAllDay || !event.startTime;
+  const start = isAllDay
+    ? dateToGoogleDay(event.startDate)
+    : dateToGoogleDateTime(event.startDate, event.startTime);
+  const endDate = event.endDate || event.startDate;
+  const end = isAllDay
+    ? nextGoogleDay(endDate)
+    : dateToGoogleDateTime(endDate, event.endTime || event.startTime || '23:59');
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: event.title,
+    dates: `${start}/${end}`,
+    location: event.location || '',
+    details: [
+      `Actividad de ${getBodyById(event.bodyId).shortName}`,
+      event.notes?.trim(),
+      'Logia Unión Fraternal No. 21',
+    ].filter(Boolean).join('\n\n'),
+  });
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
 
 export function CalendarPage() {
@@ -634,6 +667,15 @@ export function CalendarPage() {
 
                       {/* Botones de acción del evento */}
                       <div className="mt-3 pt-2 border-t border-border flex flex-wrap gap-2">
+                        {ev.status !== 'cancelada' && (
+                          <button
+                            type="button"
+                            onClick={() => window.open(googleCalendarUrl(ev), '_blank', 'noopener,noreferrer')}
+                            className="flex items-center gap-1 rounded bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
+                          >
+                            <CalendarPlus className="h-3.5 w-3.5" /> Google Calendar
+                          </button>
+                        )}
                         {canManageEvents && (
                           <button
                             onClick={() => openConvocation(ev)}
@@ -752,6 +794,16 @@ export function CalendarPage() {
 
                   {/* Botones de acción del evento */}
                   <div className="mt-3 pt-2.5 border-t border-border flex flex-wrap gap-2">
+                    {ev.status !== 'cancelada' && (
+                      <button
+                        type="button"
+                        onClick={() => window.open(googleCalendarUrl(ev), '_blank', 'noopener,noreferrer')}
+                        className="flex flex-row items-center gap-1.5 rounded-xl bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors cursor-pointer"
+                      >
+                        <CalendarPlus className="h-3.5 w-3.5 shrink-0" />
+                        <span>Google Calendar</span>
+                      </button>
+                    )}
                     {canManageEvents && (
                       <button
                         type="button"
