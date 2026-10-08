@@ -52,14 +52,13 @@ La Secretaría del Taller`;
   },
 
   generateEmailBody(event: LodgeEvent, officialText: string): string {
-    const attachmentLine = event.convocationPdfFileName
-      ? `Se adjunta el archivo PDF “${event.convocationPdfFileName}” para su lectura.`
-      : 'Se comparte la convocatoria oficial para su conocimiento.';
+    const activityLabel = event.eventCategory === 'tenida' ? 'tenida' : 'reunión';
 
     return `Estimados Hermanos:
 
-Por este medio adjunto la convocatoria para nuestra próxima tenida.
-${attachmentLine}
+Por este medio les remito adjunta la convocatoria oficial para nuestra próxima ${activityLabel}.
+
+Agradecemos revisar el documento adjunto y tomar nota de la fecha, hora, lugar y demás indicaciones allí señaladas.
 
 ${officialText}`;
   },
