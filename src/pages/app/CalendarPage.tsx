@@ -253,7 +253,9 @@ export function CalendarPage() {
   const upcomingMeetings = useMemo(() => {
     const today = new Date().toISOString().split('T')[0];
     return filteredEvents
-      .filter((ev) => ev.isMeeting && ev.status !== 'cancelada' && ev.startDate >= today)
+      .filter((ev) => (
+        ev.eventCategory === 'reunion_masonica' || ev.eventCategory === 'reunion_fraternal'
+      ) && ev.status !== 'cancelada' && ev.startDate >= today)
       .sort((a, b) => {
         const dateCompare = a.startDate.localeCompare(b.startDate);
         if (dateCompare !== 0) return dateCompare;
@@ -709,6 +711,13 @@ export function CalendarPage() {
                 if (ev.endDate && dateStr >= ev.startDate && dateStr <= ev.endDate) return true;
                 return false;
               });
+              const dayEventsForLabels = [...dayEvents].sort((a, b) => {
+                const dateCompare = a.startDate.localeCompare(b.startDate);
+                if (dateCompare !== 0) return dateCompare;
+                return (a.startTime || '').localeCompare(b.startTime || '');
+              });
+              const visibleDayEvents = dayEventsForLabels.slice(0, 2);
+              const remainingDayEvents = Math.max(0, dayEventsForLabels.length - visibleDayEvents.length);
               const hasEvents = dayEvents.length > 0;
 
               return (
@@ -743,10 +752,39 @@ export function CalendarPage() {
                     </span>
                   </div>
 
-                  {/* Punto elegante de evento estilo Apple (móvil y escritorio) */}
+                  {/* Etiquetas compactas con el título de las actividades */}
                   {hasEvents && (
-                    <div className="flex justify-center py-1 sm:py-2">
-                      <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-primary" />
+                    <div className="mt-1 space-y-0.5 overflow-hidden">
+                      {visibleDayEvents.map((event) => {
+                        const category = event.eventCategory || (event.isMeeting ? 'tenida' : 'otro');
+                        const labelClass = event.status === 'cancelada'
+                          ? 'border-destructive/20 bg-destructive/5 text-destructive line-through'
+                          : category === 'tenida'
+                          ? 'border-amber-200 bg-amber-50 text-amber-800'
+                          : category === 'reunion_masonica'
+                          ? 'border-primary/20 bg-primary/10 text-primary'
+                          : category === 'reunion_fraternal'
+                          ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                          : 'border-border bg-surface-container-low text-ink-secondary';
+
+                        return (
+                          <div
+                            key={event.id}
+                            title={event.title}
+                            className={cn(
+                              'truncate rounded border px-1 py-0.5 text-left text-[8px] leading-tight sm:px-1.5 sm:text-[9px]',
+                              labelClass,
+                            )}
+                          >
+                            {event.title}
+                          </div>
+                        );
+                      })}
+                      {remainingDayEvents > 0 && (
+                        <div className="truncate px-1 text-[8px] font-semibold leading-tight text-ink-muted sm:px-1.5 sm:text-[9px]">
+                          +{remainingDayEvents} más
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
