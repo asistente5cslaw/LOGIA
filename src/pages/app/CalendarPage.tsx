@@ -250,11 +250,13 @@ export function CalendarPage() {
 
   // Cuando no hay trabajos en el día seleccionado, mostrar las siguientes
   // reuniones futuras para que el panel siga siendo útil.
-  const upcomingMeetings = useMemo(() => {
+  const upcomingActivities = useMemo(() => {
     const today = new Date().toISOString().split('T')[0];
     return filteredEvents
       .filter((ev) => (
-        ev.eventCategory === 'reunion_masonica' || ev.eventCategory === 'reunion_fraternal'
+        ev.eventCategory === 'tenida'
+        || ev.eventCategory === 'reunion_masonica'
+        || ev.eventCategory === 'reunion_fraternal'
       ) && ev.status !== 'cancelada' && ev.startDate >= today)
       .sort((a, b) => {
         const dateCompare = a.startDate.localeCompare(b.startDate);
@@ -799,7 +801,7 @@ export function CalendarPage() {
             <div className="flex items-center justify-between border-b border-border pb-3">
               <div>
                 <h3 className="font-serif text-lg font-bold text-ink">
-                  {selectedDayEvents.length > 0 ? 'Trabajos del Día' : 'Próximas reuniones'}
+                  {selectedDayEvents.length > 0 ? 'Trabajos del Día' : 'Próximas actividades'}
                 </h3>
                 <p className="text-xs text-ink-secondary">
                   {selectedDayEvents.length > 0 ? formatDateSpanish(selectedDateStr) : 'Las siguientes actividades programadas'}
@@ -813,7 +815,7 @@ export function CalendarPage() {
             <div className="mt-4 space-y-3">
                 {selectedDayEvents.length === 0 ? (
                 <div className="space-y-3">
-                  {upcomingMeetings.length > 0 ? upcomingMeetings.map((ev) => {
+                  {upcomingActivities.length > 0 ? upcomingActivities.map((ev) => {
                     const body = getBodyById(ev.bodyId);
                     return (
                       <button
@@ -958,14 +960,14 @@ export function CalendarPage() {
       <Modal
         isOpen={showMobileDayModal}
         onClose={() => setShowMobileDayModal(false)}
-        title={selectedDayEvents.length > 0 ? 'Trabajos del Día' : 'Próximas reuniones'}
-        subtitle={selectedDayEvents.length > 0 ? formatDateSpanish(selectedDateStr) : 'Las siguientes actividades programadas'}
+        title={selectedDayEvents.length > 0 ? 'Trabajos del Día' : 'Próximas actividades'}
+        subtitle={selectedDayEvents.length > 0 ? formatDateSpanish(selectedDateStr) : 'Tenidas y reuniones programadas'}
         maxWidth="md"
       >
         <div className="space-y-3 py-1">
           {selectedDayEvents.length === 0 ? (
             <div className="space-y-3">
-              {upcomingMeetings.length > 0 ? upcomingMeetings.map((ev) => {
+              {upcomingActivities.length > 0 ? upcomingActivities.map((ev) => {
                 const body = getBodyById(ev.bodyId);
                 return (
                   <button
