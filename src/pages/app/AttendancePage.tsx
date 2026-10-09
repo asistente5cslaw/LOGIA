@@ -6,7 +6,7 @@ import { memberService } from '@/services/memberService';
 import { attendanceService } from '@/services/attendanceService';
 import { getBodyById } from '@/data/bodiesData';
 import { PageHeader } from '@/components/shared/PageHeader';
-import type { LodgeEvent, Member, AttendanceStatus, VisitorAttendance, MasonicDegree } from '@/types';
+import type { LodgeEvent, Member, AttendanceStatus, AttendanceResponseStatus, VisitorAttendance, MasonicDegree } from '@/types';
 import {
   Users,
   Search,
@@ -33,7 +33,7 @@ const visitorDegreeOptions: AppleSelectOption<MasonicDegree>[] = [
 
 export function AttendancePage() {
   const navigate = useNavigate();
-  const { user, hasPermission } = useAuth();
+  const { user } = useAuth();
   const [meetings, setMeetings] = useState<LodgeEvent[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<string>('');
   const [selectedSegmentId, setSelectedSegmentId] = useState<string>('');
@@ -41,6 +41,9 @@ export function AttendancePage() {
   const [attendanceMap, setAttendanceMap] = useState<Record<string, AttendanceStatus>>({});
   const [excuseReasons, setExcuseReasons] = useState<Record<string, string>>({});
   const [excuseSubmittedAt, setExcuseSubmittedAt] = useState<Record<string, string>>({});
+  const [memberResponses, setMemberResponses] = useState<Record<string, AttendanceResponseStatus>>({});
+  const [memberResponseReasons, setMemberResponseReasons] = useState<Record<string, string>>({});
+  const [memberResponseSubmittedAt, setMemberResponseSubmittedAt] = useState<Record<string, string>>({});
   const [editingExcuseMemberId, setEditingExcuseMemberId] = useState<string | null>(null);
   const [excuseDraft, setExcuseDraft] = useState('');
   const [visitors, setVisitors] = useState<VisitorAttendance[]>([]);
@@ -55,8 +58,8 @@ export function AttendancePage() {
   const [visDegree, setVisDegree] = useState<MasonicDegree>('maestro');
   const [visNotes, setVisNotes] = useState('');
 
-  const canManageAttendance = hasPermission('manage_attendance');
-  const canViewExcuseReasons = user?.profile?.roleId === 'sec';
+  const canManageAttendance = user?.profile?.roleId === 'vm' || user?.profile?.roleId === 'sec';
+  const canViewExcuseReasons = user?.profile?.roleId === 'sec' || user?.profile?.roleId === 'vm';
 
   const isOwnMember = (member: Member): boolean => (
     Boolean(user?.memberId && user.memberId === member.id) ||
@@ -86,27 +89,43 @@ export function AttendancePage() {
   const loadAttendanceForSelected = async (eventId: string, segmentId: string, currentMembers: Member[]) => {
     if (!segmentId) return;
     try {
-      const [records, visList] = await Promise.all([
+      const ownMember = currentMembers.find((member) => isOwnMember(member));
+      const [records, responses, visList] = await Promise.all([
         attendanceService.getAttendanceForEvent(eventId, segmentId, {
           canViewExcuseReasons,
-          memberId: currentMembers.find((member) => isOwnMember(member))?.id,
+          memberId: ownMember?.id,
+        }),
+        attendanceService.getResponsesForEvent(eventId, segmentId, {
+          canViewAll: canManageAttendance,
+          memberId: ownMember?.id,
         }),
         attendanceService.getVisitorsForEvent(eventId),
       ]);
       const map: Record<string, AttendanceStatus> = {};
       const reasons: Record<string, string> = {};
       const submitted: Record<string, string> = {};
+      const responseMap: Record<string, AttendanceResponseStatus> = {};
+      const responseReasons: Record<string, string> = {};
+      const responseSubmitted: Record<string, string> = {};
       currentMembers.forEach((m) => {
         const rec = records.find((r) => r.memberId === m.id);
         map[m.id] = rec ? rec.status : 'ausente';
         if (rec?.excuseReason) reasons[m.id] = rec.excuseReason;
         if (rec?.excuseSubmittedAt) submitted[m.id] = rec.excuseSubmittedAt;
       });
+      responses.forEach((response) => {
+        responseMap[response.memberId] = response.status;
+        if (response.excuseReason) responseReasons[response.memberId] = response.excuseReason;
+        if (response.submittedAt) responseSubmitted[response.memberId] = response.submittedAt;
+      });
       setAttendanceMap(map);
       setExcuseReasons(reasons);
       setExcuseSubmittedAt(submitted);
+      setMemberResponses(responseMap);
+      setMemberResponseReasons(responseReasons);
+      setMemberResponseSubmittedAt(responseSubmitted);
       const ownPendingExcuse = currentMembers.find(
-        (member) => isOwnMember(member) && map[member.id] === 'excusa' && !submitted[member.id]
+        (member) => isOwnMember(member) && responseMap[member.id] === 'excusa' && !responseSubmitted[member.id]
       );
       setEditingExcuseMemberId(ownPendingExcuse?.id || null);
       setExcuseDraft(ownPendingExcuse ? '' : '');
@@ -210,6 +229,31 @@ export function AttendancePage() {
     }
   };
 
+  const handleMemberResponseToggle = async (memberId: string, status: 'presente' | 'excusa') => {
+    const member = members.find((candidate) => candidate.id === memberId);
+    if (!member || !isOwnMember(member) || !selectedEventId || !selectedSegmentId) return;
+    try {
+      if (status === 'presente') {
+        await attendanceService.saveMemberConfirmation(selectedEventId, selectedSegmentId, memberId, {
+          id: user?.id,
+          email: user?.email,
+        });
+        setMemberResponses((prev) => ({ ...prev, [memberId]: 'confirmada' }));
+        setMemberResponseReasons((prev) => {
+          const next = { ...prev };
+          delete next[memberId];
+          return next;
+        });
+        toast.success('Asistencia confirmada.');
+      } else {
+        setEditingExcuseMemberId(memberId);
+        setExcuseDraft(memberResponseReasons[memberId] || '');
+      }
+    } catch {
+      toast.error('No se pudo guardar tu respuesta.');
+    }
+  };
+
   const handleMarkAllPresent = () => {
     const updated: Record<string, AttendanceStatus> = {};
     members.forEach((m) => {
@@ -246,14 +290,17 @@ export function AttendancePage() {
 
   const handleOpenExcuseEditor = (memberId: string) => {
     const member = members.find((candidate) => candidate.id === memberId);
-    if (!member || !isOwnMember(member) || attendanceMap[memberId] !== 'excusa') return;
-    const submittedAt = excuseSubmittedAt[memberId];
+    const currentResponseStatus = canManageAttendance
+      ? attendanceMap[memberId]
+      : memberResponses[memberId] === 'excusa' ? 'excusa' : undefined;
+    if (!member || !isOwnMember(member) || currentResponseStatus !== 'excusa') return;
+    const submittedAt = canManageAttendance ? excuseSubmittedAt[memberId] : memberResponseSubmittedAt[memberId];
     if (submittedAt && Date.now() >= new Date(submittedAt).getTime() + 24 * 60 * 60 * 1000) {
       toast.info('El plazo de 24 horas para editar esta excusa ya venció.');
       return;
     }
     setEditingExcuseMemberId(memberId);
-    setExcuseDraft(excuseReasons[memberId] || '');
+    setExcuseDraft(canManageAttendance ? excuseReasons[memberId] || '' : memberResponseReasons[memberId] || '');
   };
 
   const handleSaveExcuse = async (memberId: string) => {
@@ -264,8 +311,9 @@ export function AttendancePage() {
         id: user?.id,
         email: user?.email,
       });
-      setExcuseReasons((prev) => ({ ...prev, [memberId]: excuseDraft.trim() }));
-      setExcuseSubmittedAt((prev) => ({
+      setMemberResponses((prev) => ({ ...prev, [memberId]: 'excusa' }));
+      setMemberResponseReasons((prev) => ({ ...prev, [memberId]: excuseDraft.trim() }));
+      setMemberResponseSubmittedAt((prev) => ({
         ...prev,
         [memberId]: prev[memberId] || new Date().toISOString(),
       }));
@@ -471,7 +519,16 @@ export function AttendancePage() {
 
           <div className="divide-y divide-border/60">
             {filteredMembers.map((m) => {
-              const currentStatus = attendanceMap[m.id] || 'ausente';
+              const responseStatus = memberResponses[m.id];
+              const isOwn = isOwnMember(m);
+              const currentStatus = canManageAttendance
+                ? (attendanceMap[m.id] || 'ausente')
+                : responseStatus === 'confirmada'
+                  ? 'presente'
+                  : responseStatus === 'excusa'
+                    ? 'excusa'
+                    : 'ausente';
+              const currentExcuseSubmittedAt = canManageAttendance ? excuseSubmittedAt[m.id] : memberResponseSubmittedAt[m.id];
               return (
                 <div
                   key={m.id}
@@ -495,8 +552,8 @@ export function AttendancePage() {
                     <div className="flex items-center gap-1.5">
                     <button
                       type="button"
-                      disabled={!canManageAttendance}
-                      onClick={() => handleStatusToggle(m.id, 'presente')}
+                      disabled={!canManageAttendance && !isOwn}
+                      onClick={() => canManageAttendance ? void handleStatusToggle(m.id, 'presente') : void handleMemberResponseToggle(m.id, 'presente')}
                       className={`min-h-[36px] px-2.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors ${
                         currentStatus === 'presente'
                           ? 'bg-success text-white shadow-xs'
@@ -508,8 +565,8 @@ export function AttendancePage() {
 
                     <button
                       type="button"
-                      disabled={!canManageAttendance}
-                      onClick={() => handleStatusToggle(m.id, 'excusa')}
+                      disabled={!canManageAttendance && !isOwn}
+                      onClick={() => canManageAttendance ? void handleStatusToggle(m.id, 'excusa') : void handleMemberResponseToggle(m.id, 'excusa')}
                       className={`min-h-[36px] px-2.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors ${
                         currentStatus === 'excusa'
                           ? 'bg-amber-600 text-white shadow-xs'
@@ -532,9 +589,9 @@ export function AttendancePage() {
                       <X className="h-3.5 w-3.5" /> Ausente
                     </button>
                     </div>
-                    {isOwnMember(m) && currentStatus === 'excusa' && (
-                      excuseSubmittedAt[m.id] ? (
-                        excuseSubmittedAt[m.id] && Date.now() < new Date(excuseSubmittedAt[m.id]).getTime() + 24 * 60 * 60 * 1000 ? (
+                    {isOwn && currentStatus === 'excusa' && (
+                      currentExcuseSubmittedAt ? (
+                        currentExcuseSubmittedAt && Date.now() < new Date(currentExcuseSubmittedAt).getTime() + 24 * 60 * 60 * 1000 ? (
                           <button
                             type="button"
                             onClick={() => handleOpenExcuseEditor(m.id)}
@@ -555,7 +612,7 @@ export function AttendancePage() {
                         </button>
                       )
                     )}
-                    {!isOwnMember(m) && currentStatus === 'excusa' && (
+                    {!isOwn && currentStatus === 'excusa' && (
                       canViewExcuseReasons ? (
                         excuseReasons[m.id] ? (
                           <p className="max-w-xs text-left text-[11px] text-amber-800">
@@ -567,6 +624,11 @@ export function AttendancePage() {
                       ) : (
                         <span className="text-[11px] font-medium text-amber-700">Excusa registrada</span>
                       )
+                    )}
+                    {canManageAttendance && responseStatus && (
+                      <span className="text-[11px] font-semibold text-primary">
+                        Respuesta del hermano: {responseStatus === 'confirmada' ? 'Asistencia confirmada' : 'Presentó excusa'}
+                      </span>
                     )}
                   </div>
                 </div>

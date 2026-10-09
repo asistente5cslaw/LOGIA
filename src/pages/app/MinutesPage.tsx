@@ -16,6 +16,8 @@ import {
   CalendarDays,
   Mail,
   Bell,
+  ExternalLink,
+  Download,
 } from 'lucide-react';
 import { Modal } from '@/components/shared/Modal';
 import { AppleSelect, type AppleSelectOption } from '@/components/shared/AppleSelect';
@@ -290,6 +292,15 @@ export function MinutesPage() {
     }
   };
 
+  const handleNotifyMinute = async (min: Minute) => {
+    try {
+      const result = await pushNotificationService.notifyNewMinute(min.title, min.formatNumber, min.degree);
+      toast.success(result.sent > 0 ? 'Notificación push enviada' : 'No hay dispositivos push registrados para recibirla');
+    } catch {
+      toast.error('No se pudo enviar la notificación push');
+    }
+  };
+
   const handleDeleteMinute = async (minuteId: string, formatNumber: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     const confirmed = await showConfirm({
@@ -509,11 +520,30 @@ ${formDescription.trim()}${notes}`;
                 isLoadingPdf ? (
                   <p className="py-8 text-center text-ink-muted">Cargando visor del PDF…</p>
                 ) : pdfViewerUrl ? (
-                  <iframe
-                    src={pdfViewerUrl}
-                    title={`Visor del acta ${selectedMinute.formatNumber}`}
-                    className="h-[60vh] min-h-[420px] w-full rounded-lg border border-border bg-white"
-                  />
+                  <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 text-center">
+                    <p className="text-xs text-ink-secondary">
+                      Para evitar bloqueos y barras duplicadas en teléfonos, abre el PDF en el visor del dispositivo o descárgalo.
+                    </p>
+                    <div className="mt-3 flex flex-wrap justify-center gap-2">
+                      <a
+                        href={pdfViewerUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex min-h-[42px] items-center gap-1.5 rounded-xl bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary-pressed transition-colors"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                        Abrir PDF
+                      </a>
+                      <a
+                        href={pdfViewerUrl}
+                        download={selectedMinute.pdfFileName || `Acta_${selectedMinute.formatNumber}.pdf`}
+                        className="inline-flex min-h-[42px] items-center gap-1.5 rounded-xl border border-primary/30 bg-surface px-4 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        Descargar PDF
+                      </a>
+                    </div>
+                  </div>
                 ) : (
                   <p className="py-4 text-center text-destructive">No se pudo cargar el visor.</p>
                 )
@@ -592,10 +622,22 @@ ${formDescription.trim()}${notes}`;
                 </a>
               )}
 
-              {canApproveMinutes && (
+              {(canApproveMinutes || canManageMinutes) && (
                 <div className="flex items-center gap-2 ml-auto">
                   <span className="text-xs text-ink-secondary">Acciones:</span>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap justify-end gap-2">
+                    {canManageMinutes && (
+                      <button
+                        type="button"
+                        onClick={() => handleNotifyMinute(selectedMinute)}
+                        className="rounded-xl border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors flex items-center gap-1.5"
+                      >
+                        <Bell className="h-3.5 w-3.5" />
+                        Push a todos
+                      </button>
+                    )}
+                    {canApproveMinutes && (
+                      <>
                     {selectedMinute.status === 'borrador' && (
                       <button
                         type="button"
@@ -631,6 +673,8 @@ ${formDescription.trim()}${notes}`;
                       >
                         Archivar
                       </button>
+                    )}
+                      </>
                     )}
                   </div>
                 </div>

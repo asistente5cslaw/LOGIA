@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import type { AttendanceRecord, VisitorAttendance, AttendanceStatus, LodgeEvent } from '@/types';
+import type { AttendanceRecord, AttendanceResponse, VisitorAttendance, AttendanceStatus, LodgeEvent } from '@/types';
 import { auditService } from './auditService';
 
 const notifyAttendanceChanged = (eventId: string) => {
@@ -44,7 +44,7 @@ export const attendanceService = {
     if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
 
     const { data, error } = await supabase
-      .from('attendance')
+      .from('attendance_responses')
       .select('event_id, excuse_reason')
       .eq('member_id', memberId)
       .eq('status', 'excusa');
@@ -53,6 +53,24 @@ export const attendanceService = {
     return (data || [])
       .filter((record) => !record.excuse_reason?.trim())
       .map((record) => ({ eventId: record.event_id }));
+  },
+
+  async getResponsesForEvent(eventId: string, segmentId: string, viewer?: { canViewAll?: boolean; memberId?: string }): Promise<AttendanceResponse[]> {
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    let query = supabase.from('attendance_responses').select('*').eq('event_id', eventId).eq('segment_id', segmentId);
+    if (!viewer?.canViewAll && viewer?.memberId) query = query.eq('member_id', viewer.memberId);
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data || []).map((d) => ({
+      id: d.id,
+      eventId: d.event_id,
+      segmentId: d.segment_id,
+      memberId: d.member_id,
+      status: d.status,
+      excuseReason: d.excuse_reason || undefined,
+      submittedAt: d.submitted_at,
+      updatedAt: d.updated_at,
+    }));
   },
 
   async getVisitorsForEvent(eventId: string): Promise<VisitorAttendance[]> {
@@ -130,32 +148,31 @@ export const attendanceService = {
     if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
 
     const { data: current, error: currentError } = await supabase
-      .from('attendance')
-      .select('excuse_submitted_at')
+      .from('attendance_responses')
+      .select('submitted_at')
       .eq('event_id', eventId)
       .eq('segment_id', segmentId)
       .eq('member_id', memberId)
       .maybeSingle();
     if (currentError) throw currentError;
 
-    const submittedAt = current?.excuse_submitted_at as string | null | undefined;
+    const submittedAt = current?.submitted_at as string | null | undefined;
     if (submittedAt && Date.now() >= new Date(submittedAt).getTime() + 24 * 60 * 60 * 1000) {
       throw new Error('El plazo de 24 horas para editar esta excusa ya venció.');
     }
 
-    const { error } = await supabase.from('attendance').upsert({
+    const { error } = await supabase.from('attendance_responses').upsert({
       event_id: eventId,
       segment_id: segmentId,
       member_id: memberId,
       status: 'excusa',
       excuse_reason: cleanReason,
-      excuse_submitted_at: submittedAt || new Date().toISOString(),
-      updated_by: user.id || null,
+      submitted_at: submittedAt || new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }, { onConflict: 'event_id,segment_id,member_id' });
     if (error) throw error;
 
-    await auditService.log('REGISTRO_EXCUSA', 'attendance', eventId, user, {
+    await auditService.log('REGISTRO_EXCUSA', 'attendance_responses', eventId, user, {
       memberId,
       reason: cleanReason,
     });
@@ -170,14 +187,56 @@ export const attendanceService = {
   ): Promise<void> {
     if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
     const { error } = await supabase
-      .from('attendance')
+      .from('attendance_responses')
       .delete()
       .eq('event_id', eventId)
       .eq('segment_id', segmentId)
       .eq('member_id', memberId);
     if (error) throw error;
 
-    await auditService.log('RETIRAR_RESPUESTA_ASISTENCIA', 'attendance', eventId, user, { memberId });
+    await auditService.log('RETIRAR_RESPUESTA_ASISTENCIA', 'attendance_responses', eventId, user, { memberId });
+    notifyAttendanceChanged(eventId);
+  },
+
+  async saveMemberConfirmation(
+    eventId: string,
+    segmentId: string,
+    memberId: string,
+    user: { id?: string; email?: string }
+  ): Promise<void> {
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    const { error } = await supabase.from('attendance_responses').upsert({
+      event_id: eventId,
+      segment_id: segmentId,
+      member_id: memberId,
+      status: 'confirmada',
+      excuse_reason: null,
+      submitted_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'event_id,segment_id,member_id' });
+    if (error) throw error;
+    await auditService.log('CONFIRMACION_ASISTENCIA', 'attendance_responses', eventId, user, { memberId });
+    notifyAttendanceChanged(eventId);
+  },
+
+  async saveMemberExcusePending(
+    eventId: string,
+    segmentId: string,
+    memberId: string,
+    user: { id?: string; email?: string }
+  ): Promise<void> {
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    const { error } = await supabase.from('attendance_responses').upsert({
+      event_id: eventId,
+      segment_id: segmentId,
+      member_id: memberId,
+      status: 'excusa',
+      excuse_reason: null,
+      submitted_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'event_id,segment_id,member_id' });
+    if (error) throw error;
+    await auditService.log('REGISTRO_EXCUSA', 'attendance_responses', eventId, user, { memberId });
     notifyAttendanceChanged(eventId);
   },
 

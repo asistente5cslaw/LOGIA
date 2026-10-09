@@ -220,6 +220,19 @@ export interface Minute {
 
 export type AttendanceStatus = 'presente' | 'excusa' | 'ausente';
 
+export type AttendanceResponseStatus = 'confirmada' | 'excusa';
+
+export interface AttendanceResponse {
+  id: string;
+  eventId: string;
+  segmentId: string;
+  memberId: string;
+  status: AttendanceResponseStatus;
+  excuseReason?: string;
+  submittedAt: string;
+  updatedAt: string;
+}
+
 export interface AttendanceRecord {
   id: string;
   eventId: string;

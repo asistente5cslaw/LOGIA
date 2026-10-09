@@ -64,10 +64,10 @@ export function DashboardPage() {
         if (upcomingNext?.status === 'convocada') {
           const segmentId = upcomingNext.degreeSegments?.[0]?.id;
           const records = segmentId
-            ? await attendanceService.getAttendanceForEvent(upcomingNext.id, segmentId, { memberId: ownMemberId })
+            ? await attendanceService.getResponsesForEvent(upcomingNext.id, segmentId, { memberId: ownMemberId })
             : [];
           const savedStatus = records.find((record) => record.memberId === ownMemberId)?.status;
-          setHomeAttendanceStatus(savedStatus === 'presente' || savedStatus === 'excusa' ? savedStatus : null);
+          setHomeAttendanceStatus(savedStatus === 'confirmada' ? 'presente' : savedStatus === 'excusa' ? 'excusa' : null);
         } else {
           setHomeAttendanceStatus(null);
         }
@@ -163,13 +163,18 @@ export function DashboardPage() {
           id: user?.id,
           email: user?.email,
         });
-      } else {
-        await attendanceService.saveAttendanceBatch(
+      } else if (nextStatus === 'presente') {
+        await attendanceService.saveMemberConfirmation(
           nextMeeting.id,
           segmentId,
-          [{ memberId: ownMemberId, status: nextStatus }],
+          ownMemberId,
           { id: user?.id, email: user?.email }
         );
+      } else {
+        await attendanceService.saveMemberExcusePending(nextMeeting.id, segmentId, ownMemberId, {
+          id: user?.id,
+          email: user?.email,
+        });
       }
       setHomeAttendanceStatus(nextStatus === 'ausente' ? null : nextStatus);
       setShowHomeExcuse(nextStatus === 'excusa');
