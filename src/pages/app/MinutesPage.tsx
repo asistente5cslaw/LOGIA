@@ -501,14 +501,18 @@ ${formDescription.trim()}${notes}`;
               </div>
             )}
 
-            <div className="rounded-lg bg-surface-container-low p-4 text-xs text-ink leading-relaxed space-y-3 font-serif">
-              <p className="whitespace-pre-line">{selectedMinute.description}</p>
-              {selectedMinute.notes && (
-                <div className="border-t border-border pt-2 text-[11px] text-ink-muted italic">
-                  Notas de Secretaría: {selectedMinute.notes}
-                </div>
-              )}
-            </div>
+            {(selectedMinute.description || selectedMinute.notes) && (
+              <div className="rounded-lg bg-surface-container-low p-4 text-xs text-ink leading-relaxed space-y-3 font-serif">
+                {selectedMinute.description && (
+                  <p className="whitespace-pre-line">{selectedMinute.description}</p>
+                )}
+                {selectedMinute.notes && (
+                  <div className="border-t border-border pt-2 text-[11px] text-ink-muted italic">
+                    Notas de Secretaría: {selectedMinute.notes}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Visor PDF */}
             <div className="rounded-lg border border-border p-3 space-y-3 text-xs">
@@ -523,7 +527,7 @@ ${formDescription.trim()}${notes}`;
                   <p className="py-8 text-center text-ink-muted">Cargando visor del PDF…</p>
                 ) : pdfViewerUrl ? (
                   <div className="space-y-3">
-                    <div className="overflow-hidden rounded-xl border border-border bg-white">
+                    <div className="min-w-0 max-w-full overflow-hidden rounded-xl border border-border bg-white">
                       <iframe
                         src={pdfViewerUrl}
                         title={`Visor del acta ${selectedMinute.formatNumber}`}
