@@ -791,6 +791,69 @@ export function CalendarPage() {
           </div>
         </div>
 
+        {/* Próximas actividades en móvil */}
+        <div className="lg:hidden rounded-xl border border-border bg-surface p-4 shadow-card">
+          <div className="flex items-center justify-between border-b border-border pb-3">
+            <div>
+              <h3 className="font-serif text-lg font-bold text-ink">Próximas actividades</h3>
+              <p className="text-xs text-ink-secondary">Las siguientes actividades programadas</p>
+            </div>
+            <span className="rounded-full bg-surface-container px-2.5 py-0.5 text-xs font-semibold text-primary">
+              {upcomingActivities.length} próxima{upcomingActivities.length === 1 ? '' : 's'}
+            </span>
+          </div>
+
+          <div className="mt-4 space-y-3">
+            {upcomingActivities.length > 0 ? (
+              upcomingActivities.map((ev) => {
+                const body = getBodyById(ev.bodyId);
+                return (
+                  <button
+                    key={ev.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedDateStr(ev.startDate);
+                      setShowMobileDayModal(true);
+                    }}
+                    className="w-full rounded-lg border border-border bg-surface-container/30 p-3 text-left transition-colors hover:bg-surface-container"
+                  >
+                    <div className="flex items-center gap-2">
+                      <AppleEmoji name={body?.appleEmoji ?? 'calendar'} size={18} />
+                      <span className="text-xs font-semibold uppercase tracking-wide text-ink-secondary">
+                        {body?.shortName ?? 'Actividad'}
+                      </span>
+                      <span className="ml-auto text-xs font-medium text-primary">
+                        {formatDateSpanish(ev.startDate)}
+                      </span>
+                    </div>
+                    <h4 className="mt-2 line-clamp-2 font-serif text-base font-bold text-ink">
+                      {ev.title}
+                    </h4>
+                    <p className="mt-1 flex items-center gap-1 text-xs text-ink-secondary">
+                      <Clock size={13} />
+                      {formatTimeRange12(ev.startTime, ev.endTime)}
+                    </p>
+                  </button>
+                );
+              })
+            ) : (
+              <p className="rounded-lg border border-dashed border-border px-3 py-4 text-center text-sm text-ink-secondary">
+                No hay actividades próximas agendadas.
+              </p>
+            )}
+          </div>
+
+          {canManageEvents && (
+            <button
+              type="button"
+              onClick={openNewEventModal}
+              className="mt-4 w-full text-center text-sm font-semibold text-primary hover:underline"
+            >
+              + Agendar una actividad aquí
+            </button>
+          )}
+        </div>
+
         {/* Detalle Diario en escritorio */}
         <div className="hidden lg:flex rounded-xl border border-border bg-surface p-5 shadow-card flex-col justify-between">
           <div>

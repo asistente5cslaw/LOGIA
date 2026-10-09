@@ -184,6 +184,12 @@ export function AttendancePage() {
     );
   }, [members, searchMember]);
 
+  const isBeforeSelectedEvent = (): boolean => {
+    if (!selectedEvent) return false;
+    const eventStart = new Date(`${selectedEvent.startDate}T${selectedEvent.startTime || '23:59:59'}-05:00`);
+    return !Number.isNaN(eventStart.getTime()) && Date.now() < eventStart.getTime();
+  };
+
   const handleStatusToggle = async (memberId: string, status: AttendanceStatus) => {
     if (!canManageAttendance) return;
     const nextMap = {
@@ -591,7 +597,7 @@ export function AttendancePage() {
                     </div>
                     {isOwn && currentStatus === 'excusa' && (
                       currentExcuseSubmittedAt ? (
-                        currentExcuseSubmittedAt && Date.now() < new Date(currentExcuseSubmittedAt).getTime() + 24 * 60 * 60 * 1000 ? (
+                        isBeforeSelectedEvent() ? (
                           <button
                             type="button"
                             onClick={() => handleOpenExcuseEditor(m.id)}
@@ -600,7 +606,7 @@ export function AttendancePage() {
                             Editar mi excusa
                           </button>
                         ) : (
-                          <span className="text-[11px] font-medium text-ink-muted">Edición de excusa cerrada después de 24 horas</span>
+                          <span className="text-[11px] font-medium text-ink-muted">Edición de excusa cerrada al iniciar el evento</span>
                         )
                       ) : (
                         <button

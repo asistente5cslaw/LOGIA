@@ -39,6 +39,7 @@ export function MinutesPage() {
   const [statusFilter, setStatusFilter] = useState<MinuteStatus | 'all'>('all');
   const [selectedMinute, setSelectedMinute] = useState<Minute | null>(null);
   const [pdfViewerUrl, setPdfViewerUrl] = useState<string | null>(null);
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
   const [isLoadingPdf, setIsLoadingPdf] = useState(false);
 
   // Modal para redactar/editar acta
@@ -122,10 +123,17 @@ export function MinutesPage() {
   const handleOpenDetail = (min: Minute) => {
     setSelectedMinute(min);
     setPdfViewerUrl(null);
+    setPdfBlobUrl(null);
     if (min.pdfUrl) {
       setIsLoadingPdf(true);
       void minuteService.getPdfViewerUrl(min.pdfUrl)
-        .then(setPdfViewerUrl)
+        .then(async (signedUrl) => {
+          setPdfViewerUrl(signedUrl);
+          const response = await fetch(signedUrl);
+          if (!response.ok) throw new Error('No se pudo descargar temporalmente el PDF.');
+          const blob = await response.blob();
+          setPdfBlobUrl(URL.createObjectURL(blob));
+        })
         .catch(() => toast.error('No se pudo abrir el PDF del acta.'))
         .finally(() => setIsLoadingPdf(false));
     }
@@ -135,6 +143,12 @@ export function MinutesPage() {
       });
     }
   };
+
+  useEffect(() => {
+    return () => {
+      if (pdfBlobUrl) URL.revokeObjectURL(pdfBlobUrl);
+    };
+  }, [pdfBlobUrl]);
 
   const meetingOptions: AppleSelectOption<string>[] = useMemo(() => [
     {
@@ -519,14 +533,18 @@ ${formDescription.trim()}${notes}`;
               {selectedMinute.pdfUrl && (
                 isLoadingPdf ? (
                   <p className="py-8 text-center text-ink-muted">Cargando visor del PDF…</p>
-                ) : pdfViewerUrl ? (
-                  <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 text-center">
-                    <p className="text-xs text-ink-secondary">
-                      Para evitar bloqueos y barras duplicadas en teléfonos, abre el PDF en el visor del dispositivo o descárgalo.
-                    </p>
-                    <div className="mt-3 flex flex-wrap justify-center gap-2">
+                ) : pdfBlobUrl ? (
+                  <div className="space-y-3">
+                    <div className="overflow-hidden rounded-xl border border-border bg-white">
+                      <iframe
+                        src={pdfBlobUrl}
+                        title={`Visor del acta ${selectedMinute.formatNumber}`}
+                        className="block h-[60vh] min-h-[420px] w-full border-0"
+                      />
+                    </div>
+                    <div className="flex flex-wrap justify-center gap-2">
                       <a
-                        href={pdfViewerUrl}
+                        href={pdfBlobUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex min-h-[42px] items-center gap-1.5 rounded-xl bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary-pressed transition-colors"
@@ -535,7 +553,7 @@ ${formDescription.trim()}${notes}`;
                         Abrir PDF
                       </a>
                       <a
-                        href={pdfViewerUrl}
+                        href={pdfBlobUrl}
                         download={selectedMinute.pdfFileName || `Acta_${selectedMinute.formatNumber}.pdf`}
                         className="inline-flex min-h-[42px] items-center gap-1.5 rounded-xl border border-primary/30 bg-surface px-4 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
                       >
@@ -544,6 +562,8 @@ ${formDescription.trim()}${notes}`;
                       </a>
                     </div>
                   </div>
+                ) : pdfViewerUrl ? (
+                  <p className="py-4 text-center text-destructive">No se pudo preparar el visor interno del PDF.</p>
                 ) : (
                   <p className="py-4 text-center text-destructive">No se pudo cargar el visor.</p>
                 )

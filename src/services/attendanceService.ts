@@ -147,6 +147,18 @@ export const attendanceService = {
     if (!cleanReason) throw new Error('La explicación de la excusa es obligatoria.');
     if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
 
+    const { data: event, error: eventError } = await supabase
+      .from('events')
+      .select('start_date, start_time, status')
+      .eq('id', eventId)
+      .maybeSingle();
+    if (eventError) throw eventError;
+    if (!event || event.status === 'cancelada') throw new Error('La actividad ya no está disponible para registrar excusas.');
+    const eventStart = new Date(`${event.start_date}T${event.start_time || '23:59:59'}-05:00`);
+    if (Number.isNaN(eventStart.getTime()) || Date.now() >= eventStart.getTime()) {
+      throw new Error('El plazo para presentar o editar la excusa venció al iniciar el evento.');
+    }
+
     const { data: current, error: currentError } = await supabase
       .from('attendance_responses')
       .select('submitted_at')
@@ -157,9 +169,6 @@ export const attendanceService = {
     if (currentError) throw currentError;
 
     const submittedAt = current?.submitted_at as string | null | undefined;
-    if (submittedAt && Date.now() >= new Date(submittedAt).getTime() + 24 * 60 * 60 * 1000) {
-      throw new Error('El plazo de 24 horas para editar esta excusa ya venció.');
-    }
 
     const { error } = await supabase.from('attendance_responses').upsert({
       event_id: eventId,

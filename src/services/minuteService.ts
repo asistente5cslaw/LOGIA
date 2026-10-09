@@ -182,29 +182,36 @@ export const minuteService = {
     comment: string,
     user: { id?: string; email?: string; name?: string }
   ): Promise<MinuteCorrection> {
+    if (!user.id) throw new Error('No se pudo identificar al usuario que registra la observación.');
+
     const correction: MinuteCorrection = {
-      id: `corr-${Date.now()}`,
+      id: '',
       minuteId,
-      authorId: user.id || 'hermano',
+      authorId: user.id,
       authorName: user.name || user.email || 'Hermano',
       comment,
       createdAt: new Date().toISOString(),
     };
 
     if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
-    {
-        const { error } = await supabase.from('minute_corrections').insert({
-          id: correction.id,
-          minute_id: minuteId,
-          author_id: user.id,
-          author_name: correction.authorName,
-          comment,
-        });
-        if (error) throw error;
-    }
+    const { data, error } = await supabase
+      .from('minute_corrections')
+      .insert({
+        minute_id: minuteId,
+        author_id: user.id,
+        author_name: correction.authorName,
+        comment,
+      })
+      .select('id, created_at')
+      .single();
+    if (error) throw error;
 
     await auditService.log('OBSERVACION_ACTA', 'minutes', minuteId, user, { comment });
-    return correction;
+    return {
+      ...correction,
+      id: data.id,
+      createdAt: data.created_at,
+    };
   },
 
   async markAsRead(minuteId: string, memberId: string): Promise<void> {

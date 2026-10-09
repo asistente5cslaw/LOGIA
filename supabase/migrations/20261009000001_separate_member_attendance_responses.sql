@@ -51,13 +51,58 @@ CREATE POLICY "Members submit own attendance responses"
 DROP POLICY IF EXISTS "Members update own attendance responses" ON public.attendance_responses;
 CREATE POLICY "Members update own attendance responses"
   ON public.attendance_responses FOR UPDATE TO authenticated
-  USING (public.has_verified_identity() AND public.is_member_owner(member_id))
-  WITH CHECK (public.has_verified_identity() AND public.is_member_owner(member_id));
+  USING (
+    public.has_verified_identity()
+    AND public.is_member_owner(member_id)
+    AND EXISTS (
+      SELECT 1
+      FROM public.events e
+      WHERE e.id = event_id
+        AND e.status <> 'cancelada'
+        AND (
+          e.start_date > (timezone('America/Panama', now()))::date
+          OR (
+            e.start_date = (timezone('America/Panama', now()))::date
+            AND COALESCE(e.start_time, time '23:59:59') > (timezone('America/Panama', now()))::time
+          )
+        )
+    )
+  )
+  WITH CHECK (
+    public.has_verified_identity()
+    AND public.is_member_owner(member_id)
+    AND EXISTS (
+      SELECT 1
+      FROM public.events e
+      WHERE e.id = event_id
+        AND e.status <> 'cancelada'
+        AND (
+          e.start_date > (timezone('America/Panama', now()))::date
+          OR (
+            e.start_date = (timezone('America/Panama', now()))::date
+            AND COALESCE(e.start_time, time '23:59:59') > (timezone('America/Panama', now()))::time
+          )
+        )
+    )
+  );
 
 DROP POLICY IF EXISTS "Members delete own attendance responses" ON public.attendance_responses;
 CREATE POLICY "Members delete own attendance responses"
   ON public.attendance_responses FOR DELETE TO authenticated
-  USING (public.has_verified_identity() AND public.is_member_owner(member_id));
+  USING (
+    public.has_verified_identity()
+    AND public.is_member_owner(member_id)
+    AND EXISTS (
+      SELECT 1
+      FROM public.events e
+      WHERE e.id = event_id
+        AND e.start_date >= (timezone('America/Panama', now()))::date
+        AND (
+          e.start_date > (timezone('America/Panama', now()))::date
+          OR COALESCE(e.start_time, time '23:59:59') > (timezone('America/Panama', now()))::time
+        )
+    )
+  );
 
 -- Solo VM y Secretario pueden modificar la asistencia oficial.
 DROP POLICY IF EXISTS "Verified members add own attendance" ON public.attendance;
