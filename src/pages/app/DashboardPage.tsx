@@ -3,10 +3,9 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { memberService } from '@/services/memberService';
 import { eventService } from '@/services/eventService';
-import { minuteService } from '@/services/minuteService';
 import { attendanceService } from '@/services/attendanceService';
 import { getBodyById } from '@/data/bodiesData';
-import type { LodgeEvent, EventConflict } from '@/types';
+import type { LodgeEvent, EventConflict, Member } from '@/types';
 import {
   Users,
   CalendarDays,
@@ -27,6 +26,7 @@ import {
 export function DashboardPage() {
   const { user, userRoleName } = useAuth();
   const [events, setEvents] = useState<LodgeEvent[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
   const [conflicts, setConflicts] = useState<EventConflict[]>([]);
   const [pendingExcuseEvents, setPendingExcuseEvents] = useState<LodgeEvent[]>([]);
   const [ownMemberId, setOwnMemberId] = useState<string | null>(null);
@@ -35,32 +35,23 @@ export function DashboardPage() {
   const [homeAttendanceStatus, setHomeAttendanceStatus] = useState<'presente' | 'excusa' | 'ausente' | null>(null);
   const [homeExcuseDraft, setHomeExcuseDraft] = useState('');
   const [savingHomeAttendance, setSavingHomeAttendance] = useState(false);
-  const [stats, setStats] = useState({
-    activeCount: 0,
-    upcomingTenidasCount: 0,
-    upcomingReunionsCount: 0,
-    approvedMinutesCount: 0,
-    attendanceRate: 0,
-  });
-
   const loadDashboardData = async () => {
     try {
-      const [membersResult, eventsResult, minutesResult, conflictsResult] = await Promise.allSettled([
+      const [membersResult, eventsResult, conflictsResult] = await Promise.allSettled([
         memberService.getAllMembers(true),
         eventService.getAllEvents(),
-        minuteService.getAllMinutes(),
         eventService.getUnresolvedConflicts(),
       ]);
       const memList = membersResult.status === 'fulfilled' ? membersResult.value : [];
       const evList = eventsResult.status === 'fulfilled' ? eventsResult.value : [];
-      const minList = minutesResult.status === 'fulfilled' ? minutesResult.value : [];
       const conflictList = conflictsResult.status === 'fulfilled' ? conflictsResult.value : [];
 
-      for (const result of [membersResult, eventsResult, minutesResult, conflictsResult]) {
+      for (const result of [membersResult, eventsResult, conflictsResult]) {
         if (result.status === 'rejected') console.error('Error cargando datos del dashboard:', result.reason);
       }
 
       setEvents(evList);
+      setMembers(memList);
       setConflicts(conflictList);
 
       const today = getLocalIsoDate();
@@ -94,17 +85,6 @@ export function DashboardPage() {
         setHomeAttendanceStatus(null);
       }
 
-      const dashboardStats = calculateDashboardStats(memList, evList, today);
-      const approvedMinutesCount = minList.filter(
-        (m) => m.status === 'aprobada' || m.status === 'firmada'
-      ).length;
-      const attCalc = attendanceService.calculateStatistics(evList, [], dashboardStats.activeCount);
-
-      setStats({
-        ...dashboardStats,
-        approvedMinutesCount,
-        attendanceRate: attCalc.averageAttendanceRate || 0,
-      });
     } catch (e) {
       console.error('Error cargando dashboard:', e);
     }
@@ -119,6 +99,7 @@ export function DashboardPage() {
   });
 
   const today = getLocalIsoDate();
+  const dashboardStats = calculateDashboardStats(members, events, today);
   const upcomingTenidas = events
     .filter((event) => getEventCategory(event) === 'tenida' && isUpcomingEvent(event, today))
     .sort((a, b) => `${a.startDate}T${a.startTime || ''}`.localeCompare(`${b.startDate}T${b.startTime || ''}`));
@@ -467,7 +448,7 @@ export function DashboardPage() {
               <Users className="h-4 w-4" />
             </div>
           </div>
-          <p className="mt-2 font-serif text-2xl font-bold text-ink">{stats.activeCount}</p>
+          <p className="mt-2 font-serif text-2xl font-bold text-ink">{dashboardStats.activeCount}</p>
           <span className="text-[11px] text-ink-muted mt-0.5 block">Hermanos en el taller</span>
         </Link>
 
@@ -483,7 +464,7 @@ export function DashboardPage() {
               <CalendarDays className="h-4 w-4" />
             </div>
           </div>
-          <p className="mt-2 font-serif text-2xl font-bold text-ink">{stats.upcomingTenidasCount}</p>
+          <p className="mt-2 font-serif text-2xl font-bold text-ink">{dashboardStats.upcomingTenidasCount}</p>
           <span className="text-[11px] text-ink-muted mt-0.5 block">Próximos trabajos litúrgicos</span>
         </Link>
 
@@ -499,7 +480,7 @@ export function DashboardPage() {
               <CalendarDays className="h-4 w-4" />
             </div>
           </div>
-          <p className="mt-2 font-serif text-2xl font-bold text-ink">{stats.upcomingReunionsCount}</p>
+          <p className="mt-2 font-serif text-2xl font-bold text-ink">{dashboardStats.upcomingReunionsCount}</p>
           <span className="text-[11px] text-ink-muted mt-0.5 block">Masónicas y fraternales</span>
         </Link>
 
