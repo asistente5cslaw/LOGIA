@@ -53,9 +53,13 @@ export function DashboardPage() {
       }
       const failedCount = [membersResult, eventsResult, conflictsResult]
         .filter((result) => result.status === 'rejected').length;
-      setLoadError(failedCount > 0
-        ? 'Algunos datos no pudieron actualizarse. Puedes reintentar sin perder lo que ya se cargó.'
-        : null);
+      if (failedCount === 3) {
+        setLoadError('No se pudo cargar el dashboard. Revisa tu conexión e inténtalo nuevamente.');
+      } else {
+        setLoadError(failedCount > 0
+          ? 'Algunos datos no pudieron actualizarse. Puedes reintentar sin perder lo que ya se cargó.'
+          : null);
+      }
 
       setEvents(evList);
       setMembers(memList);
@@ -72,21 +76,29 @@ export function DashboardPage() {
       )?.id;
       setOwnMemberId(ownMemberId || null);
       if (ownMemberId) {
-        if (upcomingNext?.status === 'convocada') {
-          const segmentId = upcomingNext.degreeSegments?.[0]?.id;
-          const records = segmentId
-            ? await attendanceService.getResponsesForEvent(upcomingNext.id, segmentId, { memberId: ownMemberId })
-            : [];
-          const savedStatus = records.find((record) => record.memberId === ownMemberId)?.status;
-          setHomeAttendanceStatus(savedStatus === 'confirmada' ? 'presente' : savedStatus === 'excusa' ? 'excusa' : null);
-        } else {
+        try {
+          if (upcomingNext?.status === 'convocada') {
+            const segmentId = upcomingNext.degreeSegments?.[0]?.id;
+            const records = segmentId
+              ? await attendanceService.getResponsesForEvent(upcomingNext.id, segmentId, { memberId: ownMemberId })
+              : [];
+            const savedStatus = records.find((record) => record.memberId === ownMemberId)?.status;
+            setHomeAttendanceStatus(savedStatus === 'confirmada' ? 'presente' : savedStatus === 'excusa' ? 'excusa' : null);
+          } else {
+            setHomeAttendanceStatus(null);
+          }
+          const pendingExcuses = await attendanceService.getPendingExcusesForMember(ownMemberId);
+          const pendingIds = new Set(pendingExcuses.map((item) => item.eventId));
+          setPendingExcuseEvents(evList.filter(
+            (event) => getEventCategory(event) === 'tenida' && isUpcomingEvent(event, today) && pendingIds.has(event.id)
+          ));
+        } catch (attendanceError) {
+          // La asistencia es opcional para el dashboard: no debe ocultar
+          // calendario, miembros ni actividades si su consulta falla.
+          console.error('Error cargando datos opcionales de asistencia:', attendanceError);
           setHomeAttendanceStatus(null);
+          setPendingExcuseEvents([]);
         }
-        const pendingExcuses = await attendanceService.getPendingExcusesForMember(ownMemberId);
-        const pendingIds = new Set(pendingExcuses.map((item) => item.eventId));
-        setPendingExcuseEvents(evList.filter(
-          (event) => getEventCategory(event) === 'tenida' && isUpcomingEvent(event, today) && pendingIds.has(event.id)
-        ));
       } else {
         setPendingExcuseEvents([]);
         setHomeAttendanceStatus(null);
