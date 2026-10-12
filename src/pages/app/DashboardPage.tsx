@@ -17,6 +17,12 @@ import { AppleEmoji } from '@/components/shared/AppleEmoji';
 import { formatDateTimeSpanish } from '@/lib/dateUtils';
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 import { toast } from 'sonner';
+import {
+  calculateDashboardStats,
+  getEventCategory,
+  getLocalIsoDate,
+  isUpcomingEvent,
+} from '@/domain/dashboardStats';
 
 export function DashboardPage() {
   const { user, userRoleName } = useAuth();
@@ -27,7 +33,6 @@ export function DashboardPage() {
   const [excuseDrafts, setExcuseDrafts] = useState<Record<string, string>>({});
   const [savingExcuseEventId, setSavingExcuseEventId] = useState<string | null>(null);
   const [homeAttendanceStatus, setHomeAttendanceStatus] = useState<'presente' | 'excusa' | 'ausente' | null>(null);
-  const [showHomeExcuse, setShowHomeExcuse] = useState(false);
   const [homeExcuseDraft, setHomeExcuseDraft] = useState('');
   const [savingHomeAttendance, setSavingHomeAttendance] = useState(false);
   const [stats, setStats] = useState({
@@ -40,19 +45,27 @@ export function DashboardPage() {
 
   const loadDashboardData = async () => {
     try {
-      const [memList, evList, minList, conflictList] = await Promise.all([
+      const [membersResult, eventsResult, minutesResult, conflictsResult] = await Promise.allSettled([
         memberService.getAllMembers(true),
         eventService.getAllEvents(),
         minuteService.getAllMinutes(),
         eventService.getUnresolvedConflicts(),
       ]);
+      const memList = membersResult.status === 'fulfilled' ? membersResult.value : [];
+      const evList = eventsResult.status === 'fulfilled' ? eventsResult.value : [];
+      const minList = minutesResult.status === 'fulfilled' ? minutesResult.value : [];
+      const conflictList = conflictsResult.status === 'fulfilled' ? conflictsResult.value : [];
+
+      for (const result of [membersResult, eventsResult, minutesResult, conflictsResult]) {
+        if (result.status === 'rejected') console.error('Error cargando datos del dashboard:', result.reason);
+      }
 
       setEvents(evList);
       setConflicts(conflictList);
 
-      const today = new Date().toISOString().split('T')[0];
+      const today = getLocalIsoDate();
       const upcomingNext = evList
-        .filter((event) => event.eventCategory === 'tenida' && event.status !== 'cancelada' && event.startDate >= today)
+        .filter((event) => getEventCategory(event) === 'tenida' && isUpcomingEvent(event, today))
         .sort((a, b) => `${a.startDate}T${a.startTime || ''}`.localeCompare(`${b.startDate}T${b.startTime || ''}`))
         .find((event) => event.status === 'convocada');
 
@@ -74,30 +87,21 @@ export function DashboardPage() {
         const pendingExcuses = await attendanceService.getPendingExcusesForMember(ownMemberId);
         const pendingIds = new Set(pendingExcuses.map((item) => item.eventId));
         setPendingExcuseEvents(evList.filter(
-          (event) => event.eventCategory === 'tenida' && event.status !== 'cancelada' && pendingIds.has(event.id)
+          (event) => getEventCategory(event) === 'tenida' && isUpcomingEvent(event, today) && pendingIds.has(event.id)
         ));
       } else {
         setPendingExcuseEvents([]);
         setHomeAttendanceStatus(null);
       }
 
-      const activeCount = memList.filter((m) => m.isActive).length;
-      const upcomingTenidasCount = evList.filter(
-        (e) => e.eventCategory === 'tenida' && e.status !== 'cancelada' && e.startDate >= today
-      ).length;
-      const upcomingReunionsCount = evList.filter(
-        (e) => e.eventCategory !== 'tenida'
-          && e.status !== 'cancelada' && e.startDate >= today
-      ).length;
+      const dashboardStats = calculateDashboardStats(memList, evList, today);
       const approvedMinutesCount = minList.filter(
         (m) => m.status === 'aprobada' || m.status === 'firmada'
       ).length;
+      const attCalc = attendanceService.calculateStatistics(evList, [], dashboardStats.activeCount);
 
-      const attCalc = attendanceService.calculateStatistics(evList, [], activeCount);
       setStats({
-        activeCount,
-        upcomingTenidasCount,
-        upcomingReunionsCount,
+        ...dashboardStats,
         approvedMinutesCount,
         attendanceRate: attCalc.averageAttendanceRate || 0,
       });
@@ -114,14 +118,14 @@ export function DashboardPage() {
     void loadDashboardData();
   });
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = getLocalIsoDate();
   const upcomingTenidas = events
-    .filter((event) => event.eventCategory === 'tenida' && event.status !== 'cancelada' && event.startDate >= today)
+    .filter((event) => getEventCategory(event) === 'tenida' && isUpcomingEvent(event, today))
     .sort((a, b) => `${a.startDate}T${a.startTime || ''}`.localeCompare(`${b.startDate}T${b.startTime || ''}`));
   const nextMeeting = upcomingTenidas.find((event) => event.status === 'convocada') || upcomingTenidas[0];
   const nextMeetingBody = nextMeeting ? getBodyById(nextMeeting.bodyId) : null;
   const upcomingActivities = events
-    .filter((event) => event.status !== 'cancelada' && event.startDate >= today && event.id !== nextMeeting?.id)
+    .filter((event) => isUpcomingEvent(event, today) && event.id !== nextMeeting?.id)
     .sort((a, b) => `${a.startDate}T${a.startTime || ''}`.localeCompare(`${b.startDate}T${b.startTime || ''}`))
     .slice(0, 3);
 
@@ -177,7 +181,6 @@ export function DashboardPage() {
         });
       }
       setHomeAttendanceStatus(nextStatus === 'ausente' ? null : nextStatus);
-      setShowHomeExcuse(nextStatus === 'excusa');
       toast.success(
         nextStatus === 'presente'
           ? 'Asistencia confirmada.'
@@ -202,7 +205,6 @@ export function DashboardPage() {
         id: user?.id,
         email: user?.email,
       });
-      setShowHomeExcuse(false);
       setHomeExcuseDraft('');
       toast.success('Tu explicación de la excusa fue guardada.');
       void loadDashboardData();
