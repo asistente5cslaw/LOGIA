@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { calculateDashboardStats, getEventIsoDate } from '@/domain/dashboardStats';
+import { getIsoDateInTimeZone, parseLodgeDateTime } from '@/lib/dateUtils';
 import type { LodgeEvent, Member } from '@/types';
 
 const member = (isActive: boolean): Member => ({
@@ -10,7 +11,7 @@ const member = (isActive: boolean): Member => ({
 
 const event = (overrides: Partial<LodgeEvent>): LodgeEvent => ({
   id: 'event', title: 'Actividad', bodyId: 'uf21', degreeRequired: 'maestro',
-  startDate: '2026-10-14T00:00:00+00:00', isAllDay: false, isMeeting: false,
+  startDate: '2026-10-14T00:00:00+00:00', isAllDay: false, eventCategory: 'otro',
   location: 'Templo', status: 'programada', createdBy: 'user', createdAt: '2026-01-01',
   ...overrides,
 });
@@ -30,9 +31,14 @@ describe('dashboardStats', () => {
     expect(stats).toEqual({ activeCount: 1, upcomingTenidasCount: 1, upcomingReunionsCount: 1 });
   });
 
-  it('supports ISO timestamps and legacy isMeeting category fallback', () => {
+  it('supports ISO timestamps and canonical event categories', () => {
     expect(getEventIsoDate('2026-10-14T00:00:00+00:00')).toBe('2026-10-14');
-    const stats = calculateDashboardStats([], [event({ isMeeting: true, eventCategory: undefined })], '2026-10-12');
+    const stats = calculateDashboardStats([], [event({ eventCategory: 'tenida' })], '2026-10-12');
     expect(stats.upcomingTenidasCount).toBe(1);
+  });
+
+  it('keeps calendar dates in Panama instead of shifting them to UTC', () => {
+    expect(getIsoDateInTimeZone(new Date('2026-10-13T04:30:00.000Z'))).toBe('2026-10-12');
+    expect(parseLodgeDateTime('2026-10-12', '19:00').toISOString()).toBe('2026-10-13T00:00:00.000Z');
   });
 });

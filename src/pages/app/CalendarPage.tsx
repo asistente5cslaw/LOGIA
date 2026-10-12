@@ -37,9 +37,10 @@ import { officialVisitService } from '@/services/officialVisitService';
 import { useAppleDialog } from '@/components/shared/AppleDialog';
 import { Modal } from '@/components/shared/Modal';
 import { cn } from '@/lib/utils';
-import { formatDateSpanish, formatTime12, formatTimeRange12 } from '@/lib/dateUtils';
+import { formatDateSpanish, formatTime12, formatTimeRange12, getIsoDateInTimeZone, getTodayIsoDate, normalizeDateOnly } from '@/lib/dateUtils';
 import { toast } from 'sonner';
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
+import { ErrorState } from '@/components/shared/ErrorState';
 
 const eventStatusOptions: AppleSelectOption<EventStatus>[] = [
   { value: 'programada', label: 'Programada', description: 'Actividad agendada' },
@@ -66,13 +67,13 @@ function eventKindLabel(event: Pick<LodgeEvent, 'eventCategory'>): string {
 function googleCalendarUrl(event: LodgeEvent): string {
   const normalizeDate = (value: string): string => {
     const match = String(value || '').match(/^(\d{4}-\d{2}-\d{2})/);
-    return match?.[1] || new Date().toISOString().slice(0, 10);
+    return match?.[1] || getTodayIsoDate();
   };
   const dateToGoogleDay = (value: string) => normalizeDate(value).replace(/-/g, '');
   const nextGoogleDay = (value: string) => {
-    const next = new Date(`${normalizeDate(value)}T12:00:00`);
+    const next = new Date(`${normalizeDate(value)}T12:00:00-05:00`);
     next.setDate(next.getDate() + 1);
-    return Number.isNaN(next.getTime()) ? dateToGoogleDay(value) : next.toISOString().slice(0, 10).replace(/-/g, '');
+    return Number.isNaN(next.getTime()) ? dateToGoogleDay(value) : getIsoDateInTimeZone(next).replace(/-/g, '');
   };
   const normalizeTime = (value?: string): string | null => {
     const raw = String(value || '').trim().toUpperCase();
@@ -96,7 +97,7 @@ function googleCalendarUrl(event: LodgeEvent): string {
   const dateToGoogleDateTime = (date: string, time?: string): string | null => {
     const normalizedTime = normalizeTime(time);
     if (!normalizedTime) return null;
-    const parsed = new Date(`${normalizeDate(date)}T${normalizedTime}:00`);
+    const parsed = new Date(`${normalizeDate(date)}T${normalizedTime}:00-05:00`);
     return Number.isNaN(parsed.getTime())
       ? null
       : parsed.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
@@ -132,7 +133,7 @@ export function CalendarPage() {
   const [configuredTempleAddress, setConfiguredTempleAddress] = useState('');
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [selectedDateStr, setSelectedDateStr] = useState<string>(
-    new Date().toISOString().split('T')[0]
+    getTodayIsoDate()
   );
 
 
@@ -151,6 +152,7 @@ export function CalendarPage() {
   const [notifyCancellationWhatsApp, setNotifyCancellationWhatsApp] = useState(false);
   const [notifyCancellationEmail, setNotifyCancellationEmail] = useState(false);
   const [isSendingCancellationPush, setIsSendingCancellationPush] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Modal de Convocatoria
   const [showConvocationModal, setShowConvocationModal] = useState(false);
@@ -196,9 +198,11 @@ export function CalendarPage() {
       const configuredAddress = settings.templeAddress?.trim() || '';
       const isDemoAddress = /gran templo mas[oó]nico,? calle 43 bella vista/i.test(configuredAddress);
       setConfiguredTempleAddress(isDemoAddress ? '' : configuredAddress);
+      setLoadError(null);
     } catch (e) {
       console.error(e);
       toast.error('Error al cargar calendario');
+      setLoadError('No se pudo cargar el calendario. Revisa tu conexión e inténtalo nuevamente.');
     }
   };
 
@@ -238,8 +242,10 @@ export function CalendarPage() {
   // Eventos del día seleccionado
   const selectedDayEvents = useMemo(() => {
     return filteredEvents.filter((ev) => {
-      if (ev.startDate === selectedDateStr) return true;
-      if (ev.endDate && selectedDateStr >= ev.startDate && selectedDateStr <= ev.endDate) return true;
+      const startDate = normalizeDateOnly(ev.startDate);
+      const endDate = normalizeDateOnly(ev.endDate || ev.startDate);
+      if (startDate === selectedDateStr) return true;
+      if (ev.endDate && selectedDateStr >= startDate && selectedDateStr <= endDate) return true;
       return false;
     });
   }, [filteredEvents, selectedDateStr]);
@@ -247,9 +253,9 @@ export function CalendarPage() {
   // Cuando no hay trabajos en el día seleccionado, mostrar las siguientes
   // reuniones futuras para que el panel siga siendo útil.
   const upcomingActivities = useMemo(() => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayIsoDate();
     return filteredEvents
-      .filter((ev) => ev.status !== 'cancelada' && ev.startDate >= today)
+      .filter((ev) => ev.status !== 'cancelada' && normalizeDateOnly(ev.startDate) >= today)
       .sort((a, b) => {
         const dateCompare = a.startDate.localeCompare(b.startDate);
         if (dateCompare !== 0) return dateCompare;
@@ -287,7 +293,7 @@ export function CalendarPage() {
     setFormStartTime(ev.startTime || '19:30');
     setFormEndTime(ev.endTime || '21:30');
     setFormIsAllDay(ev.isAllDay);
-    setFormEventCategory(ev.eventCategory || (ev.isMeeting ? 'tenida' : 'otro'));
+    setFormEventCategory(ev.eventCategory);
     setFormLocation(ev.location);
     setFormNotes(ev.notes || '');
     setFormStatus(ev.status);
@@ -325,7 +331,6 @@ export function CalendarPage() {
       startTime: formIsAllDay ? undefined : formStartTime,
       endTime: formIsAllDay ? undefined : formEndTime,
       isAllDay: formIsAllDay,
-      isMeeting: formEventCategory === 'tenida',
       eventCategory: formEventCategory,
       location: formLocation.trim(),
       notes: formNotes.trim(),
@@ -648,6 +653,8 @@ export function CalendarPage() {
         </div>
       </div>
 
+      {loadError && <ErrorState description={loadError} onRetry={() => void loadData()} />}
+
       {/* Contenedor Cuadrícula de Calendario y Detalle Diario */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Vista Mensual Responsive */}
@@ -701,8 +708,10 @@ export function CalendarPage() {
               const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
               const isSelected = dateStr === selectedDateStr;
               const dayEvents = filteredEvents.filter((ev) => {
-                if (ev.startDate === dateStr) return true;
-                if (ev.endDate && dateStr >= ev.startDate && dateStr <= ev.endDate) return true;
+                const startDate = normalizeDateOnly(ev.startDate);
+                const endDate = normalizeDateOnly(ev.endDate || ev.startDate);
+                if (startDate === dateStr) return true;
+                if (ev.endDate && dateStr >= startDate && dateStr <= endDate) return true;
                 return false;
               });
               const dayEventsForLabels = [...dayEvents].sort((a, b) => {
@@ -750,7 +759,7 @@ export function CalendarPage() {
                   {hasEvents && (
                     <div className="mt-1 space-y-0.5 overflow-hidden">
                       {visibleDayEvents.map((event) => {
-                        const category = event.eventCategory || (event.isMeeting ? 'tenida' : 'otro');
+                        const category = event.eventCategory;
                         const labelClass = event.status === 'cancelada'
                           ? 'border-destructive/20 bg-destructive/5 text-destructive line-through'
                           : category === 'tenida'

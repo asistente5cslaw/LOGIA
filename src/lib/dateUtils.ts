@@ -23,6 +23,35 @@ const MONTHS_SPANISH = [
   'Diciembre',
 ];
 
+export const LODGE_TIME_ZONE = 'America/Panama';
+
+/** Devuelve YYYY-MM-DD en la zona horaria operativa de la logia. */
+export function getIsoDateInTimeZone(value = new Date(), timeZone = LODGE_TIME_ZONE): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(value);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+export function getTodayIsoDate(): string {
+  return getIsoDateInTimeZone();
+}
+
+/** Normaliza columnas date y timestamps ISO al día calendario, sin conversión UTC. */
+export function normalizeDateOnly(value?: string): string {
+  return String(value || '').trim().slice(0, 10);
+}
+
+/** Interpreta una fecha y hora de la agenda como hora local de Panamá. */
+export function parseLodgeDateTime(date: string, time = '00:00:00'): Date {
+  const normalizedTime = time.length === 5 ? `${time}:00` : time;
+  return new Date(`${normalizeDateOnly(date)}T${normalizedTime}-05:00`);
+}
+
 /**
  * Formatea una fecha ISO 'YYYY-MM-DD' al formato en español:
  * Ej: "Martes, 29 de Septiembre de 2026"

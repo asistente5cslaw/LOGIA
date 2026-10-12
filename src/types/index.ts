@@ -149,8 +149,8 @@ export interface LodgeEvent {
   startTime?: string; // HH:mm
   endTime?: string; // HH:mm
   isAllDay: boolean;
-  isMeeting: boolean; // Tenida vs evento social/administrativo
-  eventCategory?: EventCategory;
+  /** Categoría canónica de la actividad; determina su comportamiento. */
+  eventCategory: EventCategory;
   location: string;
   notes?: string;
   convocationPdfUrl?: string;

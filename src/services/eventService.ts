@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import type { LodgeEvent, EventConflict, EventDegreeSegment, MasonicBodyId, InstitutionalRoleCode, MasonicDegree, EventCategory } from '@/types';
 import { auditService } from './auditService';
+import { getIsoDateInTimeZone, parseLodgeDateTime } from '@/lib/dateUtils';
 
 function roleFromLegacyDegree(degree: MasonicDegree): InstitutionalRoleCode {
   if (degree === 'companero') return 'comp';
@@ -12,17 +13,15 @@ function roleFromLegacyDegree(degree: MasonicDegree): InstitutionalRoleCode {
  * Convierte un evento en timestamps para comparar solapamiento exacto
  */
 function getEventTimeRange(event: LodgeEvent): { startMs: number; endMs: number } {
-  const startStr = `${event.startDate}T${event.isAllDay || !event.startTime ? '00:00:00' : event.startTime + ':00'}`;
-  const startMs = new Date(startStr).getTime();
+  const startMs = parseLodgeDateTime(event.startDate, event.isAllDay || !event.startTime ? '00:00:00' : event.startTime).getTime();
 
   let endMs: number;
   if (event.endDate) {
-    const endStr = `${event.endDate}T${event.isAllDay || !event.endTime ? '23:59:59' : event.endTime + ':00'}`;
-    endMs = new Date(endStr).getTime();
+    endMs = parseLodgeDateTime(event.endDate, event.isAllDay || !event.endTime ? '23:59:59' : event.endTime).getTime();
   } else if (event.isAllDay || !event.endTime) {
-    endMs = new Date(`${event.startDate}T23:59:59`).getTime();
+    endMs = parseLodgeDateTime(event.startDate, '23:59:59').getTime();
   } else {
-    endMs = new Date(`${event.startDate}T${event.endTime}:00`).getTime();
+    endMs = parseLodgeDateTime(event.startDate, event.endTime).getTime();
   }
 
   return { startMs, endMs };
@@ -86,8 +85,7 @@ export const eventService = {
             startTime: d.start_time,
             endTime: d.end_time,
             isAllDay: d.is_all_day,
-            isMeeting: d.is_meeting,
-            eventCategory: (d.event_category || (d.is_meeting ? 'tenida' : 'otro')) as EventCategory,
+            eventCategory: d.event_category as EventCategory,
             location: d.location,
             notes: d.notes,
             convocationPdfUrl: d.convocation_pdf_url,
@@ -137,14 +135,14 @@ export const eventService = {
     existingEvents: LodgeEvent[],
     maxSuggestions = 4
   ): { startDate: string; endDate?: string; label: string }[] {
-    const candidateStartDate = new Date(`${candidate.startDate}T12:00:00`);
+    const candidateStartDate = parseLodgeDateTime(candidate.startDate, '12:00:00');
     const dayOfWeek = candidateStartDate.getDay(); // 0-6
 
     // Duración en días si es multi-día
     let durationDays = 0;
     if (candidate.endDate) {
-      const startMs = new Date(candidate.startDate).getTime();
-      const endMs = new Date(candidate.endDate).getTime();
+      const startMs = parseLodgeDateTime(candidate.startDate, '12:00:00').getTime();
+      const endMs = parseLodgeDateTime(candidate.endDate, '12:00:00').getTime();
       durationDays = Math.max(0, Math.round((endMs - startMs) / (1000 * 60 * 60 * 24)));
     }
 
@@ -154,7 +152,7 @@ export const eventService = {
     // Buscar en los próximos 60 días
     for (let offset = 1; offset <= 60; offset++) {
       const probeDate = new Date(candidateStartDate);
-      probeDate.setDate(probeDate.getDate() + offset);
+      probeDate.setUTCDate(probeDate.getUTCDate() + offset);
 
       // Priorizar el mismo día de la semana
       if (probeDate.getDay() !== dayOfWeek && suggestions.length < 2) {
@@ -162,19 +160,13 @@ export const eventService = {
         continue;
       }
 
-      const y = probeDate.getFullYear();
-      const m = String(probeDate.getMonth() + 1).padStart(2, '0');
-      const d = String(probeDate.getDate()).padStart(2, '0');
-      const startStr = `${y}-${m}-${d}`;
+      const startStr = getIsoDateInTimeZone(probeDate);
 
       let endStr: string | undefined = undefined;
       if (durationDays > 0) {
         const probeEndDate = new Date(probeDate);
-        probeEndDate.setDate(probeEndDate.getDate() + durationDays);
-        const ey = probeEndDate.getFullYear();
-        const em = String(probeEndDate.getMonth() + 1).padStart(2, '0');
-        const ed = String(probeEndDate.getDate()).padStart(2, '0');
-        endStr = `${ey}-${em}-${ed}`;
+        probeEndDate.setUTCDate(probeEndDate.getUTCDate() + durationDays);
+        endStr = getIsoDateInTimeZone(probeEndDate);
       }
 
       const hypothetical: LodgeEvent = {
@@ -186,11 +178,13 @@ export const eventService = {
 
       const clashes = this.detectConflicts(hypothetical, existingEvents);
       if (clashes.length === 0) {
-        const dayName = weekdaysNames[probeDate.getDay()];
+        const [, labelMonth, labelDay] = startStr.split('-');
+        const labelYear = startStr.slice(0, 4);
+        const dayName = weekdaysNames[new Date(`${startStr}T12:00:00-05:00`).getUTCDay()];
         suggestions.push({
           startDate: startStr,
           endDate: endStr,
-          label: `${dayName} ${d}/${m}/${y}`,
+          label: `${dayName} ${labelDay}/${labelMonth}/${labelYear}`,
         });
         if (suggestions.length >= maxSuggestions) break;
       }
@@ -239,8 +233,10 @@ export const eventService = {
           start_time: fullEvent.startTime,
           end_time: fullEvent.endTime,
           is_all_day: fullEvent.isAllDay,
-          is_meeting: fullEvent.isMeeting,
-          event_category: fullEvent.eventCategory || (fullEvent.isMeeting ? 'tenida' : 'otro'),
+          // is_meeting se conserva únicamente como columna legacy sincronizada
+          // desde la categoría canónica por la migración de Supabase.
+          is_meeting: fullEvent.eventCategory === 'tenida',
+          event_category: fullEvent.eventCategory,
           location: fullEvent.location,
           notes: fullEvent.notes,
           convocation_pdf_url: fullEvent.convocationPdfUrl,

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { officialVisitService } from '@/services/officialVisitService';
 import { memberService } from '@/services/memberService';
@@ -21,10 +21,6 @@ import type {
 } from '@/types';
 import {
   Settings,
-  ShieldCheck,
-  ClipboardCheck,
-  Database,
-  KeyRound,
   FileText,
   Download,
   CheckCircle,
@@ -37,6 +33,7 @@ import {
 import { AppleSelect } from '@/components/shared/AppleSelect';
 import { AppleDatePicker } from '@/components/shared/AppleDatePicker';
 import { toast } from 'sonner';
+import { getTodayIsoDate } from '@/lib/dateUtils';
 
 function roleCategoryLabel(category: 'dignatario' | 'oficial' | 'general'): string {
   if (category === 'dignatario') return 'Dignatario';
@@ -78,7 +75,7 @@ export function SettingsPage() {
   const canConfigure = user?.profile?.roleId === 'adm';
   const canManagePush = user?.email?.trim().toLowerCase() === 'asistente4@castillosucre.com';
 
-  const loadPushSubscribers = async () => {
+  const loadPushSubscribers = useCallback(async () => {
     if (!canManagePush) return;
     setIsLoadingPushSubscribers(true);
     try {
@@ -88,7 +85,7 @@ export function SettingsPage() {
     } finally {
       setIsLoadingPushSubscribers(false);
     }
-  };
+  }, [canManagePush]);
 
   const handleSendTestPush = async (subscriber: PushSubscriber, deviceOnly = false) => {
     setSendingPushTo(deviceOnly ? subscriber.subscriptionId : subscriber.userId);
@@ -175,7 +172,7 @@ export function SettingsPage() {
 
   useEffect(() => {
     if (activeTab === 'notificaciones') void loadPushSubscribers();
-  }, [activeTab]);
+  }, [activeTab, loadPushSubscribers]);
 
   const handleToggleChecklistItem = async (item: OfficialVisitChecklistItem) => {
     if (!canConfigure) {
@@ -244,7 +241,7 @@ export function SettingsPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `Respaldo_Total_Logia_UF21_${new Date().toISOString().split('T')[0]}.json`;
+      a.download = `Respaldo_Total_Logia_UF21_${getTodayIsoDate()}.json`;
       a.click();
       URL.revokeObjectURL(url);
       toast.success('Respaldo integral JSON exportado exitosamente');
@@ -920,7 +917,7 @@ export function SettingsPage() {
                   const url = URL.createObjectURL(blob);
                   const a = document.createElement('a');
                   a.href = url;
-                  a.download = `Actas_Logia_UF21_${new Date().toISOString().split('T')[0]}.csv`;
+                  a.download = `Actas_Logia_UF21_${getTodayIsoDate()}.csv`;
                   a.click();
                   toast.success('Libro de actas exportado a CSV');
                 }}

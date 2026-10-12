@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { eventService } from '@/services/eventService';
@@ -24,6 +24,7 @@ import { AppleEmoji } from '@/components/shared/AppleEmoji';
 import { formatDateSpanish, formatTime12 } from '@/lib/dateUtils';
 import { toast } from 'sonner';
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
+import { ErrorState } from '@/components/shared/ErrorState';
 
 const visitorDegreeOptions: AppleSelectOption<MasonicDegree>[] = [
   { value: 'aprendiz', label: 'Primer Grado — Aprendiz', icon: <AppleEmoji name="ruler" size={16} /> },
@@ -50,6 +51,7 @@ export function AttendancePage() {
   const [searchMember, setSearchMember] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Modal para agregar visitante
   const [showVisitorModal, setShowVisitorModal] = useState(false);
@@ -61,14 +63,14 @@ export function AttendancePage() {
   const canManageAttendance = user?.profile?.roleId === 'vm' || user?.profile?.roleId === 'sec';
   const canViewExcuseReasons = user?.profile?.roleId === 'sec' || user?.profile?.roleId === 'vm';
 
-  const isOwnMember = (member: Member): boolean => (
+  const isOwnMember = useCallback((member: Member): boolean => (
     Boolean(user?.memberId && user.memberId === member.id) ||
     Boolean(user?.email && member.email && user.email.toLowerCase() === member.email.toLowerCase()) ||
     Boolean(
       user?.displayName &&
       `${member.firstName} ${member.lastName}`.trim().toLowerCase() === user.displayName.trim().toLowerCase()
     )
-  );
+  ), [user?.displayName, user?.email, user?.memberId]);
 
   const loadInitial = async () => {
     try {
@@ -81,12 +83,14 @@ export function AttendancePage() {
       const attendanceEvents = evList.filter((e) => e.status !== 'cancelada');
       setMeetings(attendanceEvents);
       setMembers(memList);
+      setLoadError(null);
     } catch {
       toast.error('Error al cargar datos de asistencia');
+      setLoadError('No se pudieron cargar los eventos o miembros. Revisa tu conexión e inténtalo nuevamente.');
     }
   };
 
-  const loadAttendanceForSelected = async (eventId: string, segmentId: string, currentMembers: Member[]) => {
+  const loadAttendanceForSelected = useCallback(async (eventId: string, segmentId: string, currentMembers: Member[]) => {
     if (!segmentId) return;
     try {
       const ownMember = currentMembers.find((member) => isOwnMember(member));
@@ -132,8 +136,9 @@ export function AttendancePage() {
       setVisitors(visList);
     } catch {
       console.error('Error cargando asistencia del evento');
+      setLoadError('No se pudo cargar la lista de asistencia de esta actividad. Puedes reintentar.');
     }
-  };
+  }, [canManageAttendance, canViewExcuseReasons, isOwnMember]);
 
   useEffect(() => {
     void loadInitial();
@@ -157,7 +162,7 @@ export function AttendancePage() {
     }
 
     void loadAttendanceForSelected(selectedEventId, selectedSegmentId, members);
-  }, [selectedEventId, selectedSegmentId, members, hasUnsavedChanges]);
+  }, [selectedEventId, selectedSegmentId, members, hasUnsavedChanges, loadAttendanceForSelected]);
 
   // Mantiene los contadores y estados sincronizados entre dispositivos aunque
   // el canal realtime tarde o no esté disponible en el navegador.
@@ -167,7 +172,7 @@ export function AttendancePage() {
       void loadAttendanceForSelected(selectedEventId, selectedSegmentId, members);
     }, 5000);
     return () => window.clearInterval(intervalId);
-  }, [selectedEventId, selectedSegmentId, members, hasUnsavedChanges]);
+  }, [selectedEventId, selectedSegmentId, members, hasUnsavedChanges, loadAttendanceForSelected]);
 
   const selectedEvent = useMemo(() => {
     return meetings.find((m) => m.id === selectedEventId);
@@ -393,6 +398,11 @@ export function AttendancePage() {
           </div>
         )}
       </div>
+
+      {loadError && <ErrorState description={loadError} onRetry={() => {
+        void loadInitial();
+        if (selectedEventId && selectedSegmentId) void loadAttendanceForSelected(selectedEventId, selectedSegmentId, members);
+      }} />}
 
       {/* Selector de Tenida estilo Apple */}
       {meetings.length === 0 ? (

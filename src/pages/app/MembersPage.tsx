@@ -32,6 +32,7 @@ import { AppleEmoji } from '@/components/shared/AppleEmoji';
 import { useAppleDialog } from '@/components/shared/AppleDialog';
 import { formatDateSpanish } from '@/lib/dateUtils';
 import { toast } from 'sonner';
+import { ErrorState } from '@/components/shared/ErrorState';
 import { pushNotificationService } from '@/services/pushNotificationService';
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 import { auditService } from '@/services/auditService';
@@ -75,6 +76,7 @@ export function MembersPage() {
   const [isLoadingRoleHistory, setIsLoadingRoleHistory] = useState(false);
   const [roleHistoryPage, setRoleHistoryPage] = useState(1);
   const [hasNextRoleHistory, setHasNextRoleHistory] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Formulario de Miembro
   const [formFirstName, setFormFirstName] = useState('');
@@ -103,7 +105,7 @@ export function MembersPage() {
     return true;
   };
 
-  const canAssignRole = (member: Member, roleId: InstitutionalRoleCode): boolean => {
+  const canAssignRole = (member: Member): boolean => {
     if (!canChangeMemberRole(member)) return false;
     return true;
   };
@@ -117,8 +119,10 @@ export function MembersPage() {
     try {
       const list = await memberService.getAllMembers(true, canViewDeletedMembers, canValidateIdentity);
       setMembers(list);
+      setLoadError(null);
     } catch {
       toast.error('Error al cargar miembros');
+      setLoadError('No se pudo cargar el directorio de miembros. Revisa tu conexión e inténtalo nuevamente.');
     }
   }, [canViewDeletedMembers, canValidateIdentity]);
 
@@ -142,7 +146,7 @@ export function MembersPage() {
   const handleSaveRoleOnly = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!roleModalMember) return;
-    if (!canAssignRole(roleModalMember, roleModalSelectedId)) {
+    if (!canAssignRole(roleModalMember)) {
       toast.error('No tienes autorización para cambiar el cargo de este miembro.');
       return;
     }
@@ -301,7 +305,7 @@ export function MembersPage() {
 
   const handleSaveMember = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingMember && editingMember.roleId !== formRoleId && !canAssignRole(editingMember, formRoleId)) {
+    if (editingMember && editingMember.roleId !== formRoleId && !canAssignRole(editingMember)) {
       toast.error('No tienes autorización para cambiar el cargo de este miembro.');
       return;
     }
@@ -418,6 +422,8 @@ export function MembersPage() {
           subtitle={`${members.length} hermanos registrados`}
         />
       </div>
+
+      {loadError && <ErrorState description={loadError} onRetry={() => void loadMembers()} />}
 
       {/* Barra de Búsqueda y Filtros Rápidos Estilo Apple */}
       <div className="space-y-2.5">

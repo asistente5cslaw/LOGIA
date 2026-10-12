@@ -24,8 +24,9 @@ import { AppleSelect, type AppleSelectOption } from '@/components/shared/AppleSe
 import { AppleInput, AppleTextarea } from '@/components/shared/AppleInput';
 import { AppleEmoji } from '@/components/shared/AppleEmoji';
 import { useAppleDialog } from '@/components/shared/AppleDialog';
-import { formatDateSpanish } from '@/lib/dateUtils';
+import { formatDateSpanish, getTodayIsoDate } from '@/lib/dateUtils';
 import { toast } from 'sonner';
+import { ErrorState } from '@/components/shared/ErrorState';
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 import { pushNotificationService } from '@/services/pushNotificationService';
 import { PdfPageViewer } from '@/components/shared/PdfPageViewer';
@@ -41,16 +42,17 @@ export function MinutesPage() {
   const [selectedMinute, setSelectedMinute] = useState<Minute | null>(null);
   const [pdfViewerUrl, setPdfViewerUrl] = useState<string | null>(null);
   const [isLoadingPdf, setIsLoadingPdf] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Modal para redactar/editar acta
   const [showMinuteModal, setShowMinuteModal] = useState(false);
   const [editingMinute, setEditingMinute] = useState<Minute | null>(null);
   const [formEventId, setFormEventId] = useState('');
   const [formEventTitle, setFormEventTitle] = useState('');
-  const [formYear, setFormYear] = useState(new Date().getFullYear());
+  const [formYear, setFormYear] = useState(Number(getTodayIsoDate().slice(0, 4)));
   const [formTitle, setFormTitle] = useState('');
   const [formDescription, setFormDescription] = useState('');
-  const [formMeetingDate, setFormMeetingDate] = useState(new Date().toISOString().split('T')[0]);
+  const [formMeetingDate, setFormMeetingDate] = useState(getTodayIsoDate());
   const [formDegree, setFormDegree] = useState<MasonicDegree>('aprendiz');
   const [formSegmentId, setFormSegmentId] = useState('');
   const [formStatus, setFormStatus] = useState<MinuteStatus>('borrador');
@@ -77,8 +79,10 @@ export function MinutesPage() {
       setMinutes(mList);
       setMembers(memList);
       setEvents(evList);
+      setLoadError(null);
     } catch {
       toast.error('Error al cargar actas y eventos');
+      setLoadError('No se pudieron cargar las actas. Revisa tu conexión e inténtalo nuevamente.');
     }
   };
 
@@ -185,10 +189,10 @@ export function MinutesPage() {
     setEditingMinute(null);
     setFormEventId('');
     setFormEventTitle('');
-    setFormYear(new Date().getFullYear());
+    setFormYear(Number(getTodayIsoDate().slice(0, 4)));
     setFormTitle('');
     setFormDescription('A la Gloria del Gran Arquitecto del Universo...\n\nEn el Oriente de Panamá, reunidos los hermanos en el Gran Templo Masónico...');
-    setFormMeetingDate(new Date().toISOString().split('T')[0]);
+    setFormMeetingDate(getTodayIsoDate());
     setFormDegree('aprendiz');
     setFormSegmentId('');
     setFormStatus('borrador');
@@ -379,6 +383,8 @@ ${formDescription.trim()}${notes}`;
           </button>
         )}
       </div>
+
+      {loadError && <ErrorState description={loadError} onRetry={() => void loadData()} />}
 
       {/* Búsqueda y Filtros de Estado */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">

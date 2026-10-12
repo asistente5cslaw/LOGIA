@@ -2,6 +2,7 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import type { Member, MasonicDegree, MemberStatusCondition, InstitutionalRoleCode } from '@/types';
 import { auditService } from './auditService';
 import { masonicDegreeForRole } from '@/domain/masonicDegree';
+import { getTodayIsoDate } from '@/lib/dateUtils';
 
 // Cuenta técnica de operación: conserva su acceso administrativo, pero nunca
 // se incluye en directorios, conteos, asistencia, convocatorias ni búsquedas.
@@ -154,7 +155,7 @@ export const memberService = {
     const completeMember: Member = {
       ...member,
       id: memberId,
-      joinedAt: member.initiationDate || new Date().toISOString().split('T')[0],
+      joinedAt: member.initiationDate || getTodayIsoDate(),
       createdAt: now,
       updatedAt: now,
     };
@@ -458,7 +459,7 @@ export const memberService = {
         roleId: (roleId || 'her') as InstitutionalRoleCode,
         degree: (['aprendiz', 'companero', 'maestro'].includes(degree) ? degree : 'aprendiz') as MasonicDegree,
         condition: (['activo', 'ad_vitam', 'dual', 'inactivo'].includes(condition) ? condition : 'activo') as MemberStatusCondition,
-        joinedAt: new Date().toISOString().split('T')[0],
+        joinedAt: getTodayIsoDate(),
         isActive: true,
       });
     }

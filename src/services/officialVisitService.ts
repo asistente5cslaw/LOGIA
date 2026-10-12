@@ -137,7 +137,7 @@ export const officialVisitService = {
     const activeMembersCount = activeMembers.length;
 
     // Solo tenidas celebradas o activas
-    const regularMeetingsHeld = events.filter((e) => e.isMeeting && e.status !== 'cancelada').length;
+    const regularMeetingsHeld = events.filter((e) => e.eventCategory === 'tenida' && e.status !== 'cancelada').length;
 
     // Cálculo de asistencia promedio
     let averageAttendancePercentage = 0;
@@ -145,7 +145,7 @@ export const officialVisitService = {
       let totalPresents = 0;
       let evaluatedMeetings = 0;
 
-      for (const ev of events.filter((e) => e.isMeeting && e.status !== 'cancelada')) {
+      for (const ev of events.filter((e) => e.eventCategory === 'tenida' && e.status !== 'cancelada')) {
         const records = attendanceList.filter((a) => a.eventId === ev.id);
         if (records.length > 0) {
           evaluatedMeetings++;

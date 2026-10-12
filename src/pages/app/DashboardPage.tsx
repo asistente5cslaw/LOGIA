@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { memberService } from '@/services/memberService';
@@ -16,6 +16,7 @@ import { AppleEmoji } from '@/components/shared/AppleEmoji';
 import { formatDateTimeSpanish } from '@/lib/dateUtils';
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 import { toast } from 'sonner';
+import { ErrorState } from '@/components/shared/ErrorState';
 import {
   calculateDashboardStats,
   getEventCategory,
@@ -35,7 +36,8 @@ export function DashboardPage() {
   const [homeAttendanceStatus, setHomeAttendanceStatus] = useState<'presente' | 'excusa' | 'ausente' | null>(null);
   const [homeExcuseDraft, setHomeExcuseDraft] = useState('');
   const [savingHomeAttendance, setSavingHomeAttendance] = useState(false);
-  const loadDashboardData = async () => {
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const loadDashboardData = useCallback(async () => {
     try {
       const [membersResult, eventsResult, conflictsResult] = await Promise.allSettled([
         memberService.getAllMembers(true),
@@ -49,6 +51,11 @@ export function DashboardPage() {
       for (const result of [membersResult, eventsResult, conflictsResult]) {
         if (result.status === 'rejected') console.error('Error cargando datos del dashboard:', result.reason);
       }
+      const failedCount = [membersResult, eventsResult, conflictsResult]
+        .filter((result) => result.status === 'rejected').length;
+      setLoadError(failedCount > 0
+        ? 'Algunos datos no pudieron actualizarse. Puedes reintentar sin perder lo que ya se cargó.'
+        : null);
 
       setEvents(evList);
       setMembers(memList);
@@ -87,12 +94,13 @@ export function DashboardPage() {
 
     } catch (e) {
       console.error('Error cargando dashboard:', e);
+      setLoadError('No se pudo cargar el dashboard. Revisa tu conexión e inténtalo nuevamente.');
     }
-  };
+  }, [user?.email, user?.memberId]);
 
   useEffect(() => {
     void loadDashboardData();
-  }, []);
+  }, [loadDashboardData]);
 
   useRealtimeRefresh(() => {
     void loadDashboardData();
@@ -211,6 +219,8 @@ export function DashboardPage() {
           </p>
         </div>
       </div>
+
+      {loadError && <ErrorState description={loadError} onRetry={() => void loadDashboardData()} />}
 
       {/* Alerta de Conflictos de Horario si existen */}
       {conflicts.length > 0 && (

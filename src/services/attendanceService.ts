@@ -293,7 +293,7 @@ export const attendanceService = {
     averagePresentCount: number;
   } {
     // REGLA: Excluir eventos que no sean tenidas rituales o que estén cancelados
-    const meetings = events.filter((e) => e.isMeeting && e.status !== 'cancelada');
+    const meetings = events.filter((e) => e.eventCategory === 'tenida' && e.status !== 'cancelada');
 
     if (meetings.length === 0 || activeMembersCount === 0) {
       return { totalMeetings: 0, averageAttendanceRate: 0, averagePresentCount: 0 };
