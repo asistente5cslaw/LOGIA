@@ -28,6 +28,7 @@ import { formatDateSpanish } from '@/lib/dateUtils';
 import { toast } from 'sonner';
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 import { pushNotificationService } from '@/services/pushNotificationService';
+import { PdfPageViewer } from '@/components/shared/PdfPageViewer';
 
 export function MinutesPage() {
   const { user, hasPermission } = useAuth();
@@ -528,10 +529,9 @@ ${formDescription.trim()}${notes}`;
                 ) : pdfViewerUrl ? (
                   <div className="space-y-3">
                     <div className="min-w-0 max-w-full overflow-hidden rounded-xl border border-border bg-white">
-                      <iframe
-                        src={pdfViewerUrl}
+                      <PdfPageViewer
+                        url={pdfViewerUrl}
                         title={`Visor del acta ${selectedMinute.formatNumber}`}
-                        className="block h-[60vh] min-h-[420px] w-full border-0"
                       />
                     </div>
                     <div className="flex flex-wrap justify-center gap-2">
