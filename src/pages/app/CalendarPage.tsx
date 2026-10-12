@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { eventService } from '@/services/eventService';
 import { memberService } from '@/services/memberService';
@@ -127,7 +126,6 @@ function googleCalendarUrl(event: LodgeEvent): string {
 
 export function CalendarPage() {
   const { user, hasPermission } = useAuth();
-  const [searchParams] = useSearchParams();
   const { showConfirm } = useAppleDialog();
   const [events, setEvents] = useState<LodgeEvent[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
@@ -212,11 +210,9 @@ export function CalendarPage() {
     void loadData();
   });
 
-  // Filtrado de eventos
-  const filteredEvents = useMemo(() => {
-    if (searchParams.get('tipo') !== 'reuniones') return events;
-    return events.filter((event) => event.eventCategory !== 'tenida');
-  }, [events, searchParams]);
+  // El calendario siempre muestra todas las actividades. Los accesos desde
+  // las tarjetas del inicio son atajos de navegación, no filtros de datos.
+  const filteredEvents = events;
 
   // Navegación mensual
   const nextMonth = () => {
@@ -867,7 +863,7 @@ export function CalendarPage() {
                 </p>
               </div>
               <span className="rounded-full bg-surface-container px-2.5 py-0.5 text-xs font-semibold text-primary">
-                {selectedDayEvents.length} actividad(es)
+                {selectedDayEvents.length > 0 ? selectedDayEvents.length : upcomingActivities.length} actividad(es)
               </span>
             </div>
 

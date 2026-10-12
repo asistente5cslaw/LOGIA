@@ -470,7 +470,7 @@ export function DashboardPage() {
 
         {/* Reuniones Programadas */}
         <Link
-          to="/app/calendario?tipo=reuniones"
+          to="/app/calendario"
           aria-label="Ver calendario de reuniones"
           className="group rounded-2xl border border-border/80 bg-white p-4 sm:p-5 shadow-2xs transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary/40"
         >
