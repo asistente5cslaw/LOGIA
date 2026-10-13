@@ -499,7 +499,9 @@ export function AttendancePage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <PageHeader
           title="Control de Asistencia"
-          subtitle="Toma y registro de hermanos activos y visitantes del orbe"
+          subtitle={canManageAttendance
+            ? 'Toma y registro de hermanos activos y visitantes del orbe'
+            : 'Confirma tu asistencia o presenta una excusa. La asistencia oficial la registra Secretaría.'}
         />
 
         {canManageAttendance && selectedEventId && (
@@ -600,12 +602,6 @@ export function AttendancePage() {
 
       {!canManageAttendance && (
         <section className="space-y-3">
-          <div>
-            <h2 className="font-serif text-lg font-bold text-ink">Mis reuniones</h2>
-            <p className="text-xs text-ink-muted">
-              Confirma tu asistencia o presenta una excusa. La asistencia oficial la registra Secretaría.
-            </p>
-          </div>
           {memberMeetingCards.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-border bg-white p-8 text-center text-sm text-ink-muted">
               No hay reuniones próximas disponibles para responder.
