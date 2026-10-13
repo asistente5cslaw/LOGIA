@@ -11,6 +11,7 @@ import {
   Search,
   Eye,
   MessageSquare,
+  Pencil,
   Paperclip,
   Trash2,
   CalendarDays,
@@ -62,6 +63,8 @@ export function MinutesPage() {
 
   // Correcciones
   const [newComment, setNewComment] = useState('');
+  const [editingCorrectionId, setEditingCorrectionId] = useState<string | null>(null);
+  const [editingCorrectionText, setEditingCorrectionText] = useState('');
 
   const canManageMinutes = hasPermission('manage_minutes');
   const canApproveMinutes = hasPermission('approve');
@@ -293,6 +296,50 @@ export function MinutesPage() {
       loadData();
     } catch {
       toast.error('Error al agregar observación');
+    }
+  };
+
+  const handleUpdateCorrection = async (correctionId: string) => {
+    if (!selectedMinute || !editingCorrectionText.trim()) return;
+    try {
+      await minuteService.updateCorrection(correctionId, editingCorrectionText);
+      setSelectedMinute({
+        ...selectedMinute,
+        corrections: (selectedMinute.corrections || []).map((correction) => (
+          correction.id === correctionId
+            ? { ...correction, comment: editingCorrectionText.trim(), editedAt: new Date().toISOString() }
+            : correction
+        )),
+      });
+      setEditingCorrectionId(null);
+      setEditingCorrectionText('');
+      toast.success('Comentario actualizado.');
+    } catch {
+      toast.error('No se pudo actualizar el comentario.');
+    }
+  };
+
+  const handleDeleteCorrection = async (correctionId: string) => {
+    if (!selectedMinute) return;
+    const confirmed = await showConfirm({
+      title: 'Eliminar comentario',
+      message: '¿Deseas eliminar tu comentario? Esta acción no se puede deshacer.',
+      type: 'warning',
+      confirmText: 'Eliminar',
+      cancelText: 'Cancelar',
+    });
+    if (!confirmed) return;
+    try {
+      await minuteService.deleteCorrection(correctionId);
+      setSelectedMinute({
+        ...selectedMinute,
+        corrections: (selectedMinute.corrections || []).map((correction) => (
+          correction.id === correctionId ? { ...correction, deletedAt: new Date().toISOString() } : correction
+        )),
+      });
+      toast.success('Comentario eliminado.');
+    } catch {
+      toast.error('No se pudo eliminar el comentario.');
     }
   };
 
@@ -594,12 +641,83 @@ ${formDescription.trim()}${notes}`;
                 {(!selectedMinute.corrections || selectedMinute.corrections.length === 0) ? (
                   <p className="text-[11px] text-ink-muted italic">Sin observaciones registradas.</p>
                 ) : (
-                  selectedMinute.corrections.map((corr) => (
+                  selectedMinute.corrections
+                    .filter((corr) => canManageMinutes || !corr.deletedAt)
+                    .map((corr) => (
                     <div key={corr.id} className="rounded bg-surface-container p-2 text-xs">
-                      <span className="font-semibold text-ink">{corr.authorName}: </span>
-                      <span className="text-ink-secondary">{corr.comment}</span>
+                      {editingCorrectionId === corr.id && !corr.deletedAt ? (
+                        <div className="space-y-2">
+                          <textarea
+                            value={editingCorrectionText}
+                            onChange={(event) => setEditingCorrectionText(event.target.value)}
+                            rows={3}
+                            className="w-full resize-y rounded-lg border border-border bg-surface px-2.5 py-2 text-xs text-ink outline-none focus:border-primary"
+                          />
+                          <div className="flex justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingCorrectionId(null);
+                                setEditingCorrectionText('');
+                              }}
+                              className="rounded-lg border border-border px-2.5 py-1 text-[11px] font-semibold text-ink-secondary"
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handleUpdateCorrection(corr.id)}
+                              disabled={!editingCorrectionText.trim()}
+                              className="rounded-lg bg-primary px-2.5 py-1 text-[11px] font-semibold text-primary-foreground disabled:opacity-50"
+                            >
+                              Guardar
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <span className="font-semibold text-ink">{corr.authorName}: </span>
+                            <span className="text-ink-secondary">{corr.comment}</span>
+                          </div>
+                          {corr.deletedAt ? (
+                            <span className="rounded bg-destructive/10 px-2 py-1 text-[10px] font-semibold text-destructive">Comentario eliminado</span>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              {corr.editedAt && (
+                                <span className="rounded bg-amber-500/10 px-2 py-1 text-[10px] font-semibold text-amber-700">Editado</span>
+                              )}
+                              {user?.id === corr.authorId && (
+                            <div className="flex shrink-0 items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingCorrectionId(corr.id);
+                                  setEditingCorrectionText(corr.comment);
+                                }}
+                                className="rounded p-1 text-ink-muted hover:bg-surface hover:text-primary"
+                                title="Editar mi comentario"
+                                aria-label="Editar mi comentario"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void handleDeleteCorrection(corr.id)}
+                                className="rounded p-1 text-ink-muted hover:bg-destructive/10 hover:text-destructive"
+                                title="Eliminar mi comentario"
+                                aria-label="Eliminar mi comentario"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  ))
+                    ))
                 )}
               </div>
 

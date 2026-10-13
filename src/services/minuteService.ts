@@ -43,13 +43,15 @@ export const minuteService = {
             pdfUrl: d.pdf_url,
             pdfFileName: d.pdf_file_name,
             pdfFileSize: d.pdf_file_size,
-            corrections: d.minute_corrections?.map((c: { id: string; minute_id: string; author_id: string; author_name: string; comment: string; created_at: string }) => ({
+            corrections: d.minute_corrections?.map((c: { id: string; minute_id: string; author_id: string; author_name: string; comment: string; created_at: string; edited_at?: string | null; deleted_at?: string | null }) => ({
               id: c.id,
               minuteId: c.minute_id,
               authorId: c.author_id,
               authorName: c.author_name,
               comment: c.comment,
               createdAt: c.created_at,
+              editedAt: c.edited_at || undefined,
+              deletedAt: c.deleted_at || undefined,
             })),
             readBy: [],
             createdBy: d.created_by,
@@ -207,6 +209,28 @@ export const minuteService = {
       id: data.id,
       createdAt: data.created_at,
     };
+  },
+
+  async updateCorrection(
+    correctionId: string,
+    comment: string,
+  ): Promise<void> {
+    if (!comment.trim()) throw new Error('El comentario no puede estar vacío.');
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    const { error } = await supabase
+      .from('minute_corrections')
+      .update({ comment: comment.trim(), edited_at: new Date().toISOString() })
+      .eq('id', correctionId);
+    if (error) throw error;
+  },
+
+  async deleteCorrection(correctionId: string): Promise<void> {
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    const { error } = await supabase
+      .from('minute_corrections')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', correctionId);
+    if (error) throw error;
   },
 
   async markAsRead(minuteId: string, memberId: string): Promise<void> {

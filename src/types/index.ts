@@ -188,6 +188,8 @@ export interface MinuteCorrection {
   authorName: string;
   comment: string;
   createdAt: string;
+  editedAt?: string;
+  deletedAt?: string;
 }
 
 export interface Minute {
