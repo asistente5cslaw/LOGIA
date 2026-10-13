@@ -790,21 +790,21 @@ ${formDescription.trim()}${notes}`;
                       </button>
                     )}
                     {canApproveMinutes && (
-                      <label className="flex items-center gap-2 rounded-xl border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-ink">
-                        <span>Estado:</span>
-                        <select
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-ink-secondary">Estado:</span>
+                        <AppleSelect<MinuteStatus>
                           value={selectedMinute.status}
-                          onChange={(event) => void handleStatusChange(selectedMinute, event.target.value as MinuteStatus)}
-                          className="bg-transparent text-xs font-semibold outline-none cursor-pointer"
-                          aria-label="Cambiar estado del acta"
-                        >
-                          <option value="borrador">Borrador</option>
-                          <option value="circulada">Circulada</option>
-                          <option value="aprobada">Aprobada</option>
-                          <option value="firmada">Firmada</option>
-                          <option value="archivada">Archivada</option>
-                        </select>
-                      </label>
+                          onChange={(status) => void handleStatusChange(selectedMinute, status)}
+                          options={[
+                            { value: 'borrador', label: 'Borrador' },
+                            { value: 'circulada', label: 'Circulada' },
+                            { value: 'aprobada', label: 'Aprobada' },
+                            { value: 'firmada', label: 'Firmada' },
+                            { value: 'archivada', label: 'Archivada' },
+                          ]}
+                          className="w-40"
+                        />
+                      </div>
                     )}
                     {canApproveMinutes && (
                       <>
