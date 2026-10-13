@@ -102,7 +102,7 @@ export function AppleDialogProvider({ children }: { children: ReactNode }) {
 
       {/* Modal Cuadro de Notificación estilo Apple / macOS */}
       {dialog?.isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
           {/* Fondo oscuro con difuminado suave */}
           <div
             className="fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity animate-in fade-in duration-150"

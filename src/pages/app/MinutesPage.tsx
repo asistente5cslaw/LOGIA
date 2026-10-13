@@ -684,7 +684,7 @@ ${formDescription.trim()}${notes}`;
                             <span className="rounded bg-destructive/10 px-2 py-1 text-[10px] font-semibold text-destructive">Comentario eliminado</span>
                           ) : (
                             <div className="flex items-center gap-2">
-                              {corr.editedAt && (
+                              {canManageMinutes && corr.editedAt && (
                                 <span className="rounded bg-amber-500/10 px-2 py-1 text-[10px] font-semibold text-amber-700">Editado</span>
                               )}
                               {user?.id === corr.authorId && (
