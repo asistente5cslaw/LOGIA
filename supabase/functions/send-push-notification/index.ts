@@ -109,7 +109,18 @@ Deno.serve(async (request) => {
       const { data: recipients, error: recipientsError } = await admin
         .from('profiles')
         .select('id')
-        .in('role_id', ['sec', 'adm'])
+        .in('role_id', ['sec', 'adm', 'vm'])
+        .or('access_disabled.eq.false,access_disabled.is.null');
+      if (recipientsError) throw recipientsError;
+      const recipientIds = (recipients || []).map((recipient) => recipient.id);
+      if (recipientIds.length === 0) return response({ sent: 0, removed: 0 });
+      notificationRecipientIds = recipientIds;
+      subscriptionsQuery = subscriptionsQuery.in('user_id', recipientIds);
+    } else if (isIdentityResubmission) {
+      const { data: recipients, error: recipientsError } = await admin
+        .from('profiles')
+        .select('id')
+        .in('role_id', ['sec', 'adm', 'vm'])
         .or('access_disabled.eq.false,access_disabled.is.null');
       if (recipientsError) throw recipientsError;
       const recipientIds = (recipients || []).map((recipient) => recipient.id);
@@ -143,10 +154,21 @@ Deno.serve(async (request) => {
     } else {
       const { data: recipients, error: recipientsError } = await admin
         .from('profiles')
-        .select('id')
+        .select('id, member_id, identity_verified')
+        .eq('identity_verified', true)
         .or('access_disabled.eq.false,access_disabled.is.null');
       if (recipientsError) throw recipientsError;
-      notificationRecipientIds = (recipients || []).map((recipient) => recipient.id);
+      const memberIds = (recipients || []).map((recipient) => recipient.member_id).filter(Boolean);
+      const { data: members, error: membersError } = memberIds.length > 0
+        ? await admin.from('members').select('id, is_active, deleted_at').in('id', memberIds)
+        : { data: [], error: null };
+      if (membersError) throw membersError;
+      const activeMemberIds = new Set((members || [])
+        .filter((member) => member.is_active && !member.deleted_at)
+        .map((member) => member.id));
+      notificationRecipientIds = (recipients || [])
+        .filter((recipient) => !recipient.member_id || activeMemberIds.has(recipient.member_id))
+        .map((recipient) => recipient.id);
     }
 
     if (notificationRecipientIds.length > 0) {

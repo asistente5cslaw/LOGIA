@@ -22,6 +22,7 @@ import { AppleSelect, type AppleSelectOption } from '@/components/shared/AppleSe
 import { AppleInput } from '@/components/shared/AppleInput';
 import { AppleEmoji } from '@/components/shared/AppleEmoji';
 import { formatDateSpanish, formatTime12 } from '@/lib/dateUtils';
+import { getLocalIsoDate } from '@/domain/dashboardStats';
 import { toast } from 'sonner';
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 import { ErrorState } from '@/components/shared/ErrorState';
@@ -60,7 +61,10 @@ export function AttendancePage() {
   const [visDegree, setVisDegree] = useState<MasonicDegree>('maestro');
   const [visNotes, setVisNotes] = useState('');
 
-  const canManageAttendance = user?.profile?.roleId === 'vm' || user?.profile?.roleId === 'sec';
+  const canManageAttendance = user?.profile?.roleId === 'vm'
+    || user?.profile?.roleId === 'sec'
+    || user?.profile?.technicalRole === 'admin'
+    || user?.profile?.technicalRole === 'secretary';
   const canViewExcuseReasons = user?.profile?.roleId === 'sec' || user?.profile?.roleId === 'vm';
 
   const isOwnMember = useCallback((member: Member): boolean => (
@@ -94,7 +98,7 @@ export function AttendancePage() {
     if (!segmentId) return;
     try {
       const ownMember = currentMembers.find((member) => isOwnMember(member));
-      const [records, responses, visList] = await Promise.all([
+      const [recordsResult, responsesResult, visitorsResult] = await Promise.allSettled([
         attendanceService.getAttendanceForEvent(eventId, segmentId, {
           canViewExcuseReasons,
           memberId: ownMember?.id,
@@ -105,6 +109,18 @@ export function AttendancePage() {
         }),
         attendanceService.getVisitorsForEvent(eventId),
       ]);
+      if (recordsResult.status === 'rejected') {
+        throw recordsResult.reason;
+      }
+      const records = recordsResult.value;
+      const responses = responsesResult.status === 'fulfilled' ? responsesResult.value : [];
+      const visList = visitorsResult.status === 'fulfilled' ? visitorsResult.value : [];
+      if (responsesResult.status === 'rejected') {
+        console.warn('No se pudieron cargar las respuestas personales de asistencia:', responsesResult.reason);
+      }
+      if (visitorsResult.status === 'rejected') {
+        console.warn('No se pudieron cargar los visitantes de la actividad:', visitorsResult.reason);
+      }
       const map: Record<string, AttendanceStatus> = {};
       const reasons: Record<string, string> = {};
       const submitted: Record<string, string> = {};
@@ -177,6 +193,16 @@ export function AttendancePage() {
   const selectedEvent = useMemo(() => {
     return meetings.find((m) => m.id === selectedEventId);
   }, [meetings, selectedEventId]);
+
+  const memberMeetingCards = useMemo(() => {
+    const today = getLocalIsoDate();
+    return meetings
+      .filter((event) => (
+        (event.status === 'programada' || event.status === 'convocada')
+        && event.startDate >= today
+      ))
+      .sort((a, b) => `${a.startDate}T${a.startTime || ''}`.localeCompare(`${b.startDate}T${b.startTime || ''}`));
+  }, [meetings]);
 
   const filteredMembers = useMemo(() => {
     if (!searchMember.trim()) return members;
@@ -255,10 +281,43 @@ export function AttendancePage() {
           delete next[memberId];
           return next;
         });
-        toast.success('Asistencia confirmada.');
+        toast.success('Aviso de asistencia enviado. Secretaría registrará la asistencia oficial.');
       } else {
         setEditingExcuseMemberId(memberId);
         setExcuseDraft(memberResponseReasons[memberId] || '');
+      }
+    } catch {
+      toast.error('No se pudo guardar tu respuesta.');
+    }
+  };
+
+  const handleMemberMeetingResponse = async (event: LodgeEvent, status: 'presente' | 'excusa') => {
+    const member = members.find((candidate) => isOwnMember(candidate));
+    const segmentId = event.degreeSegments?.[0]?.id;
+    if (!member || !segmentId) {
+      toast.error('La reunión todavía no tiene un tramo de grado configurado.');
+      return;
+    }
+
+    setSelectedEventId(event.id);
+    setSelectedSegmentId(segmentId);
+    try {
+      if (status === 'presente') {
+        await attendanceService.saveMemberConfirmation(event.id, segmentId, member.id, {
+          id: user?.id,
+          email: user?.email,
+        });
+        setMemberResponses((prev) => ({ ...prev, [member.id]: 'confirmada' }));
+        toast.success('Aviso de asistencia enviado. Secretaría registrará la asistencia oficial.');
+      } else {
+        await attendanceService.saveMemberExcusePending(event.id, segmentId, member.id, {
+          id: user?.id,
+          email: user?.email,
+        });
+        setMemberResponses((prev) => ({ ...prev, [member.id]: 'excusa' }));
+        setMemberResponseSubmittedAt((prev) => ({ ...prev, [member.id]: new Date().toISOString() }));
+        setEditingExcuseMemberId(member.id);
+        setExcuseDraft('');
       }
     } catch {
       toast.error('No se pudo guardar tu respuesta.');
@@ -405,7 +464,7 @@ export function AttendancePage() {
       }} />}
 
       {/* Selector de Tenida estilo Apple */}
-      {meetings.length === 0 ? (
+      {canManageAttendance && (meetings.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-white p-6 sm:p-8 text-center space-y-3 shadow-xs">
           <div className="flex justify-center">
             <AppleEmoji name="temple" size={32} />
@@ -472,10 +531,72 @@ export function AttendancePage() {
             </div>
           )}
         </div>
+      ))}
+
+      {!canManageAttendance && (
+        <section className="space-y-3">
+          <div>
+            <h2 className="font-serif text-lg font-bold text-ink">Mis reuniones</h2>
+            <p className="text-xs text-ink-muted">
+              Confirma tu asistencia o presenta una excusa. La asistencia oficial la registra Secretaría.
+            </p>
+          </div>
+          {memberMeetingCards.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border bg-white p-8 text-center text-sm text-ink-muted">
+              No hay reuniones próximas disponibles para responder.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {memberMeetingCards.map((event) => {
+                const ownMember = members.find((member) => isOwnMember(member));
+                const response = ownMember ? memberResponses[ownMember.id] : undefined;
+                const body = getBodyById(event.bodyId);
+                return (
+                  <article key={event.id} className="rounded-2xl border border-border bg-white p-4 shadow-card">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3">
+                        <AppleEmoji name={body.appleEmoji} size={24} />
+                        <div>
+                          <h3 className="font-serif text-base font-bold text-ink">{event.title}</h3>
+                          <p className="mt-1 text-xs text-ink-secondary">
+                            {formatDateSpanish(event.startDate)}{event.startTime ? ` · ${formatTime12(event.startTime)}` : ''}
+                          </p>
+                          <p className="text-xs text-ink-muted">{event.location}</p>
+                        </div>
+                      </div>
+                      <span className="rounded-full bg-primary/10 px-2 py-1 text-[10px] font-semibold uppercase text-primary">
+                        {event.status === 'convocada' ? 'Convocada' : 'Programada'}
+                      </span>
+                    </div>
+                    <p className="mt-3 text-[11px] text-ink-muted">
+                      {response === 'confirmada' ? 'Has indicado que asistirás.' : response === 'excusa' ? 'Has presentado una excusa.' : 'Aún no has respondido.'}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void handleMemberMeetingResponse(event, 'presente')}
+                        className={`min-h-[36px] rounded-lg px-3 text-xs font-semibold ${response === 'confirmada' ? 'bg-success text-white' : 'border border-success/30 text-success hover:bg-success/10'}`}
+                      >
+                        {response === 'confirmada' ? 'Asistiré' : 'Confirmar asistencia'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleMemberMeetingResponse(event, 'excusa')}
+                        className={`min-h-[36px] rounded-lg px-3 text-xs font-semibold ${response === 'excusa' ? 'bg-amber-600 text-white' : 'border border-amber-300 text-amber-700 hover:bg-amber-50'}`}
+                      >
+                        {response === 'excusa' ? 'Excusa presentada' : 'Presentar excusa'}
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </section>
       )}
 
       {/* Mensaje guiado cuando aún no se ha seleccionado ninguna tenida */}
-      {meetings.length > 0 && !selectedEventId && (
+      {canManageAttendance && meetings.length > 0 && !selectedEventId && (
         <div className="rounded-2xl border border-dashed border-border bg-white p-8 sm:p-12 text-center space-y-3 shadow-xs">
           <div className="flex justify-center">
             <AppleEmoji name="temple" size={38} />
@@ -492,7 +613,7 @@ export function AttendancePage() {
       )}
 
       {/* Contenido de asistencia: Solo cuando hay una tenida seleccionada */}
-      {selectedEventId && (
+      {canManageAttendance && selectedEventId && (
         <>
 
       {/* Indicadores de Resumen */}
@@ -522,6 +643,11 @@ export function AttendancePage() {
             <h3 className="font-serif text-base font-bold text-ink flex items-center gap-2">
               <Users className="h-4 w-4 text-primary" /> Miembros del Taller
             </h3>
+            <p className="mt-1 text-[11px] text-ink-muted">
+              {canManageAttendance
+                ? 'Esta lista es el registro oficial. Secretaría, el Venerable Maestro o el Administrador autorizado seleccionan quién asistió.'
+                : 'Puedes enviar tu confirmación o presentar una excusa. Esta respuesta no modifica el registro oficial de asistencia.'}
+            </p>
             <div className="relative w-48 sm:w-64">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-ink-muted" />
               <input

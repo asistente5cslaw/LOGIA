@@ -3,6 +3,15 @@ import type { Minute, MinuteCorrection, MasonicDegree } from '@/types';
 import { auditService } from './auditService';
 
 export const minuteService = {
+  async updateMinuteStatus(id: string, status: Minute['status']): Promise<void> {
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    const { error } = await supabase.rpc('update_minute_status', {
+      target_minute_id: id,
+      new_status: status,
+    });
+    if (error) throw error;
+  },
+
   async getAllMinutes(): Promise<Minute[]> {
     if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
     {
@@ -53,18 +62,6 @@ export const minuteService = {
   },
 
   /**
-   * Genera el siguiente número consecutivo para un año específico
-   */
-  async getNextConsecutiveNumber(year: number): Promise<{ number: number; formatNumber: string }> {
-    const minutes = await this.getAllMinutes();
-    const forYear = minutes.filter((m) => m.year === year);
-    const maxNum = forYear.reduce((acc, m) => Math.max(acc, m.number), 0);
-    const nextNum = maxNum + 1;
-    const formatNumber = `${String(nextNum).padStart(2, '0')}-${year}`;
-    return { number: nextNum, formatNumber };
-  },
-
-  /**
    * Verifica si un miembro tiene permiso de lectura sobre un acta
    */
   canMemberAccessMinute(
@@ -112,13 +109,11 @@ export const minuteService = {
   ): Promise<Minute> {
     const isNew = !minute.id;
     const now = new Date().toISOString();
-    let num = minute.number;
-    let fmt = minute.formatNumber;
+    const num = minute.number;
+    const fmt = minute.formatNumber;
 
-    if (isNew || !num || !fmt) {
-      const generated = await this.getNextConsecutiveNumber(minute.year);
-      num = generated.number;
-      fmt = generated.formatNumber;
+    if (typeof num !== 'number' || !Number.isInteger(num) || num < 1 || !fmt?.trim()) {
+      throw new Error('El número de acta debe ser colocado por Secretaría.');
     }
 
     const fullMinute: Minute = {

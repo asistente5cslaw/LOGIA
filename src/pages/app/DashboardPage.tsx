@@ -69,7 +69,7 @@ export function DashboardPage() {
       const upcomingNext = evList
         .filter((event) => getEventCategory(event) === 'tenida' && isUpcomingEvent(event, today))
         .sort((a, b) => `${a.startDate}T${a.startTime || ''}`.localeCompare(`${b.startDate}T${b.startTime || ''}`))
-        .find((event) => event.status === 'convocada');
+        .find((event) => event.status === 'programada' || event.status === 'convocada');
 
       const ownMemberId = user?.memberId || memList.find(
         (member) => member.email.toLowerCase() === user?.email?.toLowerCase()
@@ -77,7 +77,7 @@ export function DashboardPage() {
       setOwnMemberId(ownMemberId || null);
       if (ownMemberId) {
         try {
-          if (upcomingNext?.status === 'convocada') {
+          if (upcomingNext && (upcomingNext.status === 'programada' || upcomingNext.status === 'convocada')) {
             const segmentId = upcomingNext.degreeSegments?.[0]?.id;
             const records = segmentId
               ? await attendanceService.getResponsesForEvent(upcomingNext.id, segmentId, { memberId: ownMemberId })
@@ -157,7 +157,11 @@ export function DashboardPage() {
   };
 
   const handleHomeAttendance = async (status: 'presente' | 'excusa') => {
-    if (!ownMemberId || !nextMeeting || nextMeeting.status !== 'convocada') return;
+    if (
+      !ownMemberId
+      || !nextMeeting
+      || (nextMeeting.status !== 'programada' && nextMeeting.status !== 'convocada')
+    ) return;
     const nextStatus = homeAttendanceStatus === status ? 'ausente' : status;
     setSavingHomeAttendance(true);
     try {
@@ -184,7 +188,7 @@ export function DashboardPage() {
       setHomeAttendanceStatus(nextStatus === 'ausente' ? null : nextStatus);
       toast.success(
         nextStatus === 'presente'
-          ? 'Asistencia confirmada.'
+          ? 'Aviso de asistencia enviado. Secretaría registrará la asistencia oficial.'
           : nextStatus === 'excusa'
           ? 'Excusa registrada. Puedes explicar el motivo abajo.'
           : 'Respuesta retirada. Quedaste pendiente de responder.'
@@ -331,9 +335,12 @@ export function DashboardPage() {
                 </div>
               </div>
 
-              {nextMeeting.status === 'convocada' && ownMemberId && (
+              {(nextMeeting.status === 'programada' || nextMeeting.status === 'convocada') && ownMemberId && (
                 <div className="mt-3 rounded-xl border border-primary/15 bg-primary/5 p-3">
-                  <p className="text-xs font-semibold text-ink">¿Confirmas tu asistencia?</p>
+                  <p className="text-xs font-semibold text-ink">¿Confirmas que asistirás?</p>
+                  <p className="mt-1 text-[11px] text-ink-muted">
+                    Esta respuesta sirve como aviso previo y no reemplaza el registro oficial de Secretaría.
+                  </p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     <button
                       type="button"
@@ -341,7 +348,7 @@ export function DashboardPage() {
                       disabled={savingHomeAttendance}
                       className={`min-h-[36px] rounded-lg px-3 text-xs font-semibold transition-colors disabled:opacity-60 ${homeAttendanceStatus === 'presente' ? 'bg-success text-white' : 'border border-success/30 bg-white text-success hover:bg-success/10'}`}
                     >
-                      {homeAttendanceStatus === 'presente' ? 'Asistencia confirmada' : 'Confirmar asistencia'}
+                      {homeAttendanceStatus === 'presente' ? 'Aviso enviado' : 'Confirmar que asistiré'}
                     </button>
                     <button
                       type="button"

@@ -50,6 +50,7 @@ export function MinutesPage() {
   const [formEventId, setFormEventId] = useState('');
   const [formEventTitle, setFormEventTitle] = useState('');
   const [formYear, setFormYear] = useState(Number(getTodayIsoDate().slice(0, 4)));
+  const [formNumber, setFormNumber] = useState('');
   const [formTitle, setFormTitle] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formMeetingDate, setFormMeetingDate] = useState(getTodayIsoDate());
@@ -190,6 +191,7 @@ export function MinutesPage() {
     setFormEventId('');
     setFormEventTitle('');
     setFormYear(Number(getTodayIsoDate().slice(0, 4)));
+    setFormNumber('');
     setFormTitle('');
     setFormDescription('A la Gloria del Gran Arquitecto del Universo...\n\nEn el Oriente de Panamá, reunidos los hermanos en el Gran Templo Masónico...');
     setFormMeetingDate(getTodayIsoDate());
@@ -203,6 +205,11 @@ export function MinutesPage() {
 
   const handleSaveMinute = async (e: React.FormEvent) => {
     e.preventDefault();
+    const manualNumber = Number(formNumber);
+    if (!Number.isInteger(manualNumber) || manualNumber < 1) {
+      toast.error('El Secretario debe colocar un número de acta válido.');
+      return;
+    }
     const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
     const pushToAll = submitter?.value === 'push';
     const statusToSave = pushToAll && formStatus === 'borrador' ? 'circulada' : formStatus;
@@ -210,8 +217,8 @@ export function MinutesPage() {
       const savedMinute = await minuteService.saveMinute(
         {
           id: editingMinute ? editingMinute.id : undefined,
-          number: editingMinute ? editingMinute.number : undefined,
-          formatNumber: editingMinute ? editingMinute.formatNumber : undefined,
+          number: manualNumber,
+          formatNumber: `${String(manualNumber).padStart(2, '0')}-${formYear}`,
           year: formYear,
           title: formTitle.trim(),
           description: formDescription.trim(),
@@ -246,12 +253,15 @@ export function MinutesPage() {
           ? 'Acta guardada y notificación push enviada'
           : editingMinute
             ? 'Acta actualizada'
-            : 'Acta creada con numeración consecutiva'
+            : 'Acta guardada con el número indicado por Secretaría'
       );
       setShowMinuteModal(false);
       loadData();
-    } catch {
-      toast.error('Error al guardar acta');
+    } catch (error) {
+      const message = error instanceof Error ? error.message.toLowerCase() : '';
+      toast.error(message.includes('duplicate') || message.includes('unique')
+        ? 'Ese número de acta ya existe para ese año.'
+        : 'Error al guardar acta');
     }
   };
 
@@ -278,10 +288,7 @@ export function MinutesPage() {
 
   const handleStatusChange = async (min: Minute, newStatus: MinuteStatus) => {
     try {
-      await minuteService.saveMinute(
-        { ...min, status: newStatus },
-        { id: user?.id, email: user?.email, name: user?.displayName }
-      );
+      await minuteService.updateMinuteStatus(min.id, newStatus);
       if (min.status === 'borrador' && newStatus !== 'borrador') {
         try {
           await pushNotificationService.notifyNewMinute(min.title, min.formatNumber, min.degree);
@@ -655,6 +662,23 @@ ${formDescription.trim()}${notes}`;
                       </button>
                     )}
                     {canApproveMinutes && (
+                      <label className="flex items-center gap-2 rounded-xl border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-ink">
+                        <span>Estado:</span>
+                        <select
+                          value={selectedMinute.status}
+                          onChange={(event) => void handleStatusChange(selectedMinute, event.target.value as MinuteStatus)}
+                          className="bg-transparent text-xs font-semibold outline-none cursor-pointer"
+                          aria-label="Cambiar estado del acta"
+                        >
+                          <option value="borrador">Borrador</option>
+                          <option value="circulada">Circulada</option>
+                          <option value="aprobada">Aprobada</option>
+                          <option value="firmada">Firmada</option>
+                          <option value="archivada">Archivada</option>
+                        </select>
+                      </label>
+                    )}
+                    {canApproveMinutes && (
                       <>
                     {selectedMinute.status === 'borrador' && (
                       <button
@@ -718,6 +742,20 @@ ${formDescription.trim()}${notes}`;
             options={meetingOptions}
             searchable={true}
           />
+
+          <AppleInput
+            label="Número de acta *"
+            type="number"
+            min={1}
+            step={1}
+            required
+            value={formNumber}
+            onChange={(event) => setFormNumber(event.target.value)}
+            placeholder="Ej. 01"
+          />
+          <p className="-mt-2 text-[11px] text-ink-muted">
+            El número debe ser colocado manualmente por Secretaría. No se asignará automáticamente.
+          </p>
 
           {formEventId && (events.find((event) => event.id === formEventId)?.degreeSegments?.length || 0) > 0 && (
             <AppleSelect<MasonicDegree>

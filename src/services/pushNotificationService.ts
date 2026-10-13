@@ -552,7 +552,7 @@ class PushNotificationService {
       url: '/app/miembros',
       tag: `nuevo-registro-${email.toLowerCase()}`,
       type: 'nuevo_registro',
-      recipientRoles: ['sec', 'adm'],
+      recipientRoles: ['sec', 'adm', 'vm'],
     });
   }
 
@@ -580,7 +580,7 @@ class PushNotificationService {
       url: '/app/miembros',
       tag: `identidad-reenviada-${email.toLowerCase()}`,
       type: 'identidad_reenviada',
-      recipientRoles: ['sec', 'adm'],
+      recipientRoles: ['sec', 'adm', 'vm'],
     });
   }
 
