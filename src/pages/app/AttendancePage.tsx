@@ -46,6 +46,7 @@ export function AttendancePage() {
   const [memberResponses, setMemberResponses] = useState<Record<string, AttendanceResponseStatus>>({});
   const [memberResponseReasons, setMemberResponseReasons] = useState<Record<string, string>>({});
   const [memberResponseSubmittedAt, setMemberResponseSubmittedAt] = useState<Record<string, string>>({});
+  const [memberMeetingResponses, setMemberMeetingResponses] = useState<Record<string, AttendanceResponseStatus>>({});
   const [editingExcuseMemberId, setEditingExcuseMemberId] = useState<string | null>(null);
   const [excuseDraft, setExcuseDraft] = useState('');
   const [visitors, setVisitors] = useState<VisitorAttendance[]>([]);
@@ -204,6 +205,40 @@ export function AttendancePage() {
       .sort((a, b) => `${a.startDate}T${a.startTime || ''}`.localeCompare(`${b.startDate}T${b.startTime || ''}`));
   }, [meetings]);
 
+  const getMemberMeetingResponseKey = useCallback((eventId: string, segmentId: string, memberId: string) => (
+    `${eventId}:${segmentId}:${memberId}`
+  ), []);
+
+  useEffect(() => {
+    if (canManageAttendance) return;
+    const ownMember = members.find((member) => isOwnMember(member));
+    if (!ownMember || memberMeetingCards.length === 0) {
+      setMemberMeetingResponses({});
+      return;
+    }
+
+    let cancelled = false;
+    const loadMemberResponses = async () => {
+      const results = await Promise.allSettled(
+        memberMeetingCards.map(async (event) => {
+          const segmentId = event.degreeSegments?.[0]?.id;
+          if (!segmentId) return null;
+          const responses = await attendanceService.getResponsesForEvent(event.id, segmentId, { memberId: ownMember.id });
+          const response = responses.find((item) => item.memberId === ownMember.id);
+          return response ? { key: getMemberMeetingResponseKey(event.id, segmentId, ownMember.id), status: response.status } : null;
+        })
+      );
+      if (cancelled) return;
+      const next: Record<string, AttendanceResponseStatus> = {};
+      results.forEach((result) => {
+        if (result.status === 'fulfilled' && result.value) next[result.value.key] = result.value.status;
+      });
+      setMemberMeetingResponses(next);
+    };
+    void loadMemberResponses();
+    return () => { cancelled = true; };
+  }, [canManageAttendance, getMemberMeetingResponseKey, isOwnMember, memberMeetingCards, members]);
+
   const filteredMembers = useMemo(() => {
     if (!searchMember.trim()) return members;
     const q = searchMember.toLowerCase();
@@ -301,12 +336,37 @@ export function AttendancePage() {
 
     setSelectedEventId(event.id);
     setSelectedSegmentId(segmentId);
+    const responseKey = getMemberMeetingResponseKey(event.id, segmentId, member.id);
+    const currentResponse = memberMeetingResponses[responseKey];
     try {
+      if (currentResponse === (status === 'presente' ? 'confirmada' : 'excusa')) {
+        await attendanceService.clearMemberAttendance(event.id, segmentId, member.id, {
+          id: user?.id,
+          email: user?.email,
+        });
+        setMemberMeetingResponses((prev) => {
+          const next = { ...prev };
+          delete next[responseKey];
+          return next;
+        });
+        setMemberResponses((prev) => {
+          const next = { ...prev };
+          delete next[member.id];
+          return next;
+        });
+        if (currentResponse === 'excusa') {
+          setEditingExcuseMemberId(null);
+          setExcuseDraft('');
+        }
+        toast.success('Respuesta retirada. La asistencia oficial no fue modificada.');
+        return;
+      }
       if (status === 'presente') {
         await attendanceService.saveMemberConfirmation(event.id, segmentId, member.id, {
           id: user?.id,
           email: user?.email,
         });
+        setMemberMeetingResponses((prev) => ({ ...prev, [responseKey]: 'confirmada' }));
         setMemberResponses((prev) => ({ ...prev, [member.id]: 'confirmada' }));
         toast.success('Aviso de asistencia enviado. Secretaría registrará la asistencia oficial.');
       } else {
@@ -314,6 +374,7 @@ export function AttendancePage() {
           id: user?.id,
           email: user?.email,
         });
+        setMemberMeetingResponses((prev) => ({ ...prev, [responseKey]: 'excusa' }));
         setMemberResponses((prev) => ({ ...prev, [member.id]: 'excusa' }));
         setMemberResponseSubmittedAt((prev) => ({ ...prev, [member.id]: new Date().toISOString() }));
         setEditingExcuseMemberId(member.id);
@@ -549,7 +610,10 @@ export function AttendancePage() {
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {memberMeetingCards.map((event) => {
                 const ownMember = members.find((member) => isOwnMember(member));
-                const response = ownMember ? memberResponses[ownMember.id] : undefined;
+                const segmentId = event.degreeSegments?.[0]?.id || '';
+                const response = ownMember && segmentId
+                  ? memberMeetingResponses[getMemberMeetingResponseKey(event.id, segmentId, ownMember.id)]
+                  : undefined;
                 const body = getBodyById(event.bodyId);
                 return (
                   <article key={event.id} className="rounded-2xl border border-border bg-white p-4 shadow-card">
