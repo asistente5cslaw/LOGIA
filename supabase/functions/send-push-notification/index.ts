@@ -44,8 +44,9 @@ Deno.serve(async (request) => {
     const isNewRegistrationNotice = requestPayload.type === 'nuevo_registro';
     const isIdentityResubmission = requestPayload.type === 'identidad_reenviada';
     const isNewMinuteNotice = requestPayload.type === 'nueva_acta';
+    const isMinuteCorrectionNotice = requestPayload.type === 'comentario_acta';
     const elevated = Boolean(profile && !profile.access_disabled && (['admin', 'secretary'].includes(profile.technical_role) || profile.role_id === 'vm' || profile.role_id === 'sec'));
-    const selfServiceNotice = Boolean(profile && !profile.access_disabled && profile.technical_role === 'member' && (isNewRegistrationNotice || isIdentityResubmission));
+    const selfServiceNotice = Boolean(profile && !profile.access_disabled && profile.technical_role === 'member' && (isNewRegistrationNotice || isIdentityResubmission || isMinuteCorrectionNotice));
     if (!elevated && !selfServiceNotice) return response({ error: 'No autorizado' }, 403, headers);
 
     webpush.setVapidDetails(
@@ -105,6 +106,17 @@ Deno.serve(async (request) => {
         .map((profile) => profile.id);
       if (notificationRecipientIds.length === 0) return response({ sent: 0, removed: 0 });
       subscriptionsQuery = subscriptionsQuery.in('user_id', notificationRecipientIds);
+    } else if (isMinuteCorrectionNotice) {
+      const { data: recipients, error: recipientsError } = await admin
+        .from('profiles')
+        .select('id')
+        .or('technical_role.in.(admin,secretary),role_id.in.(adm,sec)')
+        .or('access_disabled.eq.false,access_disabled.is.null');
+      if (recipientsError) throw recipientsError;
+      const recipientIds = (recipients || []).map((recipient) => recipient.id);
+      if (recipientIds.length === 0) return response({ sent: 0, removed: 0 });
+      notificationRecipientIds = recipientIds;
+      subscriptionsQuery = subscriptionsQuery.in('user_id', recipientIds);
     } else if (isNewRegistrationNotice) {
       const { data: recipients, error: recipientsError } = await admin
         .from('profiles')

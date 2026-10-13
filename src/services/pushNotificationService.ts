@@ -6,7 +6,7 @@ export interface PushNotificationPayload {
   body: string;
   url?: string;
   tag?: string;
-  type?: 'convocatoria' | 'trazado' | 'aviso' | 'nuevo_registro' | 'identidad_reenviada' | 'nueva_acta';
+  type?: 'convocatoria' | 'trazado' | 'aviso' | 'nuevo_registro' | 'identidad_reenviada' | 'nueva_acta' | 'comentario_acta';
   recipientRoles?: string[];
   recipientEmails?: string[];
   subscriptionId?: string;
@@ -21,7 +21,7 @@ export interface LodgeNotificationItem {
   time: string;
   timestamp: number;
   read: boolean;
-  type: 'convocatoria' | 'trazado' | 'aviso' | 'nuevo_registro' | 'identidad_reenviada' | 'nueva_acta';
+  type: 'convocatoria' | 'trazado' | 'aviso' | 'nuevo_registro' | 'identidad_reenviada' | 'nueva_acta' | 'comentario_acta';
 }
 
 export interface PushSubscriber {
@@ -597,6 +597,22 @@ class PushNotificationService {
       tag: `nueva-acta-${formatNumber}`,
       type: 'nueva_acta',
       minuteDegree: degree,
+    });
+  }
+
+  /** Notifica a administradores y secretarios cuando un miembro comenta un acta. */
+  public async notifyMinuteCorrection(
+    minuteTitle: string,
+    formatNumber: string,
+    authorName: string,
+    comment: string,
+  ): Promise<{ sent: number; removed: number }> {
+    return this.sendPushToAll({
+      title: 'Nuevo comentario en un acta',
+      body: `${authorName} comentó el acta ${formatNumber} · ${minuteTitle}: ${comment}`,
+      url: '/app/actas',
+      tag: `comentario-acta-${formatNumber}-${Date.now()}`,
+      type: 'comentario_acta',
     });
   }
 

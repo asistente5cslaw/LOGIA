@@ -274,6 +274,16 @@ export function MinutesPage() {
         { id: user?.id, email: user?.email, name: user?.displayName }
       );
       toast.success('Observación registrada en el acta');
+      try {
+        await pushNotificationService.notifyMinuteCorrection(
+          selectedMinute.title,
+          selectedMinute.formatNumber,
+          corr.authorName,
+          corr.comment,
+        );
+      } catch (notificationError) {
+        console.warn('El comentario se guardó, pero no se pudo enviar la notificación push:', notificationError);
+      }
       setNewComment('');
       // Actualizar detalle
       setSelectedMinute({
