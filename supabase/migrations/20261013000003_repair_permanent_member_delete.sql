@@ -19,9 +19,9 @@ BEGIN
     FROM public.profiles
     WHERE id = auth.uid();
 
-    IF actor_role IS DISTINCT FROM 'vm'
-       AND actor_technical_role IS DISTINCT FROM 'admin' THEN
-        RAISE EXCEPTION 'Solo un Administrador o Venerable Maestro puede eliminar definitivamente un usuario.'
+    IF actor_role NOT IN ('vm', 'sec')
+       AND actor_technical_role NOT IN ('admin', 'secretary') THEN
+        RAISE EXCEPTION 'Solo Administración, Secretaría o el Venerable Maestro pueden eliminar definitivamente un usuario.'
             USING ERRCODE = '42501';
     END IF;
 

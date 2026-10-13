@@ -113,9 +113,9 @@ export function MembersPage() {
   // Solo Secretaría y Administración validan identidades y selfies de registro.
   const canValidateIdentity = isSecretario || isAdministrador;
   const canViewDeletedMembers = isVenerableMaestro || isSecretario || user?.profile?.technicalRole === 'admin';
-  // El borrado irreversible está reservado a Administrador/Venerable,
-  // igual que la función SECURITY DEFINER de Supabase.
-  const canManageDeletedMembers = isVenerableMaestro || isAdministrador;
+  // El borrado irreversible está reservado a Venerable, Secretaría y
+  // Administración, igual que la función SECURITY DEFINER de Supabase.
+  const canManageDeletedMembers = isVenerableMaestro || isSecretario || isAdministrador;
 
   const loadMembers = useCallback(async () => {
     try {
