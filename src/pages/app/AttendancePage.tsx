@@ -48,6 +48,7 @@ export function AttendancePage() {
   const [memberResponseSubmittedAt, setMemberResponseSubmittedAt] = useState<Record<string, string>>({});
   const [memberMeetingResponses, setMemberMeetingResponses] = useState<Record<string, AttendanceResponseStatus>>({});
   const [editingExcuseMemberId, setEditingExcuseMemberId] = useState<string | null>(null);
+  const [viewingExcuse, setViewingExcuse] = useState<{ memberName: string; reason: string } | null>(null);
   const [excuseDraft, setExcuseDraft] = useState('');
   const [visitors, setVisitors] = useState<VisitorAttendance[]>([]);
   const [searchMember, setSearchMember] = useState('');
@@ -66,7 +67,10 @@ export function AttendancePage() {
     || user?.profile?.roleId === 'sec'
     || user?.profile?.technicalRole === 'admin'
     || user?.profile?.technicalRole === 'secretary';
-  const canViewExcuseReasons = user?.profile?.roleId === 'sec' || user?.profile?.roleId === 'vm';
+  const canViewExcuseReasons = user?.profile?.roleId === 'sec'
+    || user?.profile?.roleId === 'vm'
+    || user?.profile?.technicalRole === 'admin'
+    || user?.profile?.technicalRole === 'secretary';
 
   const isOwnMember = useCallback((member: Member): boolean => (
     Boolean(user?.memberId && user.memberId === member.id) ||
@@ -821,9 +825,16 @@ export function AttendancePage() {
                     {!isOwn && currentStatus === 'excusa' && (
                       canViewExcuseReasons ? (
                         excuseReasons[m.id] ? (
-                          <p className="max-w-xs text-left text-[11px] text-amber-800">
+                          <button
+                            type="button"
+                            onClick={() => setViewingExcuse({
+                              memberName: `${m.firstName} ${m.lastName}`,
+                              reason: excuseReasons[m.id],
+                            })}
+                            className="max-w-xs text-left text-[11px] text-amber-800 hover:underline"
+                          >
                             <span className="font-semibold">Excusa:</span> {excuseReasons[m.id]}
-                          </p>
+                          </button>
                         ) : (
                           <span className="text-[11px] font-medium text-amber-700">Excusa pendiente de explicación por el hermano</span>
                         )
@@ -924,6 +935,36 @@ export function AttendancePage() {
             </button>
           </div>
         </div>
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(viewingExcuse)}
+        onClose={() => setViewingExcuse(null)}
+        title="Excusa presentada"
+        subtitle={selectedEvent?.title}
+        maxWidth="sm"
+      >
+        {viewingExcuse && (
+          <div className="space-y-4">
+            <div>
+              <p className="text-xs text-ink-muted">Hermano</p>
+              <p className="text-sm font-semibold text-ink">{viewingExcuse.memberName}</p>
+            </div>
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-800">Motivo de la excusa</p>
+              <p className="whitespace-pre-wrap text-sm leading-6 text-amber-950">{viewingExcuse.reason}</p>
+            </div>
+            <div className="flex justify-end border-t border-border pt-3">
+              <button
+                type="button"
+                onClick={() => setViewingExcuse(null)}
+                className="min-h-[40px] rounded-xl bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary-pressed"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* Modal Registrar Visitante */}

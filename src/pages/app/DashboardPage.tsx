@@ -79,19 +79,24 @@ export function DashboardPage() {
             const records = segmentId
               ? await attendanceService.getResponsesForEvent(upcomingNext.id, segmentId, { memberId: ownMemberId })
               : [];
-            const savedStatus = records.find((record) => record.memberId === ownMemberId)?.status;
+            const savedResponse = records.find((record) => record.memberId === ownMemberId);
+            const savedStatus = savedResponse?.status;
             setHomeAttendanceStatus(savedStatus === 'confirmada' ? 'presente' : savedStatus === 'excusa' ? 'excusa' : null);
+            setHomeExcuseDraft(savedStatus === 'excusa' ? savedResponse?.excuseReason || '' : '');
           } else {
             setHomeAttendanceStatus(null);
+            setHomeExcuseDraft('');
           }
         } catch (attendanceError) {
           // La asistencia es opcional para el dashboard: no debe ocultar
           // calendario, miembros ni actividades si su consulta falla.
           console.error('Error cargando datos opcionales de asistencia:', attendanceError);
           setHomeAttendanceStatus(null);
+          setHomeExcuseDraft('');
         }
       } else {
         setHomeAttendanceStatus(null);
+        setHomeExcuseDraft('');
       }
 
     } catch (e) {
@@ -150,6 +155,7 @@ export function DashboardPage() {
         });
       }
       setHomeAttendanceStatus(nextStatus === 'ausente' ? null : nextStatus);
+      if (nextStatus !== 'excusa') setHomeExcuseDraft('');
       toast.success(
         nextStatus === 'presente'
           ? 'Aviso de asistencia enviado. Secretaría registrará la asistencia oficial.'
@@ -174,7 +180,6 @@ export function DashboardPage() {
         id: user?.id,
         email: user?.email,
       });
-      setHomeExcuseDraft('');
       toast.success('Tu explicación de la excusa fue guardada.');
       void loadDashboardData();
     } catch (error) {
@@ -293,23 +298,32 @@ export function DashboardPage() {
                   </div>
                   {homeAttendanceStatus === 'excusa' && (
                     <div className="mt-2">
-                      <textarea
-                        value={homeExcuseDraft}
-                        onChange={(event) => setHomeExcuseDraft(event.target.value)}
-                        placeholder="Escribe el motivo de tu excusa..."
-                        rows={2}
-                        className="w-full resize-y rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs text-ink outline-none placeholder:text-ink-muted focus:border-amber-500 focus:ring-2 focus:ring-amber-200"
-                      />
-                      <div className="mt-2 flex justify-end">
-                        <button
-                          type="button"
-                          onClick={() => void handleSaveHomeExcuse()}
-                          disabled={!homeExcuseDraft.trim() || savingHomeAttendance}
-                          className="min-h-[34px] rounded-lg bg-amber-700 px-3 text-xs font-semibold text-white hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          Guardar excusa
-                        </button>
-                      </div>
+                      {homeExcuseDraft.trim() ? (
+                        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-800">Motivo guardado</p>
+                          <p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-amber-950">{homeExcuseDraft}</p>
+                        </div>
+                      ) : (
+                        <>
+                          <textarea
+                            value={homeExcuseDraft}
+                            onChange={(event) => setHomeExcuseDraft(event.target.value)}
+                            placeholder="Escribe el motivo de tu excusa..."
+                            rows={2}
+                            className="w-full resize-y rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs text-ink outline-none placeholder:text-ink-muted focus:border-amber-500 focus:ring-2 focus:ring-amber-200"
+                          />
+                          <div className="mt-2 flex justify-end">
+                            <button
+                              type="button"
+                              onClick={() => void handleSaveHomeExcuse()}
+                              disabled={!homeExcuseDraft.trim() || savingHomeAttendance}
+                              className="min-h-[34px] rounded-lg bg-amber-700 px-3 text-xs font-semibold text-white hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              Guardar excusa
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
