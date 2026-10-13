@@ -16,9 +16,10 @@ export type CameraStatus =
 
 interface CameraCaptureProps {
   onValidated?: (result: BiometricValidationResult) => void;
+  onCaptureStarted?: () => void;
 }
 
-export function CameraCapture({ onValidated }: CameraCaptureProps) {
+export function CameraCapture({ onValidated, onCaptureStarted }: CameraCaptureProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -80,6 +81,11 @@ export function CameraCapture({ onValidated }: CameraCaptureProps) {
       return;
     }
 
+    // Este callback se ejecuta dentro del clic del usuario. Los navegadores
+    // solo permiten abrir el diálogo nativo de notificaciones desde una
+    // activación de usuario, no desde un useEffect posterior.
+    onCaptureStarted?.();
+
     const video = videoRef.current;
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
@@ -124,7 +130,7 @@ export function CameraCapture({ onValidated }: CameraCaptureProps) {
     if (onValidated) {
       onValidated(result);
     }
-  }, [consentGiven, stopCamera, onValidated]);
+  }, [consentGiven, stopCamera, onCaptureStarted, onValidated]);
 
   const reset = useCallback(() => {
     stopCamera();

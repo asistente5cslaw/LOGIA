@@ -90,6 +90,22 @@ export const memberService = {
     if (error) throw error;
   },
 
+  /**
+   * Último recurso para registros cuyo trigger creó Auth/Profile pero no
+   * alcanzó a crear o enlazar members. La función SQL repara el enlace y
+   * guarda la selfie en una sola operación autenticada.
+   */
+  async completeRegistrationIdentity(identity: Pick<Member, 'identityStatus' | 'selfieUrl'>): Promise<string> {
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+
+    const { data, error } = await supabase.rpc('complete_registration_identity', {
+      p_selfie_url: identity.selfieUrl || null,
+      p_identity_status: identity.identityStatus === 'rejected' ? 'rejected' : 'pending',
+    });
+    if (error || !data) throw error || new Error('No se pudo crear o enlazar la ficha de miembro.');
+    return String(data);
+  },
+
   async getAllMembers(includeInactive = true, includeDeleted = false, includeIdentity = false): Promise<Member[]> {
     if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
 

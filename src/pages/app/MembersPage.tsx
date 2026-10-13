@@ -113,7 +113,9 @@ export function MembersPage() {
   // Solo Secretaría y Administración validan identidades y selfies de registro.
   const canValidateIdentity = isSecretario || isAdministrador;
   const canViewDeletedMembers = isVenerableMaestro || isSecretario || user?.profile?.technicalRole === 'admin';
-  const canManageDeletedMembers = isVenerableMaestro || isSecretario || user?.profile?.technicalRole === 'admin';
+  // El borrado irreversible está reservado a Administrador/Venerable,
+  // igual que la función SECURITY DEFINER de Supabase.
+  const canManageDeletedMembers = isVenerableMaestro || isAdministrador;
 
   const loadMembers = useCallback(async () => {
     try {
@@ -409,7 +411,7 @@ export function MembersPage() {
       const message = error instanceof Error ? error.message : '';
       toast.error(message.includes('actas') || message.includes('correcciones')
         ? 'No se puede eliminar porque tiene historial de actas asociado.'
-        : 'No se pudo eliminar definitivamente el usuario.');
+        : message || 'No se pudo eliminar definitivamente el usuario.');
     }
   };
 
@@ -691,6 +693,17 @@ export function MembersPage() {
                           onClick={() => handleSoftDelete(m.id, `${m.firstName} ${m.lastName}`)}
                           className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-white text-ink-muted hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer active:scale-95 shadow-2xs"
                           title="Baja lógica"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+
+                      {canManageDeletedMembers && !isDeleted && (
+                        <button
+                          type="button"
+                          onClick={() => void handlePermanentDelete(m.id, `${m.firstName} ${m.lastName}`)}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors cursor-pointer active:scale-95 shadow-2xs"
+                          title="Eliminar definitivamente"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>

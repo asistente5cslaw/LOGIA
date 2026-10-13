@@ -65,27 +65,37 @@ export function RegisterIdentityPage() {
         pendingData.invitationCode
       );
 
-      if (!registeredUser.memberId) {
-        throw new Error('La cuenta fue creada, pero no se encontró su ficha de miembro en Supabase.');
-      }
+      // Autenticar antes de guardar la identidad permite que el RPC de
+      // recuperación repare una ficha ausente y conserve la selfie.
+      await login(pendingData.email, password);
 
       // 2. Guardar únicamente los datos de identidad en la ficha creada por el trigger
       const identityStatus = result.status === 'approved' ? 'verified' : 'pending';
       try {
-        await memberService.saveRegistrationIdentity(registeredUser.memberId, {
-            identityVerified: identityStatus === 'verified',
+        if (registeredUser.memberId) {
+          await memberService.saveRegistrationIdentity(registeredUser.memberId, {
+              identityVerified: identityStatus === 'verified',
+              identityStatus,
+              selfieUrl: result.selfieUrl,
+              identityValidatedAt: new Date().toISOString(),
+          });
+        } else {
+          await memberService.completeRegistrationIdentity({
             identityStatus,
             selfieUrl: result.selfieUrl,
-            identityValidatedAt: new Date().toISOString(),
-        });
+          });
+        }
       } catch (saveErr) {
         throw new Error(
-          `La cuenta fue creada, pero no se pudo guardar la ficha de miembro: ${saveErr instanceof Error ? saveErr.message : 'error desconocido'}`
+          `La cuenta fue creada, pero no se pudo guardar la comprobación facial: ${saveErr instanceof Error ? saveErr.message : 'error desconocido'}`
         );
       }
 
-      // 3. Iniciar sesión automáticamente
-      await login(pendingData.email, password);
+      // 3. La solicitud se inició desde el clic de captura. Después de crear la
+      // sesión podemos persistir la suscripción en Supabase.
+      if (pushNotificationService.getPermission() === 'granted') {
+        await pushNotificationService.registerCurrentDevice();
+      }
 
       // Avisar únicamente a Venerables y Secretarios; un fallo del push no invalida el registro.
       try {
@@ -150,7 +160,14 @@ export function RegisterIdentityPage() {
 
       {!isFinalizing && (
         <div className="mt-6">
-          <CameraCapture onValidated={handleValidated} />
+          <CameraCapture
+            onValidated={handleValidated}
+            onCaptureStarted={() => {
+              if (pushNotificationService.getPermission() === 'default') {
+                void pushNotificationService.requestPermission();
+              }
+            }}
+          />
         </div>
       )}
     </div>

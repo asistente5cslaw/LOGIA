@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Mail, Lock, Loader2, ArrowRight, UserPlus, Eye, EyeOff } from 'lucide-react';
 import { LodgeLogo } from '@/components/shared/LodgeLogo';
 import { Modal } from '@/components/shared/Modal';
+import { pushNotificationService } from '@/services/pushNotificationService';
 
 export function LoginPage() {
   const { user, login, resetPassword } = useAuth();
@@ -42,7 +43,15 @@ export function LoginPage() {
     }, 9000);
 
     try {
+      // Debe ejecutarse mientras el submit conserva la activación del usuario.
+      // El registro en Supabase se completa después de autenticar la sesión.
+      const notificationPermissionPromise = pushNotificationService.getPermission() === 'default'
+        ? pushNotificationService.requestPermission()
+        : Promise.resolve(pushNotificationService.getPermission());
       await login(email, password);
+      if (await notificationPermissionPromise === 'granted') {
+        await pushNotificationService.registerCurrentDevice();
+      }
       finished = true;
       clearTimeout(timer);
 
