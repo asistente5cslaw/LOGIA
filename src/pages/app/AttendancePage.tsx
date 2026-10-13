@@ -843,7 +843,7 @@ export function AttendancePage() {
                       )
                     )}
                     {canManageAttendance && responseStatus && (
-                      <span className="text-[11px] font-semibold text-primary">
+                      <span className={`text-[11px] font-semibold ${responseStatus === 'confirmada' ? 'text-success' : 'text-amber-700'}`}>
                         Respuesta del hermano: {responseStatus === 'confirmada' ? 'Asistencia confirmada' : 'Presentó excusa'}
                       </span>
                     )}

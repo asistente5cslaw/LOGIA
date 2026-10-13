@@ -275,7 +275,7 @@ export function DashboardPage() {
               {(nextMeeting.status === 'programada' || nextMeeting.status === 'convocada') && ownMemberId && (
                 <div className="mt-3 rounded-xl border border-primary/15 bg-primary/5 p-3">
                   <p className="text-xs font-semibold text-ink">¿Confirmas que asistirás?</p>
-                  <p className="mt-1 text-[11px] text-ink-muted">
+                    <p className={`mt-1 text-[11px] font-semibold ${homeAttendanceStatus === 'excusa' ? 'text-amber-700' : homeAttendanceStatus === 'presente' ? 'text-success' : 'text-ink-muted'}`}>
                     Esta respuesta sirve como aviso previo y no reemplaza el registro oficial de Secretaría.
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2">
