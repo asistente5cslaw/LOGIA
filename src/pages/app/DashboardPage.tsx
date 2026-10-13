@@ -29,10 +29,7 @@ export function DashboardPage() {
   const [events, setEvents] = useState<LodgeEvent[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [conflicts, setConflicts] = useState<EventConflict[]>([]);
-  const [pendingExcuseEvents, setPendingExcuseEvents] = useState<LodgeEvent[]>([]);
   const [ownMemberId, setOwnMemberId] = useState<string | null>(null);
-  const [excuseDrafts, setExcuseDrafts] = useState<Record<string, string>>({});
-  const [savingExcuseEventId, setSavingExcuseEventId] = useState<string | null>(null);
   const [homeAttendanceStatus, setHomeAttendanceStatus] = useState<'presente' | 'excusa' | 'ausente' | null>(null);
   const [homeExcuseDraft, setHomeExcuseDraft] = useState('');
   const [savingHomeAttendance, setSavingHomeAttendance] = useState(false);
@@ -87,20 +84,13 @@ export function DashboardPage() {
           } else {
             setHomeAttendanceStatus(null);
           }
-          const pendingExcuses = await attendanceService.getPendingExcusesForMember(ownMemberId);
-          const pendingIds = new Set(pendingExcuses.map((item) => item.eventId));
-          setPendingExcuseEvents(evList.filter(
-            (event) => getEventCategory(event) === 'tenida' && isUpcomingEvent(event, today) && pendingIds.has(event.id)
-          ));
         } catch (attendanceError) {
           // La asistencia es opcional para el dashboard: no debe ocultar
           // calendario, miembros ni actividades si su consulta falla.
           console.error('Error cargando datos opcionales de asistencia:', attendanceError);
           setHomeAttendanceStatus(null);
-          setPendingExcuseEvents([]);
         }
       } else {
-        setPendingExcuseEvents([]);
         setHomeAttendanceStatus(null);
       }
 
@@ -129,32 +119,6 @@ export function DashboardPage() {
     .filter((event) => isUpcomingEvent(event, today) && event.id !== nextMeeting?.id)
     .sort((a, b) => `${a.startDate}T${a.startTime || ''}`.localeCompare(`${b.startDate}T${b.startTime || ''}`))
     .slice(0, 3);
-
-  const handleSaveDashboardExcuse = async (eventId: string) => {
-    const reason = excuseDrafts[eventId]?.trim();
-    if (!ownMemberId || !reason) return;
-
-    setSavingExcuseEventId(eventId);
-    try {
-      const event = events.find((candidate) => candidate.id === eventId);
-      const segmentId = event?.degreeSegments?.[0]?.id;
-      if (!segmentId) throw new Error('La tenida todavía no tiene un tramo de grado configurado.');
-      await attendanceService.saveMemberExcuse(eventId, segmentId, ownMemberId, reason, {
-        id: user?.id,
-        email: user?.email,
-      });
-      setPendingExcuseEvents((previous) => previous.filter((event) => event.id !== eventId));
-      setExcuseDrafts((previous) => {
-        const next = { ...previous };
-        delete next[eventId];
-        return next;
-      });
-    } catch (error) {
-      console.error('Error guardando excusa desde el inicio:', error);
-    } finally {
-      setSavingExcuseEventId(null);
-    }
-  };
 
   const handleHomeAttendance = async (status: 'presente' | 'excusa') => {
     if (
@@ -259,38 +223,6 @@ export function DashboardPage() {
                 </Link>
               </div>
             </div>
-          </div>
-        </div>
-      )}
-
-      {pendingExcuseEvents.length > 0 && (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-xs">
-          <h3 className="text-sm font-semibold text-amber-900">Tienes una excusa pendiente</h3>
-          <div className="mt-3 space-y-3">
-            {pendingExcuseEvents.map((event) => (
-              <div key={event.id} className="rounded-xl border border-amber-200 bg-white/70 p-3">
-                <p className="text-xs text-amber-800">
-                  Explica tu excusa para <span className="font-semibold">{event.title}</span>:
-                </p>
-                <textarea
-                  value={excuseDrafts[event.id] || ''}
-                  onChange={(e) => setExcuseDrafts((previous) => ({ ...previous, [event.id]: e.target.value }))}
-                  placeholder="Escribe aquí el motivo de tu excusa..."
-                  rows={3}
-                  className="mt-2 w-full resize-y rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm text-ink outline-none placeholder:text-ink-muted focus:border-amber-500 focus:ring-2 focus:ring-amber-200"
-                />
-                <div className="mt-2 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => void handleSaveDashboardExcuse(event.id)}
-                    disabled={!excuseDrafts[event.id]?.trim() || savingExcuseEventId === event.id}
-                    className="inline-flex min-h-[38px] items-center justify-center rounded-xl bg-amber-700 px-4 text-xs font-semibold text-white hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {savingExcuseEventId === event.id ? 'Guardando...' : 'Guardar excusa'}
-                  </button>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       )}
