@@ -153,6 +153,7 @@ export interface LodgeEvent {
   eventCategory: EventCategory;
   location: string;
   notes?: string;
+  convocationText?: string;
   convocationPdfUrl?: string;
   convocationPdfFileName?: string;
   convocationPdfFileSize?: number;

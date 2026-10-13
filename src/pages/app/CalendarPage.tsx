@@ -490,7 +490,7 @@ export function CalendarPage() {
     setConvocationEvent(ev);
     setConvocationPdfFile(null);
     setConvocationPdfViewerUrl(null);
-    const text = convocationService.generateOfficialText(ev);
+    const text = ev.convocationText?.trim() || convocationService.generateOfficialText(ev);
     setConvocationText(text);
     setCopied(false);
     setShowConvocationModal(true);
@@ -501,6 +501,33 @@ export function CalendarPage() {
         .catch(() => toast.error('No se pudo abrir el PDF de la convocatoria.'))
         .finally(() => setIsLoadingConvocationPdf(false));
     }
+  };
+
+  const handleCloseConvocation = async () => {
+    if (!convocationEvent) {
+      setShowConvocationModal(false);
+      return;
+    }
+
+    const text = convocationText.trim();
+    if (text !== (convocationEvent.convocationText || '').trim()) {
+      try {
+        await eventService.updateConvocationText(convocationEvent.id, text, {
+          id: user?.id,
+          email: user?.email,
+        });
+        const updatedEvent = { ...convocationEvent, convocationText: text || undefined };
+        setConvocationEvent(updatedEvent);
+        setEvents((currentEvents) => currentEvents.map((event) => (
+          event.id === updatedEvent.id ? updatedEvent : event
+        )));
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'No se pudo guardar el texto de la convocatoria.');
+        return;
+      }
+    }
+
+    setShowConvocationModal(false);
   };
 
   const handleUploadConvocationPdf = async () => {
@@ -1541,7 +1568,7 @@ export function CalendarPage() {
       {/* Modal de Convocatoria Oficial */}
       <Modal
         isOpen={Boolean(showConvocationModal && convocationEvent)}
-        onClose={() => setShowConvocationModal(false)}
+        onClose={() => void handleCloseConvocation()}
         title="Convocatoria Protocolar"
         subtitle="Edita el texto solemne antes de la difusión fraternal"
         maxWidth="xl"

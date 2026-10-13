@@ -100,6 +100,7 @@ export const eventService = {
             eventCategory: d.event_category as EventCategory,
             location: d.location,
             notes: d.notes,
+            convocationText: d.convocation_text || undefined,
             convocationPdfUrl: d.convocation_pdf_url,
             convocationPdfFileName: d.convocation_pdf_file_name,
             convocationPdfFileSize: d.convocation_pdf_file_size,
@@ -312,6 +313,22 @@ export const eventService = {
     const { error } = await supabase.from('events').update({ status }).eq('id', id);
     if (error) throw error;
     await auditService.log('CAMBIO_ESTADO_EVENTO', 'events', id, user, { newStatus: status });
+  },
+
+  async updateConvocationText(
+    id: string,
+    text: string,
+    user: { id?: string; email?: string }
+  ): Promise<void> {
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    const { error } = await supabase
+      .from('events')
+      .update({ convocation_text: text.trim() || null })
+      .eq('id', id);
+    if (error) throw error;
+    await auditService.log('ACTUALIZAR_TEXTO_CONVOCATORIA', 'events', id, user, {
+      textLength: text.trim().length,
+    });
   },
 
   validateConvocationPdfFile(file: File): { valid: boolean; error?: string } {

@@ -115,20 +115,22 @@ export function DashboardPage() {
 
   const today = getLocalIsoDate();
   const dashboardStats = calculateDashboardStats(members, events, today);
-  const upcomingTenidas = events
-    .filter((event) => getEventCategory(event) === 'tenida' && isUpcomingEvent(event, today))
-    .sort((a, b) => `${a.startDate}T${a.startTime || ''}`.localeCompare(`${b.startDate}T${b.startTime || ''}`));
-  const nextMeeting = upcomingTenidas.find((event) => event.status === 'convocada') || upcomingTenidas[0];
-  const nextMeetingBody = nextMeeting ? getBodyById(nextMeeting.bodyId) : null;
   const upcomingActivities = events
-    .filter((event) => isUpcomingEvent(event, today) && event.id !== nextMeeting?.id)
-    .sort((a, b) => `${a.startDate}T${a.startTime || ''}`.localeCompare(`${b.startDate}T${b.startTime || ''}`))
+    .filter((event) => isUpcomingEvent(event, today))
+    .sort((a, b) => `${a.startDate}T${a.startTime || ''}`.localeCompare(`${b.startDate}T${b.startTime || ''}`));
+  // La tarjeta principal debe mostrar la actividad más cercana, sin filtrar
+  // por categoría ni priorizar un estado sobre la fecha.
+  const nextMeeting = upcomingActivities[0];
+  const nextMeetingBody = nextMeeting ? getBodyById(nextMeeting.bodyId) : null;
+  const upcomingActivitiesList = upcomingActivities
+    .filter((event) => event.id !== nextMeeting?.id)
     .slice(0, 3);
 
   const handleHomeAttendance = async (status: 'presente' | 'excusa') => {
     if (
       !ownMemberId
       || !nextMeeting
+      || getEventCategory(nextMeeting) !== 'tenida'
       || (nextMeeting.status !== 'programada' && nextMeeting.status !== 'convocada')
     ) return;
     const nextStatus = homeAttendanceStatus === status ? 'ausente' : status;
@@ -171,7 +173,7 @@ export function DashboardPage() {
   };
 
   const handleSaveHomeExcuse = async () => {
-    if (!ownMemberId || !nextMeeting || !homeExcuseDraft.trim()) return;
+    if (!ownMemberId || !nextMeeting || getEventCategory(nextMeeting) !== 'tenida' || !homeExcuseDraft.trim()) return;
     setSavingHomeAttendance(true);
     try {
       const segmentId = nextMeeting.degreeSegments?.[0]?.id;
@@ -272,7 +274,9 @@ export function DashboardPage() {
                 </div>
               </div>
 
-              {(nextMeeting.status === 'programada' || nextMeeting.status === 'convocada') && ownMemberId && (
+              {getEventCategory(nextMeeting) === 'tenida'
+                && (nextMeeting.status === 'programada' || nextMeeting.status === 'convocada')
+                && ownMemberId && (
                 <div className="mt-3 rounded-xl border border-primary/15 bg-primary/5 p-3">
                   <p className="text-xs font-semibold text-ink">¿Confirmas que asistirás?</p>
                     <p className={`mt-1 text-[11px] font-semibold ${homeAttendanceStatus === 'excusa' ? 'text-amber-700' : homeAttendanceStatus === 'presente' ? 'text-success' : 'text-ink-muted'}`}>
@@ -375,9 +379,9 @@ export function DashboardPage() {
             Ver todas
           </Link>
         </div>
-        {upcomingActivities.length > 0 ? (
+        {upcomingActivitiesList.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {upcomingActivities.map((event) => {
+            {upcomingActivitiesList.map((event) => {
               const body = getBodyById(event.bodyId);
               return (
                 <Link
