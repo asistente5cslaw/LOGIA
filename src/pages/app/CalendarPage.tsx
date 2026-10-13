@@ -187,6 +187,12 @@ export function CalendarPage() {
 
   const loadData = async () => {
     try {
+      try {
+        await eventService.syncPastEvents();
+      } catch (syncError) {
+        // Una migración pendiente no debe impedir abrir el calendario.
+        console.warn('No se pudieron actualizar automáticamente las actividades culminadas:', syncError);
+      }
       const [evList, memList] = await Promise.all([
         eventService.getAllEvents(),
         memberService.getAllMembers(true),

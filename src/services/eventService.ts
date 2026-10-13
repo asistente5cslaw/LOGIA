@@ -28,6 +28,18 @@ function getEventTimeRange(event: LodgeEvent): { startMs: number; endMs: number 
 }
 
 export const eventService = {
+  /**
+   * Sincroniza en Supabase las actividades cuyo horario de finalización ya
+   * pasó. La función SQL es SECURITY DEFINER para que también se ejecute al
+   * abrir el calendario con una cuenta que no administra eventos.
+   */
+  async syncPastEvents(): Promise<number> {
+    if (!isSupabaseConfigured()) return 0;
+    const { data, error } = await supabase.rpc('mark_past_events_completed');
+    if (error) throw error;
+    return Number(data || 0);
+  },
+
   async getDegreeSegments(eventIds?: string[]): Promise<EventDegreeSegment[]> {
     if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
     let query = supabase.from('event_degree_segments').select('*').order('sequence', { ascending: true });
