@@ -158,6 +158,16 @@ export const memberService = {
     return list.find((m) => m.id === id);
   },
 
+  async updateOwnPhone(memberId: string, phone: string): Promise<void> {
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    const { error } = await supabase
+      .from('members')
+      .update({ phone: phone.trim(), updated_at: new Date().toISOString() })
+      .eq('id', memberId)
+      .eq('deleted_at', null);
+    if (error) throw error;
+  },
+
   async saveMember(
     member: Omit<Member, 'id' | 'joinedAt'> & { id?: string },
     user: { id?: string; email?: string; name?: string }

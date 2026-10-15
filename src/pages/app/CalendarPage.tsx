@@ -39,6 +39,8 @@ import { Modal } from '@/components/shared/Modal';
 import { cn } from '@/lib/utils';
 import { formatDateSpanish, formatTime12, formatTimeRange12, getIsoDateInTimeZone, getTodayIsoDate, normalizeDateOnly } from '@/lib/dateUtils';
 import { toast } from 'sonner';
+
+const getConvocationDraftStorageKey = (eventId: string) => `logia:convocation-text:${eventId}`;
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 import { ErrorState } from '@/components/shared/ErrorState';
 
@@ -490,7 +492,8 @@ export function CalendarPage() {
     setConvocationEvent(ev);
     setConvocationPdfFile(null);
     setConvocationPdfViewerUrl(null);
-    const text = ev.convocationText?.trim() || convocationService.generateOfficialText(ev);
+    const localDraft = localStorage.getItem(getConvocationDraftStorageKey(ev.id))?.trim();
+    const text = ev.convocationText?.trim() || localDraft || convocationService.generateOfficialText(ev);
     setConvocationText(text);
     setCopied(false);
     setShowConvocationModal(true);
@@ -511,17 +514,24 @@ export function CalendarPage() {
 
     const text = convocationText.trim();
     if (text !== (convocationEvent.convocationText || '').trim()) {
+      localStorage.setItem(getConvocationDraftStorageKey(convocationEvent.id), text);
       try {
         await eventService.updateConvocationText(convocationEvent.id, text, {
           id: user?.id,
           email: user?.email,
         });
+        localStorage.removeItem(getConvocationDraftStorageKey(convocationEvent.id));
         const updatedEvent = { ...convocationEvent, convocationText: text || undefined };
         setConvocationEvent(updatedEvent);
         setEvents((currentEvents) => currentEvents.map((event) => (
           event.id === updatedEvent.id ? updatedEvent : event
         )));
       } catch (error) {
+        if (error instanceof Error && /convocation_text.*does not exist/i.test(error.message)) {
+          setShowConvocationModal(false);
+          toast.info('Texto guardado en este dispositivo. Se sincronizará con la base de datos al aplicar la migración.');
+          return;
+        }
         toast.error(error instanceof Error ? error.message : 'No se pudo guardar el texto de la convocatoria.');
         return;
       }

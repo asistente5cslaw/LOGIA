@@ -11,7 +11,7 @@ const defaultAuthContext: AuthContextValue = {
   user: null,
   isLoading: false,
   login: async () => {},
-  register: async () => {},
+  register: async () => { throw new Error('Autenticación no disponible.'); },
   logout: async () => {},
   resetPassword: async () => {},
   hasPermission: () => false,
@@ -87,10 +87,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string,
     firstName: string,
     lastName: string,
-    invitationCode?: string
+    invitationCode?: string,
+    phone?: string
   ) => {
-    const u = await authService.register(email, password, firstName, lastName, invitationCode);
+    const u = await authService.register(email, password, firstName, lastName, invitationCode, phone);
     setUser(u.isAuthenticated ? u : null);
+    return u;
   };
 
   const logout = async () => {

@@ -562,10 +562,10 @@ class PushNotificationService {
     reviewerName?: string,
   ): Promise<{ sent: number; removed: number }> {
     return this.sendPushToAll({
-      title: approved ? 'Identidad aprobada' : 'Nueva selfie solicitada',
+      title: approved ? 'Solicitud aprobada' : 'Solicitud pendiente de corrección',
       body: approved
         ? 'Tu identidad fue aprobada. Ya tienes acceso completo al sistema.'
-        : `${reviewerName || 'Secretaría'} rechazó la selfie. Debes enviar una nueva selfie para continuar con la validación.`,
+        : `${reviewerName || 'Secretaría'} solicitó revisar tus datos. Contacta al Secretario del Taller para continuar con la validación.`,
       url: '/app',
       tag: `identidad-${approved ? 'aprobada' : 'rechazada'}-${email.toLowerCase()}`,
       type: 'aviso',
@@ -575,8 +575,8 @@ class PushNotificationService {
 
   public async notifyIdentityResubmission(displayName: string, email: string): Promise<{ sent: number; removed: number }> {
     return this.sendPushToAll({
-      title: 'Nueva selfie pendiente de revisión',
-      body: `${displayName} (${email}) envió una nueva selfie. Revisa nuevamente su identidad.`,
+      title: 'Solicitud pendiente de revisión',
+      body: `${displayName} (${email}) actualizó sus datos de identidad. Revisa nuevamente su solicitud.`,
       url: '/app/miembros',
       tag: `identidad-reenviada-${email.toLowerCase()}`,
       type: 'identidad_reenviada',

@@ -10,8 +10,9 @@ export interface AuthContextValue {
     password: string,
     firstName: string,
     lastName: string,
-    invitationCode?: string
-  ) => Promise<void>;
+    invitationCode?: string,
+    phone?: string
+  ) => Promise<User>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   hasPermission: (permission: Permission) => boolean;

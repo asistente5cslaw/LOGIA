@@ -18,7 +18,6 @@ import {
   ShieldAlert,
   CheckCircle2,
   XCircle,
-  Camera,
   Check,
   X,
   History,
@@ -110,7 +109,7 @@ export function MembersPage() {
     return true;
   };
 
-  // Solo Secretaría y Administración validan identidades y selfies de registro.
+  // Solo Secretaría y Administración validan las solicitudes de identidad.
   const canValidateIdentity = isSecretario || isAdministrador;
   const canViewDeletedMembers = isVenerableMaestro || isSecretario || user?.profile?.technicalRole === 'admin';
   // El borrado irreversible está reservado a Venerable, Secretaría y
@@ -294,8 +293,8 @@ export function MembersPage() {
         validatingMember.email,
         false,
         user?.displayName || user?.profile?.displayName,
-      ).catch((error) => console.warn('No se pudo enviar aviso de nueva selfie:', error));
-      toast.info(`Validación rechazada. Se solicitará nueva selfie al hermano.`);
+      ).catch((error) => console.warn('No se pudo enviar aviso de rechazo:', error));
+      toast.info('Solicitud rechazada. El miembro deberá contactar a Secretaría.');
       setValidatingMember(null);
       loadMembers();
     } catch {
@@ -538,18 +537,10 @@ export function MembersPage() {
                       className={`relative h-12 w-12 shrink-0 rounded-2xl overflow-hidden border border-border bg-surface shadow-2xs flex items-center justify-center transition-transform ${canValidateIdentity ? 'cursor-pointer group active:scale-95' : ''}`}
                       title={canValidateIdentity ? 'Ver validación de identidad' : undefined}
                     >
-                      {canValidateIdentity && m.selfieUrl ? (
-                        <img
-                          src={m.selfieUrl}
-                          alt={`${m.firstName} ${m.lastName}`}
-                          className="h-full w-full object-cover group-hover:scale-105 transition-transform"
-                        />
-                      ) : (
-                        <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-primary/15 via-primary/5 to-surface text-primary font-serif font-bold text-sm">
-                          {m.firstName[0]}
-                          {m.lastName[0]}
-                        </div>
-                      )}
+                      <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-primary/15 via-primary/5 to-surface text-primary font-serif font-bold text-sm">
+                        {m.firstName[0]}
+                        {m.lastName[0]}
+                      </div>
 
                       {/* Icono de verificación en la esquina del avatar */}
                       {isVerified && (
@@ -637,7 +628,7 @@ export function MembersPage() {
                         type="button"
                         onClick={() => handleOpenValidationModal(m)}
                         className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors cursor-pointer"
-                        title="Identidad verificada. Clic para ver selfie de registro."
+                        title="Solicitud aprobada. Clic para revisar los datos."
                       >
                         <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
                         <span>Verificado</span>
@@ -647,7 +638,7 @@ export function MembersPage() {
                         type="button"
                         onClick={() => handleOpenValidationModal(m)}
                         className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-300 px-3 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-100 transition-all cursor-pointer shadow-2xs active:scale-95"
-                        title="Validación pendiente de aprobación. Clic para revisar selfie."
+                        title="Solicitud pendiente de aprobación. Clic para revisar los datos."
                       >
                         <ShieldAlert className="h-3.5 w-3.5 text-amber-600 animate-pulse" />
                         <span>Validación Pendiente</span>
@@ -667,10 +658,10 @@ export function MembersPage() {
                         type="button"
                         onClick={() => handleOpenValidationModal(m)}
                         className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-500 hover:bg-zinc-200 transition-colors cursor-pointer"
-                        title="Sin selfie de registro cargada"
+                        title="Solicitud pendiente de revisión"
                       >
-                        <Camera className="h-3 w-3 text-zinc-400" />
-                        <span>Sin selfie</span>
+                        <ShieldAlert className="h-3 w-3 text-zinc-400" />
+                        <span>Pendiente</span>
                       </button>
                     )}
 
@@ -738,80 +729,29 @@ export function MembersPage() {
         )}
       </div>
 
-      {/* Modal de Validación de Registro e Identidad Facial (Para Secretario y Venerable Maestro) */}
+      {/* Modal de revisión manual de solicitud */}
       <Modal
         isOpen={Boolean(validatingMember)}
         onClose={() => setValidatingMember(null)}
-        title={validatingMember?.identityStatus === 'verified' ? 'Identidad verificada' : 'Validación de Identidad y Registro Facial'}
+        title={validatingMember?.identityStatus === 'verified' ? 'Solicitud aprobada' : 'Revisión de solicitud'}
         maxWidth="md"
       >
         {validatingMember && (
           <div className="space-y-4">
-            {/* Aviso Explicativo de Seguridad */}
             <div className="flex items-start gap-2.5 rounded-xl bg-surface-container-low border border-border p-3 text-xs text-ink-secondary">
               <ShieldCheck className="h-4 w-4 text-primary shrink-0 mt-0.5" />
               <div>
-                <span className="font-semibold text-ink">Protección contra usurpación de identidad:</span>{' '}
-                Esta comprobación facial se solicita durante el registro para validar la pertenencia fraternal de cada hermano antes de otorgar acceso directo a los trabajos de la logia.
+                <span className="font-semibold text-ink">Verificación manual:</span>{' '}
+                Confirma la solicitud con el registro de Secretaría y el teléfono informado por el hermano antes de otorgar acceso a los trabajos.
               </div>
             </div>
-
-            {/* Fotografía de Selfie de Registro */}
-            <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-surface border border-border">
-              <div className="relative h-44 w-44 sm:h-52 sm:w-52 rounded-2xl overflow-hidden border-2 border-border shadow-md bg-zinc-950 flex items-center justify-center">
-                {validatingMember.selfieUrl ? (
-                  <img
-                    src={validatingMember.selfieUrl}
-                    alt={`Selfie de ${validatingMember.firstName}`}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <div className="flex flex-col items-center justify-center p-4 text-center space-y-2">
-                    <Camera className="h-10 w-10 text-zinc-500" />
-                    <span className="text-xs text-zinc-400">Sin captura de selfie registrada</span>
-                  </div>
-                )}
-
-                {/* Badge flotante en la foto */}
-                <div className="absolute top-2 right-2">
-                  {validatingMember.identityStatus === 'verified' ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600/90 backdrop-blur-xs px-2.5 py-0.5 text-[10px] font-bold text-white shadow-xs">
-                      <Check className="h-3 w-3 stroke-[3]" /> Aprobado
-                    </span>
-                  ) : validatingMember.identityStatus === 'pending' ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-600/90 backdrop-blur-xs px-2.5 py-0.5 text-[10px] font-bold text-white shadow-xs">
-                      <ShieldAlert className="h-3 w-3" /> Pendiente
-                    </span>
-                  ) : validatingMember.identityStatus === 'rejected' ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-rose-600/90 backdrop-blur-xs px-2.5 py-0.5 text-[10px] font-bold text-white shadow-xs">
-                      <XCircle className="h-3 w-3" /> Rechazado
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-
-              {/* Datos del hermano */}
-              <div className="mt-3 text-center space-y-0.5">
-                <h3 className="font-serif text-base font-bold text-ink">
-                  {validatingMember.firstName} {validatingMember.lastName}
-                </h3>
-                <p className="text-xs text-ink-muted">
-                  {validatingMember.degree.toUpperCase()} · {validatingMember.email}
-                </p>
-              </div>
-            </div>
-
-            {/* Resumen del Dictamen Biométrico */}
-            <div className="space-y-2 rounded-xl border border-border p-3 text-xs bg-white">
-              <div className="flex items-center justify-between">
-                <span className="text-ink-secondary">Comprobación biométrica (Liveness):</span>
-                <span className="font-semibold text-emerald-700 inline-flex items-center gap-1">
-                  <Check className="h-3.5 w-3.5" /> Positiva (Presencia real)
-                </span>
-              </div>
+            <div className="space-y-2 rounded-xl border border-border p-4 text-sm bg-white">
+              <h3 className="font-serif text-base font-bold text-ink">{validatingMember.firstName} {validatingMember.lastName}</h3>
+              <p className="text-xs text-ink-muted">{validatingMember.degree.toUpperCase()} · {validatingMember.email}</p>
+              <p className="pt-2 text-xs text-ink-secondary">Teléfono registrado: <span className="font-semibold text-ink">{validatingMember.phone || 'No informado'}</span></p>
               {validatingMember.identityValidatedAt && (
                 <div className="flex items-center justify-between">
-                  <span className="text-ink-secondary">Fecha de captura / revisión:</span>
+                  <span className="text-ink-secondary">Fecha de revisión:</span>
                   <span className="font-semibold text-ink">
                     {formatDateSpanish(validatingMember.identityValidatedAt)}
                   </span>
@@ -820,7 +760,7 @@ export function MembersPage() {
               {validatingMember.identityValidatedBy && (
                 <div className="flex items-center justify-between">
                   <span className="text-ink-secondary">Dictamen emitido por:</span>
-                  <span className="font-semibold text-primary">
+                    <span className="font-semibold text-primary">
                     {validatingMember.identityValidatedBy}
                   </span>
                 </div>
@@ -845,7 +785,7 @@ export function MembersPage() {
                     onClick={handleRejectIdentity}
                     className="flex-1 sm:flex-initial h-10 px-3.5 rounded-xl border border-rose-200 bg-rose-50 text-xs font-semibold text-rose-700 hover:bg-rose-100 transition-colors disabled:opacity-50 cursor-pointer"
                   >
-                    Solicitar Nueva Selfie
+                    Rechazar solicitud
                   </button>
 
                   <button
@@ -1043,15 +983,7 @@ export function MembersPage() {
             {/* Tarjeta Resumen del Hermano */}
             <div className="flex items-center gap-3 p-3 rounded-2xl bg-surface-container-low border border-border">
               <div className="h-11 w-11 shrink-0 rounded-xl overflow-hidden border border-border bg-surface flex items-center justify-center font-serif font-bold text-primary text-sm shadow-2xs">
-                {canValidateIdentity && roleModalMember.selfieUrl ? (
-                  <img
-                    src={roleModalMember.selfieUrl}
-                    alt={roleModalMember.firstName}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <span>{roleModalMember.firstName[0]}{roleModalMember.lastName[0]}</span>
-                )}
+                <span>{roleModalMember.firstName[0]}{roleModalMember.lastName[0]}</span>
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-bold text-ink truncate">

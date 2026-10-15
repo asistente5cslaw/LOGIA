@@ -564,6 +564,28 @@ export function SettingsPage() {
               </p>
             </div>
 
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-ink">Secretario de turno</label>
+                <input
+                  value={lodgeSettings.currentSecretary || ''}
+                  onChange={(e) => setLodgeSettings({ ...lodgeSettings, currentSecretary: e.target.value })}
+                  placeholder="Alexis Castillo Gaona"
+                  className="min-h-[40px] rounded-lg border border-border bg-surface px-3 text-sm text-ink outline-none focus:border-primary"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-ink">WhatsApp del Secretario</label>
+                <input
+                  value={lodgeSettings.currentSecretaryPhone || ''}
+                  onChange={(e) => setLodgeSettings({ ...lodgeSettings, currentSecretaryPhone: e.target.value.replace(/[^\d+]/g, '') })}
+                  placeholder="+50767471286"
+                  inputMode="tel"
+                  className="min-h-[40px] rounded-lg border border-border bg-surface px-3 text-sm text-ink outline-none focus:border-primary"
+                />
+              </div>
+            </div>
+
             <div className="pt-3 border-t border-border flex justify-end">
               <button
                 type="submit"
@@ -692,7 +714,7 @@ export function SettingsPage() {
               Generar Código de Invitación
             </h3>
             <p className="text-xs text-ink-secondary mt-1">
-              Permite a un hermano registrarse pasando la validación facial obligatoria.
+              Permite a un hermano enviar su solicitud para revisión manual por Secretaría.
             </p>
 
             <form onSubmit={handleCreateInvitation} noValidate className="mt-4 space-y-3">

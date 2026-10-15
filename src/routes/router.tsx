@@ -6,7 +6,6 @@ import { AppLayout } from '@/layouts/AppLayout';
 import { LandingPage } from '@/pages/LandingPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { RegisterPage } from '@/pages/RegisterPage';
-import { RegisterIdentityPage } from '@/pages/RegisterIdentityPage';
 import { RegisterConfirmationPage } from '@/pages/RegisterConfirmationPage';
 import { DashboardPage } from '@/pages/app/DashboardPage';
 import { CalendarPage } from '@/pages/app/CalendarPage';
@@ -24,7 +23,6 @@ export const router = createBrowserRouter([
     children: [
       { path: '/login', element: <LoginPage /> },
       { path: '/registro', element: <RegisterPage /> },
-      { path: '/registro/identidad', element: <RegisterIdentityPage /> },
       { path: '/registro/confirmacion', element: <RegisterConfirmationPage /> },
     ],
   },

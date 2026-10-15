@@ -243,7 +243,8 @@ export const authService = {
     password: string,
     firstName: string,
     lastName: string,
-    invitationCode?: string
+    invitationCode?: string,
+    phone?: string
   ): Promise<User> {
     let assignedRoleId: InstitutionalRoleCode = 'apr';
     if (invitationCode && invitationCode.trim()) {
@@ -265,6 +266,7 @@ export const authService = {
             display_name: displayName,
             first_name: firstName.trim(),
             last_name: lastName.trim(),
+            phone: phone?.trim() || null,
             invitation_code: invitationCode ? invitationCode.trim().toUpperCase() : null,
             role_id: assignedRoleId,
           },

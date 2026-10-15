@@ -76,7 +76,7 @@ export interface Member {
   deletedAt?: string;
   createdAt?: string;
   updatedAt?: string;
-  // Validación de identidad y selfie de registro
+  // Estado de revisión de identidad; los campos selfie se conservan por compatibilidad histórica.
   identityVerified?: boolean;
   identityStatus?: 'pending' | 'verified' | 'rejected' | 'not_started';
   selfieUrl?: string;
@@ -271,6 +271,7 @@ export interface LodgeSettings {
   secretaryEmail: string;
   currentVenerableMaster?: string;
   currentSecretary?: string;
+  currentSecretaryPhone?: string;
   privacyPolicyUrl?: string;
   updatedAt: string;
 }

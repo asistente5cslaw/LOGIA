@@ -19,7 +19,7 @@ import { LodgeLogo } from '@/components/shared/LodgeLogo';
 import { NotificationButton } from '@/components/shared/NotificationButton';
 import { useAppleDialog } from '@/components/shared/AppleDialog';
 import { AppIconSelectorModal } from '@/components/shared/AppIconSelectorModal';
-import { IdentityRevalidationModal } from '@/components/shared/IdentityRevalidationModal';
+import { PhoneCaptureModal } from '@/components/shared/PhoneCaptureModal';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { pushNotificationService } from '@/services/pushNotificationService';
 import { DATA_CHANGED_EVENT } from '@/hooks/useRealtimeRefresh';
@@ -180,7 +180,7 @@ export function AppLayout() {
         isOpen={isIconModalOpen && !isInstalled}
         onClose={() => setIsIconModalOpen(false)}
       />
-      <IdentityRevalidationModal />
+      <PhoneCaptureModal />
 
       {/* Barra lateral escritorio fija */}
       <aside
@@ -443,12 +443,12 @@ function RestrictedAccessScreen({ status }: { status?: 'pending' | 'verified' | 
         </h1>
         <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-ink-secondary">
           {isRejected
-            ? 'Tu selfie fue devuelta por Secretaría. Completa la nueva captura solicitada para recuperar el acceso a la información de la logia.'
+            ? 'Tu solicitud fue devuelta por Secretaría. Contacta al Secretario para completar la verificación de tus datos.'
             : 'Puedes acceder al sistema, pero el calendario, las actas, la asistencia y el directorio permanecerán ocultos hasta que un Venerable o Secretario apruebe tu identidad.'}
         </p>
         <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-left text-xs leading-5 text-amber-900">
           {isRejected
-            ? 'La ventana de captura aparecerá automáticamente para completar la nueva selfie.'
+            ? 'Contacta al Secretario del Taller para corregir los datos de tu solicitud.'
             : 'Recibirás acceso automáticamente cuando tu identidad sea aprobada. No necesitas volver a registrarte.'}
         </div>
       </section>

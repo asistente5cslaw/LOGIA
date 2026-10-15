@@ -11,6 +11,16 @@ import type {
 import { auditService } from './auditService';
 
 export const officialVisitService = {
+  async getRegistrationContact(): Promise<{ name: string; phone: string }> {
+    if (!isSupabaseConfigured()) return { name: 'Alexis Castillo Gaona', phone: '+50767471286' };
+    const { data, error } = await supabase.rpc('get_registration_contact');
+    if (error || !data) return { name: 'Alexis Castillo Gaona', phone: '+50767471286' };
+    const contact = Array.isArray(data) ? data[0] : data;
+    return {
+      name: String(contact?.secretary_name || 'Alexis Castillo Gaona'),
+      phone: String(contact?.secretary_phone || '+50767471286'),
+    };
+  },
   async getChecklist(): Promise<OfficialVisitChecklistItem[]> {
     if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
     {
@@ -76,6 +86,7 @@ export const officialVisitService = {
             secretaryEmail: data.secretary_email || data.contact_email,
             currentVenerableMaster: data.current_venerable_master,
             currentSecretary: data.current_secretary,
+            currentSecretaryPhone: data.current_secretary_phone,
             privacyPolicyUrl: data.privacy_policy_url,
             updatedAt: data.updated_at,
           };
@@ -111,6 +122,7 @@ export const officialVisitService = {
             secretary_email: updated.secretaryEmail,
             current_venerable_master: updated.currentVenerableMaster,
             current_secretary: updated.currentSecretary,
+            current_secretary_phone: updated.currentSecretaryPhone,
             privacy_policy_url: updated.privacyPolicyUrl,
           })
           .eq('id', updated.id);
