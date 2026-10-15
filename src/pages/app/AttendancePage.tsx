@@ -16,6 +16,7 @@ import {
   Save,
   User,
   Building2,
+  MapPin,
 } from 'lucide-react';
 import { Modal } from '@/components/shared/Modal';
 import { AppleSelect, type AppleSelectOption } from '@/components/shared/AppleSelect';
@@ -593,7 +594,7 @@ export function AttendancePage() {
           )}
           {selectedEvent && (
             <div className="pt-2 flex items-center justify-between text-xs text-ink-secondary">
-              <span>Lugar: <strong className="text-ink">{selectedEvent.location}</strong></span>
+              <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-primary" /> Lugar: <strong className="text-ink">{selectedEvent.location}</strong></span>
               <span className="capitalize font-medium">Estado: <span className="text-primary">{selectedEvent.status}</span></span>
             </div>
           )}
@@ -625,7 +626,7 @@ export function AttendancePage() {
                           <p className="mt-1 text-xs text-ink-secondary">
                             {formatDateSpanish(event.startDate)}{event.startTime ? ` · ${formatTime12(event.startTime)}` : ''}
                           </p>
-                          <p className="text-xs text-ink-muted">{event.location}</p>
+                          <p className="flex items-center gap-1 text-xs text-ink-muted"><MapPin className="h-3 w-3 text-primary shrink-0" /> {event.location}</p>
                         </div>
                       </div>
                       <span className="rounded-full bg-primary/10 px-2 py-1 text-[10px] font-semibold uppercase text-primary">

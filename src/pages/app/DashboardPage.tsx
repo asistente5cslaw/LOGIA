@@ -9,6 +9,7 @@ import type { LodgeEvent, EventConflict, Member } from '@/types';
 import {
   Users,
   CalendarDays,
+  MapPin,
   AlertTriangle,
   ArrowRight,
 } from 'lucide-react';
@@ -269,7 +270,7 @@ export function DashboardPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <AppleEmoji name={nextMeetingBody?.appleEmoji || 'temple'} size={16} />
+                  <MapPin className="h-4 w-4 text-primary shrink-0" />
                   <span className="truncate">{nextMeeting.location}</span>
                 </div>
               </div>
