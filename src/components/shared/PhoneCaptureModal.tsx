@@ -59,7 +59,7 @@ export function PhoneCaptureModal() {
 
   return (
     <Modal isOpen onClose={() => undefined} title="Completa tu teléfono" subtitle="Este dato es necesario para confirmar tu identidad con Secretaría." maxWidth="md">
-      <div className="space-y-4">
+      <div className="space-y-4 overflow-visible">
         <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
           <Phone className="mt-0.5 h-5 w-5 shrink-0" />
           <p>Registra el celular que tienes informado en Secretaría. No podrás continuar hasta completar este dato.</p>
