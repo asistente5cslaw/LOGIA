@@ -12,6 +12,7 @@ import { institutionalRoles, permissionLabels } from '@/data/rolesData';
 import { PageHeader } from '@/components/shared/PageHeader';
 import type {
   LodgeSettings,
+  Member,
   OfficialVisitChecklistItem,
   OfficialVisitSummary,
   AuditLog,
@@ -31,7 +32,6 @@ import {
   Trash2,
 } from 'lucide-react';
 import { AppleSelect } from '@/components/shared/AppleSelect';
-import { AppleDatePicker } from '@/components/shared/AppleDatePicker';
 import { toast } from 'sonner';
 import { getTodayIsoDate } from '@/lib/dateUtils';
 
@@ -52,6 +52,7 @@ export function SettingsPage() {
   const [checklist, setChecklist] = useState<OfficialVisitChecklistItem[]>([]);
   const [summary, setSummary] = useState<OfficialVisitSummary | null>(null);
   const [lodgeSettings, setLodgeSettings] = useState<LodgeSettings | null>(null);
+  const [lodgeMembers, setLodgeMembers] = useState<Member[]>([]);
 
   // Invitaciones
   const [invitations, setInvitations] = useState<Invitation[]>([]);
@@ -141,7 +142,7 @@ export function SettingsPage() {
       const [chkList, settings, memList, evList, minList, invList, logs] = await Promise.all([
         officialVisitService.getChecklist(),
         officialVisitService.getLodgeSettings(),
-        memberService.getAllMembers(true),
+        memberService.getAllMembers(true, false, true),
         eventService.getAllEvents(),
         minuteService.getAllMinutes(),
         authService.getInvitations(),
@@ -150,6 +151,7 @@ export function SettingsPage() {
 
       setChecklist(chkList);
       setLodgeSettings(settings);
+      setLodgeMembers(memList);
       setInvitations(invList);
       setAuditLogs(logs);
 
@@ -473,7 +475,7 @@ export function SettingsPage() {
           <form onSubmit={handleSaveLodgeSettings} noValidate className="mt-4 space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-ink">Nombre de la Logia</label>
+                <label className="text-xs font-medium text-ink">Nombre oficial de la Respetable Logia</label>
                 <input
                   required
                   value={lodgeSettings.lodgeName}
@@ -494,58 +496,11 @@ export function SettingsPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-ink">Oriente Masónico</label>
-                <input
-                  value={lodgeSettings.orient}
-                  onChange={(e) => setLodgeSettings({ ...lodgeSettings, orient: e.target.value })}
-                  className="min-h-[40px] rounded-lg border border-border bg-surface px-3 text-sm text-ink outline-none focus:border-primary"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-ink">Rito de Trabajo</label>
-                <input
-                  value={lodgeSettings.rite}
-                  onChange={(e) => setLodgeSettings({ ...lodgeSettings, rite: e.target.value })}
-                  className="min-h-[40px] rounded-lg border border-border bg-surface px-3 text-sm text-ink outline-none focus:border-primary"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <AppleDatePicker
-                  label="Fecha de Carta Patente"
-                  value={lodgeSettings.charterDate}
-                  onChange={(val) => setLodgeSettings({ ...lodgeSettings, charterDate: val })}
-                />
-
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-ink">Días de Tenida Habituales</label>
-                <input
-                  value={lodgeSettings.regularMeetingDays}
-                  onChange={(e) => setLodgeSettings({ ...lodgeSettings, regularMeetingDays: e.target.value })}
-                  className="min-h-[40px] rounded-lg border border-border bg-surface px-3 text-sm text-ink outline-none focus:border-primary"
-                />
-              </div>
-            </div>
-
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-ink">Dirección del Templo</label>
+              <label className="text-xs font-medium text-ink">Oriente Masónico</label>
               <input
-                value={lodgeSettings.templeAddress}
-                onChange={(e) => setLodgeSettings({ ...lodgeSettings, templeAddress: e.target.value })}
-                className="min-h-[40px] rounded-lg border border-border bg-surface px-3 text-sm text-ink outline-none focus:border-primary"
-              />
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-ink">Correo Oficial de Contacto</label>
-              <input
-                type="email"
-                value={lodgeSettings.contactEmail}
-                onChange={(e) => setLodgeSettings({ ...lodgeSettings, contactEmail: e.target.value })}
+                value={lodgeSettings.orient}
+                onChange={(e) => setLodgeSettings({ ...lodgeSettings, orient: e.target.value })}
                 className="min-h-[40px] rounded-lg border border-border bg-surface px-3 text-sm text-ink outline-none focus:border-primary"
               />
             </div>
@@ -567,12 +522,24 @@ export function SettingsPage() {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-medium text-ink">Secretario de turno</label>
-                <input
+                <select
                   value={lodgeSettings.currentSecretary || ''}
-                  onChange={(e) => setLodgeSettings({ ...lodgeSettings, currentSecretary: e.target.value })}
-                  placeholder="Alexis Castillo Gaona"
+                  onChange={(e) => {
+                    const selectedMember = lodgeMembers.find((member) => `${member.firstName} ${member.lastName}` === e.target.value);
+                    setLodgeSettings({
+                      ...lodgeSettings,
+                      currentSecretary: e.target.value,
+                      currentSecretaryPhone: selectedMember?.phone || '',
+                    });
+                  }}
                   className="min-h-[40px] rounded-lg border border-border bg-surface px-3 text-sm text-ink outline-none focus:border-primary"
-                />
+                >
+                  <option value="">Selecciona un miembro</option>
+                  {lodgeMembers.map((member) => {
+                    const name = `${member.firstName} ${member.lastName}`.trim();
+                    return <option key={member.id} value={name}>{name}</option>;
+                  })}
+                </select>
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-medium text-ink">WhatsApp del Secretario</label>
