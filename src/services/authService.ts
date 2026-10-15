@@ -2,6 +2,7 @@ import { supabase, supabaseUrl, isSupabaseConfigured } from '@/lib/supabase';
 import type { User, UserProfile, Invitation, MasonicDegree, InstitutionalRoleCode } from '@/types';
 import { institutionalRoles } from '@/data/rolesData';
 import { auditService } from './auditService';
+import { pushNotificationService } from './pushNotificationService';
 
 interface AuthResponseShape {
   data: { user: { id: string; email?: string } | null; session: unknown };
@@ -300,6 +301,9 @@ export const authService = {
       };
 
       await auditService.log('REGISTRO_USUARIO', 'auth', user.id, { id: user.id, email: cleanEmail });
+      void pushNotificationService.notifyNewRegistration(displayName, cleanEmail).catch((notificationError) => {
+        console.warn('No se pudo enviar la notificación de nuevo registro:', notificationError);
+      });
       return user;
     }
 

@@ -33,7 +33,12 @@ export function RegisterConfirmationPage() {
       <p className="mt-3 max-w-md text-sm text-ink-secondary leading-relaxed">
         {isApproved
           ? 'Tu cuenta ha sido confirmada y tu identidad ha sido verificada. Ya puedes ingresar al portal de la logia.'
-          : 'Revisión de solicitud. El administrador revisará su solicitud y le otorgará el grado masónico correspondiente. Puede contactar al Secretario del Taller por WhatsApp para agilizar el proceso. Verificación de identidad. Para evitar la suplantación de identidad, confirmaremos su solicitud con el celular que tenga registrado en Secretaría.'}
+          : (
+            <>
+              <span>Revisión de solicitud. El administrador revisará su solicitud y le otorgará el grado masónico correspondiente. Puede contactar al Secretario del Taller por WhatsApp para agilizar el proceso. Verificación de identidad.</span>
+              <span className="mt-4 block">Para evitar la suplantación de identidad, confirmaremos su solicitud con el celular que tenga registrado en Secretaría.</span>
+            </>
+          )}
       </p>
       {!isApproved && (
         <div className="mt-4 w-full max-w-md rounded-xl border border-border bg-surface p-4 text-left text-sm">
@@ -43,14 +48,6 @@ export function RegisterConfirmationPage() {
           <a href={convocationService.generateWhatsAppUrl(contact.phone, 'Hola Alexis, acabo de enviar mi solicitud de ingreso a la Logia UF No. 21.')} target="_blank" rel="noreferrer" className="mt-3 inline-flex min-h-[40px] items-center justify-center rounded-lg bg-emerald-600 px-4 text-xs font-semibold text-white hover:bg-emerald-700">Contactar por WhatsApp</a>
         </div>
       )}
-
-      <div className="mt-4 rounded-xl border border-border bg-surface p-4 text-xs text-ink-secondary max-w-sm text-left">
-        <p className="font-medium text-ink">Próximos pasos:</p>
-        <ul className="mt-1 list-disc list-inside space-y-1">
-          <li>Revisa tu correo electrónico para confirmar el enlace de activación si aplica.</li>
-          <li>Comunícate con el Secretario de tu taller para la habilitación de permisos.</li>
-        </ul>
-      </div>
 
       <Link
         to="/login"
