@@ -164,7 +164,7 @@ export const memberService = {
       .from('members')
       .update({ phone: phone.trim(), updated_at: new Date().toISOString() })
       .eq('id', memberId)
-      .eq('deleted_at', null);
+      .is('deleted_at', null);
     if (error) throw error;
   },
 

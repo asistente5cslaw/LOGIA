@@ -91,7 +91,6 @@ export function PhoneCountrySelect({ value, onChange, disabled = false }: PhoneC
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                autoFocus
                 placeholder="Buscar país o prefijo"
                 className="min-h-[38px] min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-ink-muted"
               />
