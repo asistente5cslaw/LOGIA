@@ -4,6 +4,7 @@ import { Modal } from '@/components/shared/Modal';
 import { useAuth } from '@/hooks/useAuth';
 import { memberService } from '@/services/memberService';
 import { panamaPhoneCountry, phoneCountries } from '@/data/phoneCountries';
+import { PhoneCountrySelect } from '@/components/shared/PhoneCountrySelect';
 import { toast } from 'sonner';
 
 export function PhoneCaptureModal() {
@@ -64,9 +65,7 @@ export function PhoneCaptureModal() {
           <p>Registra el celular que tienes informado en Secretaría. No podrás continuar hasta completar este dato.</p>
         </div>
         <div className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-2">
-          <select value={countryCode} onChange={(event) => setCountryCode(event.target.value)} aria-label="País del teléfono" className="min-h-[46px] rounded-xl border border-border bg-surface px-2 text-sm text-ink outline-none focus:border-primary focus:ring-3 focus:ring-primary/15">
-            {phoneCountries.map((country) => <option key={country.code} value={country.code}>{country.flag} {country.name} ({country.dialCode})</option>)}
-          </select>
+          <PhoneCountrySelect value={countryCode} onChange={setCountryCode} />
           <input value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value.replace(/\D/g, '').slice(0, 15))} inputMode="numeric" placeholder="61234567" className="min-h-[46px] rounded-xl border border-border bg-surface px-3.5 text-base text-ink outline-none focus:border-primary focus:ring-3 focus:ring-primary/15" />
         </div>
         <button type="button" onClick={() => void handleSave()} disabled={isSaving} className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary-pressed disabled:opacity-60">

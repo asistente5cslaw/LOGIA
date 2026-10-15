@@ -8,6 +8,7 @@ import { LodgeLogo } from '@/components/shared/LodgeLogo';
 import { useAppleDialog } from '@/components/shared/AppleDialog';
 import { useAuth } from '@/hooks/useAuth';
 import { panamaPhoneCountry, phoneCountries } from '@/data/phoneCountries';
+import { PhoneCountrySelect } from '@/components/shared/PhoneCountrySelect';
 
 const registerSchema = z.object({
   firstName: z.string().min(2, 'Ingresa tus nombres completos'),
@@ -29,7 +30,7 @@ export function RegisterPage() {
   const { register: registerAccount, login } = useAuth();
   const { showAlert } = useAppleDialog();
   const [showPasswords, setShowPasswords] = useState(false);
-  const { register, handleSubmit, setValue, formState: { errors, isSubmitting } } = useForm<RegisterFormValues>({
+  const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: { phoneCountryCode: panamaPhoneCountry.code },
   });
@@ -79,9 +80,7 @@ export function RegisterPage() {
         <div className="flex flex-col gap-1.5">
           <label htmlFor="phoneNumber" className="text-sm font-medium text-ink flex items-center gap-1.5"><Phone className="h-3.5 w-3.5 text-ink-muted" /> Teléfono de contacto</label>
           <div className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-2">
-            <select {...register('phoneCountryCode')} aria-label="País del teléfono" className="min-h-[46px] rounded-xl border border-border bg-surface px-2 text-sm text-ink outline-none focus:border-primary focus:ring-3 focus:ring-primary/15">
-              {phoneCountries.map((country) => <option key={country.code} value={country.code}>{country.flag} {country.name} ({country.dialCode})</option>)}
-            </select>
+            <PhoneCountrySelect value={watch('phoneCountryCode')} onChange={(countryCode) => setValue('phoneCountryCode', countryCode, { shouldValidate: true })} />
             <input id="phoneNumber" type="text" inputMode="numeric" autoComplete="tel-national" {...register('phoneNumber', { onChange: (event) => setValue('phoneNumber', event.target.value.replace(/\D/g, '').slice(0, 15)) })} placeholder="61234567" className={inputClass} />
           </div>
           {errors.phoneNumber && <p className="text-xs text-destructive">{errors.phoneNumber.message}</p>}
