@@ -2,6 +2,7 @@ import { createPortal } from 'react-dom';
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { Check, ChevronDown, Search } from 'lucide-react';
 import { panamaPhoneCountry, phoneCountries, type PhoneCountry } from '@/data/phoneCountries';
+import 'flag-icons/css/flag-icons.min.css';
 
 interface PhoneCountrySelectProps {
   value: string;
@@ -126,9 +127,8 @@ export function PhoneCountrySelect({ value, onChange, disabled = false }: PhoneC
 
 function Flag({ country }: { country: PhoneCountry }) {
   return (
-    <span className="relative inline-flex h-5 w-7 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-surface-container text-sm leading-none" aria-label={`Bandera de ${country.name}`}>
-      <span aria-hidden="true">{country.flag}</span>
-      <img src={`https://flagcdn.com/w40/${country.code.toLowerCase()}.png`} alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" />
+    <span className="inline-flex h-5 w-7 shrink-0 overflow-hidden rounded-sm bg-surface-container" aria-label={`Bandera de ${country.name}`}>
+      <span className={`fi fi-${country.code.toLowerCase()} h-full w-full bg-cover bg-center`} aria-hidden="true" />
     </span>
   );
 }

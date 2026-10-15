@@ -158,6 +158,13 @@ export const memberService = {
     return list.find((m) => m.id === id);
   },
 
+  async getOwnPhone(): Promise<string | undefined> {
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    const { data, error } = await supabase.rpc('get_my_member_phone');
+    if (error) throw error;
+    return typeof data === 'string' && data.trim() ? data.trim() : undefined;
+  },
+
   async updateOwnPhone(memberId: string, phone: string): Promise<void> {
     if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
     const { error } = await supabase

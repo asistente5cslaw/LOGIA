@@ -23,8 +23,8 @@ export function PhoneCaptureModal() {
         return;
       }
       try {
-        const member = await memberService.getMemberById(user.memberId);
-        if (!cancelled) setNeedsPhone(!member?.phone?.trim());
+        const phone = await memberService.getOwnPhone();
+        if (!cancelled) setNeedsPhone(!phone);
       } catch (error) {
         console.error('No se pudo revisar el teléfono del usuario:', error);
       } finally {
