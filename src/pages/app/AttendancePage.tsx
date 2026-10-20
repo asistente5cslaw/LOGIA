@@ -59,12 +59,14 @@ export function AttendancePage() {
   const [searchMember, setSearchMember] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [pendingAttendanceEvents, setPendingAttendanceEvents] = useState<LodgeEvent[]>([]);
   const [savedAttendanceKeys, setSavedAttendanceKeys] = useState<Record<string, boolean>>({});
   const [attendanceCalendarDate, setAttendanceCalendarDate] = useState(() => {
     const today = new Date();
     return new Date(today.getFullYear(), today.getMonth(), 1);
   });
-  const [showAttendanceCalendar, setShowAttendanceCalendar] = useState(true);
+  const [showAttendanceCalendar, setShowAttendanceCalendar] = useState(false);
+  const [dayEventChoices, setDayEventChoices] = useState<LodgeEvent[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   // Modal para agregar visitante
@@ -200,6 +202,40 @@ export function AttendancePage() {
     void loadAttendanceForSelected(selectedEventId, selectedSegmentId, members);
   }, [selectedEventId, selectedSegmentId, members, hasUnsavedChanges, loadAttendanceForSelected]);
 
+  // Reuniones culminadas que todavía no tienen asistencia oficial guardada.
+  useEffect(() => {
+    if (!canManageAttendance || meetings.length === 0) {
+      setPendingAttendanceEvents([]);
+      return;
+    }
+
+    let cancelled = false;
+    const loadPendingAttendance = async () => {
+      const now = Date.now();
+      const candidates = meetings.filter((event) => {
+        if (event.status === 'cancelada' || !event.degreeSegments?.[0]) return false;
+        const eventStart = new Date(`${event.startDate}T${event.startTime || '23:59:59'}-05:00`).getTime();
+        return event.status === 'celebrada' || (!Number.isNaN(eventStart) && eventStart <= now);
+      });
+      const results = await Promise.allSettled(candidates.map(async (event) => {
+        const segmentId = event.degreeSegments?.[0]?.id;
+        if (!segmentId) return null;
+        const records = await attendanceService.getAttendanceForEvent(event.id, segmentId);
+        return records.length === 0 ? event : null;
+      }));
+      if (cancelled) return;
+      setPendingAttendanceEvents(
+        results
+          .filter((result): result is PromiseFulfilledResult<LodgeEvent | null> => result.status === 'fulfilled')
+          .map((result) => result.value)
+          .filter((event): event is LodgeEvent => Boolean(event))
+          .sort((a, b) => `${a.startDate}T${a.startTime || ''}`.localeCompare(`${b.startDate}T${b.startTime || ''}`))
+      );
+    };
+    void loadPendingAttendance();
+    return () => { cancelled = true; };
+  }, [canManageAttendance, meetings]);
+
   // Mantiene los contadores y estados sincronizados entre dispositivos aunque
   // el canal realtime tarde o no esté disponible en el navegador.
   useEffect(() => {
@@ -317,6 +353,7 @@ export function AttendancePage() {
         ...prev,
         [`${selectedEventId}:${selectedSegmentId}`]: true,
       }));
+      setPendingAttendanceEvents((prev) => prev.filter((event) => event.id !== selectedEventId));
     } catch {
       toast.error('No se pudo guardar el estado de asistencia.');
     } finally {
@@ -438,6 +475,7 @@ export function AttendancePage() {
         ...prev,
         [`${selectedEventId}:${selectedSegmentId}`]: true,
       }));
+      setPendingAttendanceEvents((prev) => prev.filter((event) => event.id !== selectedEventId));
       toast.success('Lista de asistencia guardada correctamente.');
     } catch {
       toast.error('Error al guardar la asistencia');
@@ -532,6 +570,14 @@ export function AttendancePage() {
     setSelectedSegmentId(event.degreeSegments?.[0]?.id || '');
     setSelectedEventId(event.id);
     setShowAttendanceCalendar(false);
+    setDayEventChoices([]);
+  };
+  const handleAttendanceCalendarDayClick = (events: LodgeEvent[]) => {
+    if (events.length === 1) {
+      selectAttendanceEvent(events[0]);
+    } else if (events.length > 1) {
+      setDayEventChoices(events);
+    }
   };
 
   return (
@@ -671,21 +717,31 @@ export function AttendancePage() {
                   });
                   const hasEvents = dayEvents.length > 0;
                   return (
-                    <div key={dateStr} className={`min-h-[60px] rounded-xl border p-1.5 sm:min-h-[74px] ${hasEvents ? 'border-primary/40 bg-primary/10' : 'border-border bg-white'}`}>
+                    <div
+                      key={dateStr}
+                      role={hasEvents ? 'button' : undefined}
+                      tabIndex={hasEvents ? 0 : -1}
+                      onClick={() => handleAttendanceCalendarDayClick(dayEvents)}
+                      onKeyDown={(event) => {
+                        if (hasEvents && (event.key === 'Enter' || event.key === ' ')) {
+                          event.preventDefault();
+                          handleAttendanceCalendarDayClick(dayEvents);
+                        }
+                      }}
+                      className={`min-h-[60px] rounded-xl border p-1.5 sm:min-h-[74px] ${hasEvents ? 'cursor-pointer border-primary/40 bg-primary/10 hover:bg-primary/15' : 'border-border bg-white'}`}
+                    >
                       <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs ${hasEvents ? 'bg-primary font-bold text-primary-foreground' : 'text-ink-secondary'}`}>{day}</span>
                       {hasEvents && (
                         <div className="mt-1 space-y-1 overflow-hidden">
                           {dayEvents.slice(0, 2).map((event) => (
-                            <button
+                            <span
                               key={event.id}
-                              type="button"
                               title={event.title}
-                              onClick={() => selectAttendanceEvent(event)}
-                              className="flex w-full items-center gap-1 truncate rounded border border-primary/20 bg-white px-1 py-0.5 text-left text-[8px] leading-tight text-primary hover:bg-primary/10 sm:text-[9px]"
+                              className="flex w-full items-center gap-1 truncate rounded border border-primary/20 bg-white px-1 py-0.5 text-left text-[8px] leading-tight text-primary sm:text-[9px]"
                             >
                               <AppleEmoji name={getBodyById(event.bodyId).appleEmoji} size={11} />
                               <span className="truncate">{event.title}</span>
-                            </button>
+                            </span>
                           ))}
                           {dayEvents.length > 2 && <span className="block px-1 text-[8px] font-semibold text-ink-muted">+{dayEvents.length - 2} más</span>}
                         </div>
@@ -721,6 +777,75 @@ export function AttendancePage() {
           )}
         </div>
       ))}
+
+      <Modal
+        isOpen={dayEventChoices.length > 1}
+        onClose={() => setDayEventChoices([])}
+        title="Selecciona la reunión"
+        subtitle="Hay más de una actividad programada para este día."
+        maxWidth="sm"
+      >
+        <div className="space-y-2">
+          {dayEventChoices.map((event) => (
+            <button
+              key={event.id}
+              type="button"
+              onClick={() => selectAttendanceEvent(event)}
+              className="flex w-full items-start gap-3 rounded-xl border border-border bg-surface px-3 py-3 text-left transition-colors hover:border-primary hover:bg-surface-container-low"
+            >
+              <AppleEmoji name={getBodyById(event.bodyId).appleEmoji} size={24} />
+              <span className="min-w-0 flex-1">
+                <span className="block font-serif text-sm font-bold text-ink">{event.title}</span>
+                <span className="mt-1 block text-xs text-ink-muted">
+                  {formatTimeRange12(event.startTime, event.endTime) || 'Horario por confirmar'} · {event.location || 'Ubicación por confirmar'}
+                </span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </Modal>
+
+      {canManageAttendance && !selectedEventId && pendingAttendanceEvents.length > 0 && (
+        <section className="rounded-2xl border border-dashed border-border bg-white p-5 shadow-xs sm:p-6">
+          <div className="mb-5 text-center">
+            <h4 className="font-serif text-base font-bold text-ink">Registros pendientes</h4>
+            <p className="mx-auto mt-1 max-w-md text-xs text-ink-muted">Estas reuniones todavía no tienen asistencia oficial guardada.</p>
+          </div>
+          <div className="grid gap-3 text-left sm:grid-cols-2 lg:grid-cols-3">
+            {pendingAttendanceEvents.map((event) => (
+              <button
+                key={event.id}
+                type="button"
+                onClick={() => selectAttendanceEvent(event)}
+                className="rounded-2xl border border-border bg-surface px-4 py-4 text-left transition-colors hover:border-primary hover:bg-surface-container-low"
+              >
+                <span className="flex items-start justify-between gap-3">
+                  <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-ink-secondary">
+                    <AppleEmoji name={getBodyById(event.bodyId).appleEmoji} size={24} />
+                    {getBodyById(event.bodyId).shortName}
+                  </span>
+                  <span className="shrink-0 rounded-full bg-surface-container px-2.5 py-1 text-[10px] font-semibold uppercase text-ink-secondary">
+                    {event.status === 'convocada' ? 'Convocada' : event.status === 'celebrada' ? 'Celebrada' : 'Programada'}
+                  </span>
+                </span>
+                <span className="mt-3 block font-serif text-base font-bold text-ink">{event.title}</span>
+                <span className="mt-2 flex items-center gap-1.5 text-[11px] text-ink-muted">
+                  <Clock3 className="h-3.5 w-3.5 shrink-0 text-primary" />
+                  {formatTimeRange12(event.startTime, event.endTime) || 'Horario por confirmar'}
+                </span>
+                <span className="mt-1 flex items-center gap-1.5 text-[11px] text-ink-muted">
+                  <MapPin className="h-3.5 w-3.5 shrink-0 text-primary" />
+                  {event.location || 'Ubicación por confirmar'}
+                </span>
+                {event.notes?.trim() && (
+                  <span className="mt-2 block text-[11px] italic leading-relaxed text-ink-muted">«{event.notes.trim()}»</span>
+                )}
+                <span className="mt-3 block border-t border-border pt-3 text-[11px] font-semibold text-primary">Abrir registro →</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       {!canManageAttendance && (
         <section className="space-y-3">
