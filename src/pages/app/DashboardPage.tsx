@@ -164,13 +164,9 @@ export function DashboardPage() {
         });
       }
       setHomeAttendanceStatus(nextStatus === 'ausente' ? null : nextStatus);
-      if (nextStatus !== 'excusa') {
-        setHomeExcuseDraft('');
-        setHomeExcuseSaved(false);
-      } else {
-        setHomeExcuseDraft('');
-        setHomeExcuseSaved(false);
-      }
+      // Retener el motivo localmente permite quitar y volver a seleccionar
+      // la excusa sin obligar al hermano a escribirlo nuevamente.
+      if (nextStatus !== 'excusa') setHomeExcuseSaved(false);
       toast.success(
         nextStatus === 'presente'
           ? 'Aviso de asistencia enviado. Secretaría registrará la asistencia oficial.'
