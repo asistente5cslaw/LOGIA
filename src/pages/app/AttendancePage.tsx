@@ -55,6 +55,8 @@ export function AttendancePage() {
   const [searchMember, setSearchMember] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [pendingAttendanceEvents, setPendingAttendanceEvents] = useState<LodgeEvent[]>([]);
+  const [savedAttendanceKeys, setSavedAttendanceKeys] = useState<Record<string, boolean>>({});
   const [loadError, setLoadError] = useState<string | null>(null);
 
   // Modal para agregar visitante
@@ -145,6 +147,10 @@ export function AttendancePage() {
         if (response.submittedAt) responseSubmitted[response.memberId] = response.submittedAt;
       });
       setAttendanceMap(map);
+      setSavedAttendanceKeys((prev) => ({
+        ...prev,
+        [`${eventId}:${segmentId}`]: records.length > 0,
+      }));
       setExcuseReasons(reasons);
       setExcuseSubmittedAt(submitted);
       setMemberResponses(responseMap);
@@ -185,6 +191,41 @@ export function AttendancePage() {
 
     void loadAttendanceForSelected(selectedEventId, selectedSegmentId, members);
   }, [selectedEventId, selectedSegmentId, members, hasUnsavedChanges, loadAttendanceForSelected]);
+
+  // Reuniones culminadas sin asistencia oficial guardada: quedan disponibles
+  // como accesos rápidos para Secretaría, Venerable y Administración.
+  useEffect(() => {
+    if (!canManageAttendance || meetings.length === 0) {
+      setPendingAttendanceEvents([]);
+      return;
+    }
+
+    let cancelled = false;
+    const loadPendingAttendance = async () => {
+      const now = Date.now();
+      const candidates = meetings.filter((event) => {
+        if (event.status === 'cancelada' || !event.degreeSegments?.[0]) return false;
+        const eventStart = new Date(`${event.startDate}T${event.startTime || '23:59:59'}-05:00`).getTime();
+        return event.status === 'celebrada' || (!Number.isNaN(eventStart) && eventStart <= now);
+      });
+      const results = await Promise.allSettled(candidates.map(async (event) => {
+        const segmentId = event.degreeSegments?.[0]?.id;
+        if (!segmentId) return null;
+        const records = await attendanceService.getAttendanceForEvent(event.id, segmentId);
+        return records.length === 0 ? event : null;
+      }));
+      if (cancelled) return;
+      setPendingAttendanceEvents(
+        results
+          .filter((result): result is PromiseFulfilledResult<LodgeEvent | null> => result.status === 'fulfilled')
+          .map((result) => result.value)
+          .filter((event): event is LodgeEvent => Boolean(event))
+          .sort((a, b) => `${a.startDate}T${a.startTime || ''}`.localeCompare(`${b.startDate}T${b.startTime || ''}`))
+      );
+    };
+    void loadPendingAttendance();
+    return () => { cancelled = true; };
+  }, [canManageAttendance, meetings]);
 
   // Mantiene los contadores y estados sincronizados entre dispositivos aunque
   // el canal realtime tarde o no esté disponible en el navegador.
@@ -299,6 +340,11 @@ export function AttendancePage() {
         email: user?.email,
       });
       setHasUnsavedChanges(false);
+      setSavedAttendanceKeys((prev) => ({
+        ...prev,
+        [`${selectedEventId}:${selectedSegmentId}`]: true,
+      }));
+      setPendingAttendanceEvents((prev) => prev.filter((event) => event.id !== selectedEventId));
     } catch {
       toast.error('No se pudo guardar el estado de asistencia.');
     } finally {
@@ -416,6 +462,11 @@ export function AttendancePage() {
       });
 
       setHasUnsavedChanges(false);
+      setSavedAttendanceKeys((prev) => ({
+        ...prev,
+        [`${selectedEventId}:${selectedSegmentId}`]: true,
+      }));
+      setPendingAttendanceEvents((prev) => prev.filter((event) => event.id !== selectedEventId));
       toast.success('Lista de asistencia guardada correctamente.');
     } catch {
       toast.error('Error al guardar la asistencia');
@@ -530,6 +581,33 @@ export function AttendancePage() {
         void loadInitial();
         if (selectedEventId && selectedSegmentId) void loadAttendanceForSelected(selectedEventId, selectedSegmentId, members);
       }} />}
+
+      {canManageAttendance && pendingAttendanceEvents.length > 0 && (
+        <section className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 shadow-xs sm:p-5">
+          <div className="mb-3">
+            <h2 className="font-serif text-base font-bold text-amber-950">Registros pendientes</h2>
+            <p className="mt-1 text-xs text-amber-800">Estas reuniones ya culminaron y todavía no tienen asistencia oficial guardada.</p>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {pendingAttendanceEvents.map((event) => (
+              <button
+                key={event.id}
+                type="button"
+                onClick={() => {
+                  setHasUnsavedChanges(false);
+                  setSelectedSegmentId(event.degreeSegments?.[0]?.id || '');
+                  setSelectedEventId(event.id);
+                }}
+                className="rounded-xl border border-amber-200 bg-white px-3 py-3 text-left transition-colors hover:border-primary hover:bg-white"
+              >
+                <span className="block text-xs font-semibold text-ink">{event.title}</span>
+                <span className="mt-1 block text-[11px] text-ink-muted">{formatDateSpanish(event.startDate)}{event.startTime ? ` · ${formatTime12(event.startTime)}` : ''}</span>
+                <span className="mt-2 block text-[11px] font-semibold text-primary">Abrir registro →</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Selector de Tenida estilo Apple */}
       {canManageAttendance && (meetings.length === 0 ? (
@@ -680,6 +758,19 @@ export function AttendancePage() {
       {/* Contenido de asistencia: Solo cuando hay una tenida seleccionada */}
       {canManageAttendance && selectedEventId && (
         <>
+
+      {savedAttendanceKeys[`${selectedEventId}:${selectedSegmentId}`] && (
+        <div className="flex flex-col gap-2 rounded-xl border border-success/25 bg-success/5 px-4 py-3 text-xs sm:flex-row sm:items-center sm:justify-between">
+          <span className="font-semibold text-success">Registro oficial guardado. Puedes editarlo.</span>
+          <button
+            type="button"
+            onClick={() => setHasUnsavedChanges(true)}
+            className="self-start rounded-lg border border-success/30 px-3 py-1.5 font-semibold text-success hover:bg-success/10 sm:self-auto"
+          >
+            Editar registro
+          </button>
+        </div>
+      )}
 
       {/* Indicadores de Resumen */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
