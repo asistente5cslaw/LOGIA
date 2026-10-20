@@ -17,12 +17,13 @@ import {
   User,
   Building2,
   MapPin,
+  Clock3,
 } from 'lucide-react';
 import { Modal } from '@/components/shared/Modal';
 import { AppleSelect, type AppleSelectOption } from '@/components/shared/AppleSelect';
 import { AppleInput } from '@/components/shared/AppleInput';
 import { AppleEmoji } from '@/components/shared/AppleEmoji';
-import { formatDateSpanish, formatTime12 } from '@/lib/dateUtils';
+import { formatDateSpanish, formatTime12, formatTimeRange12 } from '@/lib/dateUtils';
 import { getLocalIsoDate } from '@/domain/dashboardStats';
 import { toast } from 'sonner';
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
@@ -582,33 +583,6 @@ export function AttendancePage() {
         if (selectedEventId && selectedSegmentId) void loadAttendanceForSelected(selectedEventId, selectedSegmentId, members);
       }} />}
 
-      {canManageAttendance && pendingAttendanceEvents.length > 0 && (
-        <section className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 shadow-xs sm:p-5">
-          <div className="mb-3">
-            <h2 className="font-serif text-base font-bold text-amber-950">Registros pendientes</h2>
-            <p className="mt-1 text-xs text-amber-800">Estas reuniones ya culminaron y todavía no tienen asistencia oficial guardada.</p>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {pendingAttendanceEvents.map((event) => (
-              <button
-                key={event.id}
-                type="button"
-                onClick={() => {
-                  setHasUnsavedChanges(false);
-                  setSelectedSegmentId(event.degreeSegments?.[0]?.id || '');
-                  setSelectedEventId(event.id);
-                }}
-                className="rounded-xl border border-amber-200 bg-white px-3 py-3 text-left transition-colors hover:border-primary hover:bg-white"
-              >
-                <span className="block text-xs font-semibold text-ink">{event.title}</span>
-                <span className="mt-1 block text-[11px] text-ink-muted">{formatDateSpanish(event.startDate)}{event.startTime ? ` · ${formatTime12(event.startTime)}` : ''}</span>
-                <span className="mt-2 block text-[11px] font-semibold text-primary">Abrir registro →</span>
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
-
       {/* Selector de Tenida estilo Apple */}
       {canManageAttendance && (meetings.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-white p-6 sm:p-8 text-center space-y-3 shadow-xs">
@@ -741,17 +715,63 @@ export function AttendancePage() {
       {/* Mensaje guiado cuando aún no se ha seleccionado ninguna tenida */}
       {canManageAttendance && meetings.length > 0 && !selectedEventId && (
         <div className="rounded-2xl border border-dashed border-border bg-white p-8 sm:p-12 text-center space-y-3 shadow-xs">
-          <div className="flex justify-center">
-            <AppleEmoji name="temple" size={38} />
-          </div>
-          <div>
-            <h4 className="font-serif text-base font-bold text-ink">
-              Ninguna actividad seleccionada
-            </h4>
-            <p className="text-xs text-ink-muted max-w-md mx-auto mt-1">
-              Por favor selecciona en la lista desplegable superior la reunión o actividad masónica para registrar la asistencia y los QQ.·. HH.·. visitantes.
-            </p>
-          </div>
+          {pendingAttendanceEvents.length > 0 ? (
+            <div className="w-full text-left">
+              <div className="mb-5 text-center">
+                <h4 className="font-serif text-base font-bold text-ink">Registros pendientes</h4>
+                <p className="mx-auto mt-1 max-w-md text-xs text-ink-muted">Selecciona una reunión para registrar la asistencia oficial.</p>
+              </div>
+              <div className="grid gap-3 text-left sm:grid-cols-2 lg:grid-cols-3">
+                {pendingAttendanceEvents.map((event) => (
+                  <button
+                    key={event.id}
+                    type="button"
+                    onClick={() => {
+                      setHasUnsavedChanges(false);
+                      setSelectedSegmentId(event.degreeSegments?.[0]?.id || '');
+                      setSelectedEventId(event.id);
+                    }}
+                    className="rounded-xl border border-border bg-surface px-4 py-4 text-left transition-colors hover:border-primary hover:bg-surface-container-low"
+                  >
+                    <span className="flex items-start justify-between gap-3">
+                      <span className="text-xs font-semibold text-ink">{getBodyById(event.bodyId).shortName}</span>
+                      <span className="shrink-0 rounded-full bg-primary/10 px-2 py-1 text-[10px] font-semibold text-primary">
+                        {event.status === 'convocada' ? 'Convocada' : event.status === 'celebrada' ? 'Celebrada' : 'Programada'}
+                      </span>
+                    </span>
+                    <span className="mt-3 block font-serif text-sm font-bold text-ink">{event.title}</span>
+                    <span className="mt-2 flex items-center gap-1.5 text-[11px] text-ink-muted">
+                      <Clock3 className="h-3.5 w-3.5 shrink-0 text-primary" />
+                      {formatTimeRange12(event.startTime, event.endTime) || 'Horario por confirmar'}
+                    </span>
+                    <span className="mt-1 flex items-center gap-1.5 text-[11px] text-ink-muted">
+                      <MapPin className="h-3.5 w-3.5 shrink-0 text-primary" />
+                      {event.location || 'Ubicación por confirmar'}
+                    </span>
+                    <span className="mt-1 block text-[11px] text-ink-muted">{formatDateSpanish(event.startDate)}</span>
+                    {event.notes?.trim() && (
+                      <span className="mt-3 block border-t border-border pt-2 text-[11px] italic leading-relaxed text-ink-secondary">
+                        «{event.notes.trim()}»
+                      </span>
+                    )}
+                    <span className="mt-3 block text-[11px] font-semibold text-primary">Abrir registro →</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="flex justify-center">
+                <AppleEmoji name="temple" size={38} />
+              </div>
+              <div>
+                <h4 className="font-serif text-base font-bold text-ink">Ninguna actividad seleccionada</h4>
+                <p className="mx-auto mt-1 max-w-md text-xs text-ink-muted">
+                  Por favor selecciona en la lista desplegable superior la reunión o actividad masónica para registrar la asistencia y los QQ.·. HH.·. visitantes.
+                </p>
+              </div>
+            </>
+          )}
         </div>
       )}
 
