@@ -93,7 +93,10 @@ export function MembersPage() {
 
   const isVenerableMaestro = user?.profile?.roleId === 'vm';
   const isSecretario = user?.profile?.roleId === 'sec';
-  const isAdministrador = user?.profile?.technicalRole === 'admin' || user?.profile?.roleId === 'adm';
+  const isAdministrador = user?.profile?.roleId === 'adm';
+  const visibleRoleOptions = isAdministrador
+    ? roleOptions
+    : roleOptions.filter((option) => option.value !== 'adm');
   const canManageMembers = hasPermission('manage_members') || isVenerableMaestro || isSecretario;
 
   const canChangeMemberRole = (member: Member): boolean => {
@@ -106,6 +109,7 @@ export function MembersPage() {
 
   const canAssignRole = (member: Member): boolean => {
     if (!canChangeMemberRole(member)) return false;
+    if (!isAdministrador && member.roleId === 'adm') return false;
     return true;
   };
 
@@ -149,6 +153,10 @@ export function MembersPage() {
     if (!roleModalMember) return;
     if (!canAssignRole(roleModalMember)) {
       toast.error('No tienes autorización para cambiar el cargo de este miembro.');
+      return;
+    }
+    if (roleModalSelectedId === 'adm' && !isAdministrador) {
+      toast.error('Solo un administrador puede asignar el rol Administrador.');
       return;
     }
     setIsSavingRole(true);
@@ -306,6 +314,10 @@ export function MembersPage() {
 
   const handleSaveMember = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (formRoleId === 'adm' && !isAdministrador) {
+      toast.error('Solo un administrador puede asignar el rol Administrador.');
+      return;
+    }
     if (editingMember && editingMember.roleId !== formRoleId && !canAssignRole(editingMember)) {
       toast.error('No tienes autorización para cambiar el cargo de este miembro.');
       return;
@@ -931,7 +943,7 @@ export function MembersPage() {
             label="Cargo o Rol en el Taller *"
             value={formRoleId}
             onChange={setFormRoleId}
-            options={roleOptions}
+            options={visibleRoleOptions}
             searchable={true}
           />
 
@@ -998,7 +1010,7 @@ export function MembersPage() {
               label="Seleccionar Cargo o Rol en el Taller *"
               value={roleModalSelectedId}
               onChange={setRoleModalSelectedId}
-              options={roleOptions}
+              options={visibleRoleOptions}
               searchable={true}
             />
 
