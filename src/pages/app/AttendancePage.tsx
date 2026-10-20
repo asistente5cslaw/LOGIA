@@ -746,15 +746,15 @@ export function AttendancePage() {
                       setSelectedSegmentId(event.degreeSegments?.[0]?.id || '');
                       setSelectedEventId(event.id);
                     }}
-                    className="rounded-xl border border-border bg-surface px-4 py-4 text-left transition-colors hover:border-primary hover:bg-surface-container-low"
+                    className="rounded-2xl border border-border bg-surface px-4 py-4 text-left transition-colors hover:border-primary hover:bg-surface-container-low"
                   >
                     <span className="flex items-start justify-between gap-3">
-                      <span className="text-xs font-semibold text-ink">{getBodyById(event.bodyId).shortName}</span>
-                      <span className="shrink-0 rounded-full bg-primary/10 px-2 py-1 text-[10px] font-semibold text-primary">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-ink-secondary">{getBodyById(event.bodyId).shortName}</span>
+                      <span className="shrink-0 rounded-full bg-surface-container px-2.5 py-1 text-[10px] font-semibold uppercase text-ink-secondary">
                         {event.status === 'convocada' ? 'Convocada' : event.status === 'celebrada' ? 'Celebrada' : 'Programada'}
                       </span>
                     </span>
-                    <span className="mt-3 block font-serif text-sm font-bold text-ink">{event.title}</span>
+                    <span className="mt-3 block font-serif text-base font-bold text-ink">{event.title}</span>
                     <span className="mt-2 flex items-center gap-1.5 text-[11px] text-ink-muted">
                       <Clock3 className="h-3.5 w-3.5 shrink-0 text-primary" />
                       {formatTimeRange12(event.startTime, event.endTime) || 'Horario por confirmar'}
@@ -763,13 +763,12 @@ export function AttendancePage() {
                       <MapPin className="h-3.5 w-3.5 shrink-0 text-primary" />
                       {event.location || 'Ubicación por confirmar'}
                     </span>
-                    <span className="mt-1 block text-[11px] text-ink-muted">{formatDateSpanish(event.startDate)}</span>
                     {event.notes?.trim() && (
-                      <span className="mt-3 block border-t border-border pt-2 text-[11px] italic leading-relaxed text-ink-secondary">
+                      <span className="mt-2 block text-[11px] italic leading-relaxed text-ink-muted">
                         «{event.notes.trim()}»
                       </span>
                     )}
-                    <span className="mt-3 block text-[11px] font-semibold text-primary">Abrir registro →</span>
+                    <span className="mt-3 block border-t border-border pt-3 text-[11px] font-semibold text-primary">Abrir registro →</span>
                   </button>
                 ))}
               </div>
