@@ -840,9 +840,27 @@ export function AttendancePage() {
                       )
                     )}
                     {canManageAttendance && responseStatus && (
-                      <span className={`text-[11px] font-semibold ${responseStatus === 'confirmada' ? 'text-success' : 'text-amber-700'}`}>
-                        Respuesta del hermano: {responseStatus === 'confirmada' ? 'Asistencia confirmada' : 'Presentó excusa'}
-                      </span>
+                      <>
+                        <span className={`text-[11px] font-semibold ${responseStatus === 'confirmada' ? 'text-success' : 'text-amber-700'}`}>
+                          Respuesta del hermano: {responseStatus === 'confirmada' ? 'Asistencia confirmada' : 'Presentó excusa'}
+                        </span>
+                        {responseStatus === 'excusa' && canViewExcuseReasons && (
+                          memberResponseReasons[m.id] ? (
+                            <button
+                              type="button"
+                              onClick={() => setViewingExcuse({
+                                memberName: `${m.firstName} ${m.lastName}`,
+                                reason: memberResponseReasons[m.id],
+                              })}
+                              className="max-w-xs text-left text-[11px] text-amber-800 hover:underline"
+                            >
+                              <span className="font-semibold">Ver motivo de la excusa:</span> {memberResponseReasons[m.id]}
+                            </button>
+                          ) : (
+                            <span className="text-[11px] font-medium text-amber-700">Motivo de la excusa pendiente de explicación</span>
+                          )
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
