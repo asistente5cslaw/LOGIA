@@ -50,6 +50,9 @@ function getPushFingerprint(value: string): string {
   return (hash >>> 0).toString(36);
 }
 
+const MAX_CUSTOM_PUSH_TITLE_LENGTH = 80;
+const MAX_CUSTOM_PUSH_BODY_LENGTH = 130;
+
 export function SettingsPage() {
   const { user, isSecretaryOrVM } = useAuth();
 
@@ -874,7 +877,7 @@ export function SettingsPage() {
                 <input
                   value={customPushTitle}
                   onChange={(event) => setCustomPushTitle(event.target.value)}
-                  maxLength={80}
+                  maxLength={MAX_CUSTOM_PUSH_TITLE_LENGTH}
                   placeholder="Ej. Cambio de horario"
                   className="min-h-[42px] rounded-lg border border-border bg-surface-container-low px-3 text-sm font-normal text-ink outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
                 />
@@ -884,12 +887,12 @@ export function SettingsPage() {
                 <textarea
                   value={customPushBody}
                   onChange={(event) => setCustomPushBody(event.target.value)}
-                  maxLength={130}
+                  maxLength={MAX_CUSTOM_PUSH_BODY_LENGTH}
                   rows={4}
                   placeholder="Escribe el mensaje que recibirán en su dispositivo..."
                   className="resize-y rounded-lg border border-border bg-surface-container-low px-3 py-2.5 text-sm font-normal text-ink outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
                 />
-                <span className="text-right text-[11px] font-normal text-ink-muted">{customPushBody.length}/130</span>
+                <span className="text-right text-[11px] font-normal text-ink-muted">{customPushBody.length}/{MAX_CUSTOM_PUSH_BODY_LENGTH}</span>
               </label>
 
               <div className="grid gap-2">

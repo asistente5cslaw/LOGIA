@@ -55,11 +55,13 @@ Deno.serve(async (request) => {
       Deno.env.get('VAPID_PRIVATE_KEY')!,
     );
     const { recipientRoles, recipientEmails, subscriptionId, minuteDegree, ...notificationPayload } = requestPayload;
-    const title = String(notificationPayload.title || 'Nueva notificación').slice(0, requestPayload.type === 'aviso' ? 80 : 160);
-    const body = String(notificationPayload.body || '').slice(0, 2000);
-    if (requestPayload.type === 'aviso' && body.length > 130) {
+    const rawTitle = String(notificationPayload.title || 'Nueva notificación');
+    const rawBody = String(notificationPayload.body || '');
+    if (requestPayload.type === 'aviso' && rawBody.length > 130) {
       return response({ error: 'El mensaje personalizado no puede superar 130 caracteres.' }, 400, headers);
     }
+    const title = rawTitle.slice(0, requestPayload.type === 'aviso' ? 80 : 160);
+    const body = rawBody.slice(0, requestPayload.type === 'aviso' ? 130 : 2000);
     const safeUrl = typeof notificationPayload.url === 'string' && /^\/(?!\/)[^\s]{0,300}$/.test(notificationPayload.url) ? notificationPayload.url : null;
     const payload = JSON.stringify({ ...notificationPayload, title, body, url: safeUrl });
     const notificationTag = typeof notificationPayload.tag === 'string'
