@@ -41,6 +41,15 @@ function roleCategoryLabel(category: 'dignatario' | 'oficial' | 'general'): stri
   return 'Miembro';
 }
 
+function getPushFingerprint(value: string): string {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
 export function SettingsPage() {
   const { user, isSecretaryOrVM } = useAuth();
 
@@ -166,19 +175,26 @@ export function SettingsPage() {
       const recipientEmails = customPushAudience === 'seleccionados'
         ? pushSubscriberGroups
           .filter(({ userId }) => customPushRecipients.includes(userId))
-          .map(({ devices }) => devices[0].email)
+          .map(({ devices }) => devices[0].email.trim().toLowerCase())
         : undefined;
+      const pushFingerprint = getPushFingerprint([
+        title,
+        body,
+        customPushAudience,
+        ...(recipientEmails || []),
+      ].join('|'));
       const result = await pushNotificationService.sendPushToAll({
         title,
         body,
         url: '/app',
-        tag: `aviso-manual-${Date.now()}`,
+        tag: `aviso-manual-${pushFingerprint}`,
         type: 'aviso',
         ...(recipientEmails?.length ? { recipientEmails } : {}),
       });
-      if (result.sent > 0) {
+      if (result.duplicate) {
+        toast.info('Este mismo aviso ya fue enviado recientemente.');
+      } else if (result.sent > 0) {
         toast.success(`Notificación enviada a ${result.sent} dispositivo${result.sent === 1 ? '' : 's'}.`);
-        setCustomPushBody('');
       } else {
         toast.warning('No hay dispositivos push activos para esos destinatarios.');
       }

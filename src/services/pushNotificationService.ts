@@ -428,12 +428,16 @@ class PushNotificationService {
     }
   }
 
-  public async sendPushToAll(payload: PushNotificationPayload): Promise<{ sent: number; removed: number }> {
+  public async sendPushToAll(payload: PushNotificationPayload): Promise<{ sent: number; removed: number; duplicate?: boolean }> {
     const { supabase, isSupabaseConfigured } = await import('@/lib/supabase');
     if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
     const { data, error } = await supabase.functions.invoke('send-push-notification', { body: payload });
     if (error) throw error;
-    return { sent: Number(data?.sent || 0), removed: Number(data?.removed || 0) };
+    return {
+      sent: Number(data?.sent || 0),
+      removed: Number(data?.removed || 0),
+      duplicate: Boolean(data?.duplicate),
+    };
   }
 
   public async getPushSubscribers(): Promise<PushSubscriber[]> {

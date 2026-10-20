@@ -59,6 +59,25 @@ Deno.serve(async (request) => {
     const body = String(notificationPayload.body || '').slice(0, 2000);
     const safeUrl = typeof notificationPayload.url === 'string' && /^\/(?!\/)[^\s]{0,300}$/.test(notificationPayload.url) ? notificationPayload.url : null;
     const payload = JSON.stringify({ ...notificationPayload, title, body, url: safeUrl });
+    const notificationTag = typeof notificationPayload.tag === 'string'
+      ? notificationPayload.tag.slice(0, 80)
+      : null;
+    // Los avisos manuales usan un tag determinista. Si el mismo envío se
+    // repite en pocos minutos (doble clic, reintento o red inestable), no se
+    // vuelve a insertar ni a entregar a los dispositivos.
+    if (requestPayload.type === 'aviso' && notificationTag?.startsWith('aviso-manual-')) {
+      const recentCutoff = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+      const { data: recentNotification, error: recentNotificationError } = await admin
+        .from('push_notifications')
+        .select('id')
+        .eq('tag', notificationTag)
+        .gte('created_at', recentCutoff)
+        .limit(1);
+      if (recentNotificationError) throw recentNotificationError;
+      if (recentNotification && recentNotification.length > 0) {
+        return response({ sent: 0, removed: 0, duplicate: true }, 200, headers);
+      }
+    }
     let subscriptionsQuery = admin.from('push_subscriptions').select('id, endpoint, expiration_time, p256dh, auth, user_id').eq('enabled', true);
     let notificationRecipientIds: string[] = [];
     if (subscriptionId) {
@@ -190,7 +209,7 @@ Deno.serve(async (request) => {
           title,
           body,
           url: safeUrl,
-          tag: notificationPayload.tag ? String(notificationPayload.tag).slice(0, 80) : null,
+          tag: notificationTag,
           type: notificationPayload.type ? String(notificationPayload.type) : 'aviso',
         })),
       );
