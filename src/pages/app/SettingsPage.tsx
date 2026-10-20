@@ -66,6 +66,11 @@ export function SettingsPage() {
   const [isLoadingPushSubscribers, setIsLoadingPushSubscribers] = useState(false);
   const [sendingPushTo, setSendingPushTo] = useState<string | null>(null);
   const [selectedPushUserId, setSelectedPushUserId] = useState<string | null>(null);
+  const [customPushTitle, setCustomPushTitle] = useState('Aviso de la Logia');
+  const [customPushBody, setCustomPushBody] = useState('');
+  const [customPushAudience, setCustomPushAudience] = useState<'todos' | 'seleccionados'>('todos');
+  const [customPushRecipients, setCustomPushRecipients] = useState<string[]>([]);
+  const [isSendingCustomPush, setIsSendingCustomPush] = useState(false);
 
   // Respaldo e Importación
   const [importJsonText, setImportJsonText] = useState('');
@@ -136,6 +141,53 @@ export function SettingsPage() {
   const selectedPushDevices = selectedPushUserId
     ? pushSubscribers.filter((device) => device.userId === selectedPushUserId)
     : [];
+
+  const toggleCustomPushRecipient = (userId: string) => {
+    setCustomPushRecipients((prev) => prev.includes(userId)
+      ? prev.filter((id) => id !== userId)
+      : [...prev, userId]);
+  };
+
+  const handleSendCustomPush = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const title = customPushTitle.trim();
+    const body = customPushBody.trim();
+    if (!title || !body) {
+      toast.error('Escribe un título y un mensaje para la notificación.');
+      return;
+    }
+    if (customPushAudience === 'seleccionados' && customPushRecipients.length === 0) {
+      toast.error('Selecciona al menos un destinatario.');
+      return;
+    }
+
+    setIsSendingCustomPush(true);
+    try {
+      const recipientEmails = customPushAudience === 'seleccionados'
+        ? pushSubscriberGroups
+          .filter(({ userId }) => customPushRecipients.includes(userId))
+          .map(({ devices }) => devices[0].email)
+        : undefined;
+      const result = await pushNotificationService.sendPushToAll({
+        title,
+        body,
+        url: '/app',
+        tag: `aviso-manual-${Date.now()}`,
+        type: 'aviso',
+        ...(recipientEmails?.length ? { recipientEmails } : {}),
+      });
+      if (result.sent > 0) {
+        toast.success(`Notificación enviada a ${result.sent} dispositivo${result.sent === 1 ? '' : 's'}.`);
+        setCustomPushBody('');
+      } else {
+        toast.warning('No hay dispositivos push activos para esos destinatarios.');
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo enviar la notificación.');
+    } finally {
+      setIsSendingCustomPush(false);
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -770,6 +822,96 @@ export function SettingsPage() {
       {/* 5. RESPALDO Y RESTAURACIÓN */}
       {activeTab === 'notificaciones' && canManagePush && (
         <div className="space-y-6">
+          <form onSubmit={handleSendCustomPush} className="rounded-xl border border-border bg-surface p-5 shadow-card sm:p-6">
+            <div className="border-b border-border pb-4">
+              <h3 className="font-serif text-lg font-bold text-ink">Enviar notificación personalizada</h3>
+              <p className="mt-1 text-xs text-ink-secondary">
+                Escribe el aviso y envíalo a todos los dispositivos activos o únicamente a los miembros que selecciones.
+              </p>
+            </div>
+
+            <div className="mt-4 grid gap-4">
+              <label className="grid gap-1.5 text-xs font-semibold text-ink">
+                Título
+                <input
+                  value={customPushTitle}
+                  onChange={(event) => setCustomPushTitle(event.target.value)}
+                  maxLength={160}
+                  placeholder="Ej. Cambio de horario"
+                  className="min-h-[42px] rounded-lg border border-border bg-surface-container-low px-3 text-sm font-normal text-ink outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+                />
+              </label>
+              <label className="grid gap-1.5 text-xs font-semibold text-ink">
+                Mensaje
+                <textarea
+                  value={customPushBody}
+                  onChange={(event) => setCustomPushBody(event.target.value)}
+                  maxLength={2000}
+                  rows={4}
+                  placeholder="Escribe el mensaje que recibirán en su dispositivo..."
+                  className="resize-y rounded-lg border border-border bg-surface-container-low px-3 py-2.5 text-sm font-normal text-ink outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+                />
+                <span className="text-right text-[11px] font-normal text-ink-muted">{customPushBody.length}/2000</span>
+              </label>
+
+              <div className="grid gap-2">
+                <p className="text-xs font-semibold text-ink">Destinatarios</p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCustomPushAudience('todos')}
+                    className={`min-h-[38px] rounded-lg px-3 text-xs font-semibold ${customPushAudience === 'todos' ? 'bg-primary text-primary-foreground' : 'border border-border text-ink-secondary hover:bg-surface-container'}`}
+                  >
+                    Todos los dispositivos activos
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCustomPushAudience('seleccionados')}
+                    className={`min-h-[38px] rounded-lg px-3 text-xs font-semibold ${customPushAudience === 'seleccionados' ? 'bg-primary text-primary-foreground' : 'border border-border text-ink-secondary hover:bg-surface-container'}`}
+                  >
+                    Seleccionar miembros ({customPushRecipients.length})
+                  </button>
+                </div>
+              </div>
+
+              {customPushAudience === 'seleccionados' && (
+                <div className="max-h-56 overflow-y-auto rounded-lg border border-border divide-y divide-border/60">
+                  {pushSubscriberGroups.length === 0 ? (
+                    <p className="p-4 text-xs text-ink-muted">No hay miembros con dispositivos push registrados.</p>
+                  ) : pushSubscriberGroups.map(({ userId, devices }) => {
+                    const subscriber = devices[0];
+                    const activeDevices = devices.filter((device) => device.enabled).length;
+                    return (
+                      <label key={userId} className="flex cursor-pointer items-center gap-3 px-3 py-2.5 hover:bg-surface-container-low">
+                        <input
+                          type="checkbox"
+                          checked={customPushRecipients.includes(userId)}
+                          onChange={() => toggleCustomPushRecipient(userId)}
+                          className="h-4 w-4 accent-primary"
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold text-ink">{subscriber.displayName}</span>
+                          <span className="block truncate text-[11px] text-ink-muted">{subscriber.email} · {activeDevices} dispositivo{activeDevices === 1 ? '' : 's'} activo{activeDevices === 1 ? '' : 's'}</span>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="flex justify-end border-t border-border pt-4">
+                <button
+                  type="submit"
+                  disabled={isSendingCustomPush || !customPushBody.trim() || (customPushAudience === 'seleccionados' && customPushRecipients.length === 0)}
+                  className="flex min-h-[40px] items-center justify-center gap-2 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary-pressed disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  {isSendingCustomPush ? 'Enviando…' : 'Enviar notificación'}
+                </button>
+              </div>
+            </div>
+          </form>
+
           <div className="rounded-xl border border-border bg-surface p-5 sm:p-6 shadow-card">
             <div className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
