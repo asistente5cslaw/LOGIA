@@ -33,6 +33,7 @@ export function DashboardPage() {
   const [ownMemberId, setOwnMemberId] = useState<string | null>(null);
   const [homeAttendanceStatus, setHomeAttendanceStatus] = useState<'presente' | 'excusa' | 'ausente' | null>(null);
   const [homeExcuseDraft, setHomeExcuseDraft] = useState('');
+  const [homeExcuseSaved, setHomeExcuseSaved] = useState(false);
   const [savingHomeAttendance, setSavingHomeAttendance] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const loadDashboardData = useCallback(async () => {
@@ -83,10 +84,13 @@ export function DashboardPage() {
             const savedResponse = records.find((record) => record.memberId === ownMemberId);
             const savedStatus = savedResponse?.status;
             setHomeAttendanceStatus(savedStatus === 'confirmada' ? 'presente' : savedStatus === 'excusa' ? 'excusa' : null);
-            setHomeExcuseDraft(savedStatus === 'excusa' ? savedResponse?.excuseReason || '' : '');
+            const savedExcuse = savedStatus === 'excusa' ? savedResponse?.excuseReason || '' : '';
+            setHomeExcuseDraft(savedExcuse);
+            setHomeExcuseSaved(Boolean(savedExcuse.trim()));
           } else {
             setHomeAttendanceStatus(null);
             setHomeExcuseDraft('');
+            setHomeExcuseSaved(false);
           }
         } catch (attendanceError) {
           // La asistencia es opcional para el dashboard: no debe ocultar
@@ -94,10 +98,12 @@ export function DashboardPage() {
           console.error('Error cargando datos opcionales de asistencia:', attendanceError);
           setHomeAttendanceStatus(null);
           setHomeExcuseDraft('');
+          setHomeExcuseSaved(false);
         }
       } else {
         setHomeAttendanceStatus(null);
         setHomeExcuseDraft('');
+        setHomeExcuseSaved(false);
       }
 
     } catch (e) {
@@ -158,7 +164,13 @@ export function DashboardPage() {
         });
       }
       setHomeAttendanceStatus(nextStatus === 'ausente' ? null : nextStatus);
-      if (nextStatus !== 'excusa') setHomeExcuseDraft('');
+      if (nextStatus !== 'excusa') {
+        setHomeExcuseDraft('');
+        setHomeExcuseSaved(false);
+      } else {
+        setHomeExcuseDraft('');
+        setHomeExcuseSaved(false);
+      }
       toast.success(
         nextStatus === 'presente'
           ? 'Aviso de asistencia enviado. Secretaría registrará la asistencia oficial.'
@@ -183,6 +195,7 @@ export function DashboardPage() {
         id: user?.id,
         email: user?.email,
       });
+      setHomeExcuseSaved(true);
       toast.success('Tu explicación de la excusa fue guardada.');
       void loadDashboardData();
     } catch (error) {
@@ -303,7 +316,7 @@ export function DashboardPage() {
                   </div>
                   {homeAttendanceStatus === 'excusa' && (
                     <div className="mt-2">
-                      {homeExcuseDraft.trim() ? (
+                      {homeExcuseSaved ? (
                         <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
                           <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-800">Motivo guardado</p>
                           <p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-amber-950">{homeExcuseDraft}</p>
