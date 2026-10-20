@@ -18,12 +18,15 @@ import {
   Building2,
   MapPin,
   Clock3,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { Modal } from '@/components/shared/Modal';
 import { AppleSelect, type AppleSelectOption } from '@/components/shared/AppleSelect';
 import { AppleInput } from '@/components/shared/AppleInput';
 import { AppleEmoji } from '@/components/shared/AppleEmoji';
-import { formatDateSpanish, formatTime12, formatTimeRange12 } from '@/lib/dateUtils';
+import { formatDateSpanish, formatTime12, formatTimeRange12, normalizeDateOnly } from '@/lib/dateUtils';
 import { getLocalIsoDate } from '@/domain/dashboardStats';
 import { toast } from 'sonner';
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
@@ -56,8 +59,12 @@ export function AttendancePage() {
   const [searchMember, setSearchMember] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [pendingAttendanceEvents, setPendingAttendanceEvents] = useState<LodgeEvent[]>([]);
   const [savedAttendanceKeys, setSavedAttendanceKeys] = useState<Record<string, boolean>>({});
+  const [attendanceCalendarDate, setAttendanceCalendarDate] = useState(() => {
+    const today = new Date();
+    return new Date(today.getFullYear(), today.getMonth(), 1);
+  });
+  const [showAttendanceCalendar, setShowAttendanceCalendar] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   // Modal para agregar visitante
@@ -193,41 +200,6 @@ export function AttendancePage() {
     void loadAttendanceForSelected(selectedEventId, selectedSegmentId, members);
   }, [selectedEventId, selectedSegmentId, members, hasUnsavedChanges, loadAttendanceForSelected]);
 
-  // Reuniones culminadas sin asistencia oficial guardada: quedan disponibles
-  // como accesos rápidos para Secretaría, Venerable y Administración.
-  useEffect(() => {
-    if (!canManageAttendance || meetings.length === 0) {
-      setPendingAttendanceEvents([]);
-      return;
-    }
-
-    let cancelled = false;
-    const loadPendingAttendance = async () => {
-      const now = Date.now();
-      const candidates = meetings.filter((event) => {
-        if (event.status === 'cancelada' || !event.degreeSegments?.[0]) return false;
-        const eventStart = new Date(`${event.startDate}T${event.startTime || '23:59:59'}-05:00`).getTime();
-        return event.status === 'celebrada' || (!Number.isNaN(eventStart) && eventStart <= now);
-      });
-      const results = await Promise.allSettled(candidates.map(async (event) => {
-        const segmentId = event.degreeSegments?.[0]?.id;
-        if (!segmentId) return null;
-        const records = await attendanceService.getAttendanceForEvent(event.id, segmentId);
-        return records.length === 0 ? event : null;
-      }));
-      if (cancelled) return;
-      setPendingAttendanceEvents(
-        results
-          .filter((result): result is PromiseFulfilledResult<LodgeEvent | null> => result.status === 'fulfilled')
-          .map((result) => result.value)
-          .filter((event): event is LodgeEvent => Boolean(event))
-          .sort((a, b) => `${a.startDate}T${a.startTime || ''}`.localeCompare(`${b.startDate}T${b.startTime || ''}`))
-      );
-    };
-    void loadPendingAttendance();
-    return () => { cancelled = true; };
-  }, [canManageAttendance, meetings]);
-
   // Mantiene los contadores y estados sincronizados entre dispositivos aunque
   // el canal realtime tarde o no esté disponible en el navegador.
   useEffect(() => {
@@ -345,7 +317,6 @@ export function AttendancePage() {
         ...prev,
         [`${selectedEventId}:${selectedSegmentId}`]: true,
       }));
-      setPendingAttendanceEvents((prev) => prev.filter((event) => event.id !== selectedEventId));
     } catch {
       toast.error('No se pudo guardar el estado de asistencia.');
     } finally {
@@ -467,7 +438,6 @@ export function AttendancePage() {
         ...prev,
         [`${selectedEventId}:${selectedSegmentId}`]: true,
       }));
-      setPendingAttendanceEvents((prev) => prev.filter((event) => event.id !== selectedEventId));
       toast.success('Lista de asistencia guardada correctamente.');
     } catch {
       toast.error('Error al guardar la asistencia');
@@ -549,6 +519,20 @@ export function AttendancePage() {
   const attendanceKey = `${selectedEventId}:${selectedSegmentId}`;
   const attendanceIsSaved = Boolean(savedAttendanceKeys[attendanceKey]);
   const isEditingSavedAttendance = attendanceIsSaved && hasUnsavedChanges;
+  const attendanceCalendarYear = attendanceCalendarDate.getFullYear();
+  const attendanceCalendarMonth = attendanceCalendarDate.getMonth();
+  const attendanceDaysInMonth = new Date(attendanceCalendarYear, attendanceCalendarMonth + 1, 0).getDate();
+  const attendanceFirstDayIndex = new Date(attendanceCalendarYear, attendanceCalendarMonth, 1).getDay();
+  const attendanceMonthNames = [
+    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+  ];
+  const selectAttendanceEvent = (event: LodgeEvent) => {
+    setHasUnsavedChanges(false);
+    setSelectedSegmentId(event.degreeSegments?.[0]?.id || '');
+    setSelectedEventId(event.id);
+    setShowAttendanceCalendar(false);
+  };
 
   return (
     <div className="space-y-4 sm:space-y-6 px-4 pt-2.5 pb-6 sm:py-6 md:px-8 max-w-7xl mx-auto">
@@ -626,22 +610,92 @@ export function AttendancePage() {
           <label className="text-xs font-semibold text-ink block">
             Selecciona la actividad a registrar:
           </label>
-          <AppleSelect
-            value={selectedEventId}
-            onChange={(val) => {
-              setHasUnsavedChanges(false);
-              const selected = meetings.find((meeting) => meeting.id === val);
-              setSelectedSegmentId(selected?.degreeSegments?.[0]?.id || '');
-              setSelectedEventId(val);
-            }}
-            placeholder="Elige una actividad para registrar asistencia..."
-            options={meetings.map((m) => ({
-              value: m.id,
-              label: `${formatDateSpanish(m.startDate)} ${m.startTime ? `(${formatTime12(m.startTime)})` : ''} — ${m.title}`,
-              badge: m.status,
-              icon: <AppleEmoji name={getBodyById(m.bodyId).appleEmoji} size={16} />
-            }))}
-          />
+          <button
+            type="button"
+            onClick={() => setShowAttendanceCalendar((current) => !current)}
+            className="flex min-h-[50px] w-full items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 text-left text-sm text-ink transition-colors hover:border-primary"
+          >
+            <span className="flex min-w-0 items-center gap-2">
+              {selectedEvent ? (
+                <>
+                  <AppleEmoji name={getBodyById(selectedEvent.bodyId).appleEmoji} size={18} />
+                  <span className="truncate">{formatDateSpanish(selectedEvent.startDate)}{selectedEvent.startTime ? ` (${formatTime12(selectedEvent.startTime)})` : ''} — {selectedEvent.title}</span>
+                </>
+              ) : (
+                <span className="text-ink-muted">Elige una actividad para registrar asistencia...</span>
+              )}
+            </span>
+            {showAttendanceCalendar ? <ChevronLeft className="h-4 w-4 rotate-90 text-ink-muted" /> : <ChevronRight className="h-4 w-4 rotate-90 text-ink-muted" />}
+          </button>
+
+          {showAttendanceCalendar && (
+            <div className="mt-3 rounded-2xl border border-border bg-surface p-4 sm:p-5">
+              <div className="flex items-center justify-between border-b border-border pb-3">
+                <h3 className="flex items-center gap-2 font-serif text-lg font-bold text-ink">
+                  <CalendarDays className="h-5 w-5 text-primary" />
+                  {attendanceMonthNames[attendanceCalendarMonth]} {attendanceCalendarYear}
+                </h3>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    aria-label="Mes anterior"
+                    onClick={() => setAttendanceCalendarDate(new Date(attendanceCalendarYear, attendanceCalendarMonth - 1, 1))}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-border text-ink hover:bg-surface-container"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Mes siguiente"
+                    onClick={() => setAttendanceCalendarDate(new Date(attendanceCalendarYear, attendanceCalendarMonth + 1, 1))}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-border text-ink hover:bg-surface-container"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+              <div className="mt-3 grid grid-cols-7 text-center text-[11px] font-semibold text-ink-muted">
+                {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map((day) => <span key={day}>{day}</span>)}
+              </div>
+              <div className="mt-2 grid grid-cols-7 gap-1 sm:gap-2">
+                {Array.from({ length: attendanceFirstDayIndex }).map((_, index) => (
+                  <div key={`attendance-empty-${index}`} className="min-h-[60px] rounded-lg border border-transparent bg-surface-container-low/30 sm:min-h-[74px]" />
+                ))}
+                {Array.from({ length: attendanceDaysInMonth }).map((_, index) => {
+                  const day = index + 1;
+                  const dateStr = `${attendanceCalendarYear}-${String(attendanceCalendarMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                  const dayEvents = meetings.filter((event) => {
+                    const start = normalizeDateOnly(event.startDate);
+                    const end = normalizeDateOnly(event.endDate || event.startDate);
+                    return start === dateStr || (dateStr >= start && dateStr <= end);
+                  });
+                  const hasEvents = dayEvents.length > 0;
+                  return (
+                    <div key={dateStr} className={`min-h-[60px] rounded-xl border p-1.5 sm:min-h-[74px] ${hasEvents ? 'border-primary/40 bg-primary/10' : 'border-border bg-white'}`}>
+                      <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs ${hasEvents ? 'bg-primary font-bold text-primary-foreground' : 'text-ink-secondary'}`}>{day}</span>
+                      {hasEvents && (
+                        <div className="mt-1 space-y-1 overflow-hidden">
+                          {dayEvents.slice(0, 2).map((event) => (
+                            <button
+                              key={event.id}
+                              type="button"
+                              title={event.title}
+                              onClick={() => selectAttendanceEvent(event)}
+                              className="flex w-full items-center gap-1 truncate rounded border border-primary/20 bg-white px-1 py-0.5 text-left text-[8px] leading-tight text-primary hover:bg-primary/10 sm:text-[9px]"
+                            >
+                              <AppleEmoji name={getBodyById(event.bodyId).appleEmoji} size={11} />
+                              <span className="truncate">{event.title}</span>
+                            </button>
+                          ))}
+                          {dayEvents.length > 2 && <span className="block px-1 text-[8px] font-semibold text-ink-muted">+{dayEvents.length - 2} más</span>}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           {selectedEvent && (selectedEvent.degreeSegments?.length || 0) > 0 && (
             <div className="mt-3">
               <AppleSelect
@@ -725,71 +779,6 @@ export function AttendancePage() {
             </div>
           )}
         </section>
-      )}
-
-      {/* Mensaje guiado cuando aún no se ha seleccionado ninguna tenida */}
-      {canManageAttendance && meetings.length > 0 && !selectedEventId && (
-        <div className="rounded-2xl border border-dashed border-border bg-white p-8 sm:p-12 text-center space-y-3 shadow-xs">
-          {pendingAttendanceEvents.length > 0 ? (
-            <div className="w-full text-left">
-              <div className="mb-5 text-center">
-                <h4 className="font-serif text-base font-bold text-ink">Registros pendientes</h4>
-                <p className="mx-auto mt-1 max-w-md text-xs text-ink-muted">Selecciona una reunión para registrar la asistencia oficial.</p>
-              </div>
-              <div className="grid gap-3 text-left sm:grid-cols-2 lg:grid-cols-3">
-                {pendingAttendanceEvents.map((event) => (
-                  <button
-                    key={event.id}
-                    type="button"
-                    onClick={() => {
-                      setHasUnsavedChanges(false);
-                      setSelectedSegmentId(event.degreeSegments?.[0]?.id || '');
-                      setSelectedEventId(event.id);
-                    }}
-                    className="rounded-2xl border border-border bg-surface px-4 py-4 text-left transition-colors hover:border-primary hover:bg-surface-container-low"
-                  >
-                    <span className="flex items-start justify-between gap-3">
-                      <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-ink-secondary">
-                        <AppleEmoji name={getBodyById(event.bodyId).appleEmoji} size={24} />
-                        {getBodyById(event.bodyId).shortName}
-                      </span>
-                      <span className="shrink-0 rounded-full bg-surface-container px-2.5 py-1 text-[10px] font-semibold uppercase text-ink-secondary">
-                        {event.status === 'convocada' ? 'Convocada' : event.status === 'celebrada' ? 'Celebrada' : 'Programada'}
-                      </span>
-                    </span>
-                    <span className="mt-3 block font-serif text-base font-bold text-ink">{event.title}</span>
-                    <span className="mt-2 flex items-center gap-1.5 text-[11px] text-ink-muted">
-                      <Clock3 className="h-3.5 w-3.5 shrink-0 text-primary" />
-                      {formatTimeRange12(event.startTime, event.endTime) || 'Horario por confirmar'}
-                    </span>
-                    <span className="mt-1 flex items-center gap-1.5 text-[11px] text-ink-muted">
-                      <MapPin className="h-3.5 w-3.5 shrink-0 text-primary" />
-                      {event.location || 'Ubicación por confirmar'}
-                    </span>
-                    {event.notes?.trim() && (
-                      <span className="mt-2 block text-[11px] italic leading-relaxed text-ink-muted">
-                        «{event.notes.trim()}»
-                      </span>
-                    )}
-                    <span className="mt-3 block border-t border-border pt-3 text-[11px] font-semibold text-primary">Abrir registro →</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="flex justify-center">
-                <AppleEmoji name="temple" size={38} />
-              </div>
-              <div>
-                <h4 className="font-serif text-base font-bold text-ink">Ninguna actividad seleccionada</h4>
-                <p className="mx-auto mt-1 max-w-md text-xs text-ink-muted">
-                  Por favor selecciona en la lista desplegable superior la reunión o actividad masónica para registrar la asistencia y los QQ.·. HH.·. visitantes.
-                </p>
-              </div>
-            </>
-          )}
-        </div>
       )}
 
       {/* Contenido de asistencia: Solo cuando hay una tenida seleccionada */}
