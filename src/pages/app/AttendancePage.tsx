@@ -546,6 +546,9 @@ export function AttendancePage() {
   const excuseCount = Object.values(attendanceMap).filter((s) => s === 'excusa').length;
   const absentCount = totalActive - presentCount - excuseCount;
   const currentPercentage = totalActive > 0 ? Math.round((presentCount / totalActive) * 100) : 0;
+  const attendanceKey = `${selectedEventId}:${selectedSegmentId}`;
+  const attendanceIsSaved = Boolean(savedAttendanceKeys[attendanceKey]);
+  const isEditingSavedAttendance = attendanceIsSaved && hasUnsavedChanges;
 
   return (
     <div className="space-y-4 sm:space-y-6 px-4 pt-2.5 pb-6 sm:py-6 md:px-8 max-w-7xl mx-auto">
@@ -566,14 +569,26 @@ export function AttendancePage() {
               <Check className="h-4 w-4 text-success shrink-0" />
               <span className="whitespace-nowrap">Todos presentes</span>
             </button>
-            <button
-              onClick={handleSaveAttendance}
-              disabled={isSaving}
-              className="flex-1 sm:flex-initial min-h-[40px] flex flex-row items-center justify-center gap-1.5 rounded-xl bg-primary px-3 sm:px-4 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary-pressed transition-colors disabled:opacity-60 active:scale-95 cursor-pointer whitespace-nowrap flex-nowrap shrink-0"
-            >
-              <Save className="h-4 w-4 shrink-0" />
-              <span className="whitespace-nowrap">{isSaving ? 'Guardando…' : 'Guardar lista'}</span>
-            </button>
+            {attendanceIsSaved && !hasUnsavedChanges ? (
+              <button
+                type="button"
+                onClick={() => setHasUnsavedChanges(true)}
+                className="flex-1 sm:flex-initial min-h-[40px] flex flex-row items-center justify-center gap-1.5 rounded-xl border border-primary bg-surface px-3 sm:px-4 text-xs font-semibold text-primary hover:bg-primary/5 transition-colors active:scale-95 cursor-pointer whitespace-nowrap flex-nowrap shrink-0"
+              >
+                <Save className="h-4 w-4 shrink-0" />
+                <span className="whitespace-nowrap">Editar</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleSaveAttendance}
+                disabled={isSaving}
+                className="flex-1 sm:flex-initial min-h-[40px] flex flex-row items-center justify-center gap-1.5 rounded-xl bg-primary px-3 sm:px-4 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary-pressed transition-colors disabled:opacity-60 active:scale-95 cursor-pointer whitespace-nowrap flex-nowrap shrink-0"
+              >
+                <Save className="h-4 w-4 shrink-0" />
+                <span className="whitespace-nowrap">{isSaving ? 'Guardando…' : isEditingSavedAttendance ? 'Guardar cambios' : 'Guardar lista'}</span>
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -778,19 +793,6 @@ export function AttendancePage() {
       {/* Contenido de asistencia: Solo cuando hay una tenida seleccionada */}
       {canManageAttendance && selectedEventId && (
         <>
-
-      {savedAttendanceKeys[`${selectedEventId}:${selectedSegmentId}`] && (
-        <div className="flex flex-col gap-2 rounded-xl border border-success/25 bg-success/5 px-4 py-3 text-xs sm:flex-row sm:items-center sm:justify-between">
-          <span className="font-semibold text-success">Registro oficial guardado. Puedes editarlo.</span>
-          <button
-            type="button"
-            onClick={() => setHasUnsavedChanges(true)}
-            className="self-start rounded-lg border border-success/30 px-3 py-1.5 font-semibold text-success hover:bg-success/10 sm:self-auto"
-          >
-            Editar registro
-          </button>
-        </div>
-      )}
 
       {/* Indicadores de Resumen */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
