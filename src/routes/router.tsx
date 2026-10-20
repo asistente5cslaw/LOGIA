@@ -13,6 +13,7 @@ import { MinutesPage } from '@/pages/app/MinutesPage';
 import { AttendancePage } from '@/pages/app/AttendancePage';
 import { MembersPage } from '@/pages/app/MembersPage';
 import { SettingsPage } from '@/pages/app/SettingsPage';
+import { NotificationsPage } from '@/pages/app/NotificationsPage';
 import { ErrorPage } from '@/pages/ErrorPage';
 
 export const router = createBrowserRouter([
@@ -41,6 +42,7 @@ export const router = createBrowserRouter([
       { path: 'asistencia', element: <AttendancePage /> },
       { path: 'miembros', element: <MembersPage /> },
       { path: 'ajustes', element: <SettingsPage /> },
+      { path: 'notificaciones', element: <NotificationsPage /> },
     ],
   },
   // Catch-all: cualquier ruta desconocida

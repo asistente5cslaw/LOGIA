@@ -12,6 +12,7 @@ import {
   Smartphone,
   ShieldAlert,
   Settings,
+  Bell,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -70,6 +71,8 @@ export function AppLayout() {
     : mobileNavItems;
   // Ajustes pertenece al cargo Administrador, no a un correo personal fijo.
   const canAccessSettings = user?.profile?.roleId === 'adm';
+  const canAccessNotifications = user?.profile?.roleId === 'sec'
+    || user?.profile?.technicalRole === 'secretary';
 
   useEffect(() => {
     if (sessionStorage.getItem('reopen_icon_selector') === 'true') {
@@ -255,6 +258,21 @@ export function AppLayout() {
             </NavLink>
           )}
 
+          {canAccessNotifications && (
+            <NavLink
+              to="/app/notificaciones"
+              title={isCollapsed ? 'Notificaciones' : undefined}
+              className={({ isActive }) => cn(
+                'flex min-h-[44px] items-center rounded-xl text-sm font-medium transition-colors',
+                isCollapsed ? 'justify-center px-0' : 'gap-3 px-3',
+                isActive ? 'bg-primary text-primary-foreground shadow-sm' : 'text-ink-secondary hover:bg-surface-container hover:text-ink'
+              )}
+            >
+              <Bell className="h-5 w-5 shrink-0" />
+              {!isCollapsed && <span className="truncate">Notificaciones</span>}
+            </NavLink>
+          )}
+
           {/* Botón directo de Ícono App / Instalar en la barra lateral */}
           {!isInstalled && (
             <button
@@ -422,6 +440,18 @@ export function AppLayout() {
           >
             <Settings className="h-5 w-5" />
             <span className="truncate max-w-[56px]">Ajustes</span>
+          </NavLink>
+        )}
+        {canAccessNotifications && (
+          <NavLink
+            to="/app/notificaciones"
+            className={({ isActive }) => cn(
+              'flex min-h-[56px] flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors',
+              isActive ? 'text-primary font-semibold' : 'text-ink-muted hover:text-ink-secondary'
+            )}
+          >
+            <Bell className="h-5 w-5" />
+            <span className="truncate max-w-[72px]">Notificaciones</span>
           </NavLink>
         )}
       </nav>
