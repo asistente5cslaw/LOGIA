@@ -749,7 +749,10 @@ export function AttendancePage() {
                     className="rounded-2xl border border-border bg-surface px-4 py-4 text-left transition-colors hover:border-primary hover:bg-surface-container-low"
                   >
                     <span className="flex items-start justify-between gap-3">
-                      <span className="text-xs font-semibold uppercase tracking-wide text-ink-secondary">{getBodyById(event.bodyId).shortName}</span>
+                      <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-ink-secondary">
+                        <AppleEmoji name={getBodyById(event.bodyId).appleEmoji} size={24} />
+                        {getBodyById(event.bodyId).shortName}
+                      </span>
                       <span className="shrink-0 rounded-full bg-surface-container px-2.5 py-1 text-[10px] font-semibold uppercase text-ink-secondary">
                         {event.status === 'convocada' ? 'Convocada' : event.status === 'celebrada' ? 'Celebrada' : 'Programada'}
                       </span>
