@@ -385,15 +385,13 @@ class PushNotificationService {
         this.lastRegistrationError = 'El navegador no devolvió una suscripción push válida.';
         return false;
       }
-      const { error } = await supabase.from('push_subscriptions').upsert({
-        endpoint: json.endpoint,
-        expiration_time: json.expirationTime ?? null,
-        p256dh: json.keys.p256dh,
-        auth: json.keys.auth,
-        user_agent: navigator.userAgent,
-        enabled: true,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'endpoint' });
+      const { error } = await supabase.rpc('register_push_subscription', {
+        p_endpoint: json.endpoint,
+        p_expiration_time: json.expirationTime ?? null,
+        p_p256dh: json.keys.p256dh,
+        p_auth: json.keys.auth,
+        p_user_agent: navigator.userAgent,
+      });
       if (error) {
         this.lastRegistrationError = `Supabase rechazó el registro: ${error.message}`;
         return false;

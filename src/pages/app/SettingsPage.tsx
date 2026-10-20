@@ -89,6 +89,9 @@ export function SettingsPage() {
 
   const canConfigure = user?.profile?.roleId === 'adm';
   const canManagePush = user?.email?.trim().toLowerCase() === 'asistente4@castillosucre.com';
+  const canSendCustomPush = canManagePush
+    || user?.profile?.roleId === 'sec'
+    || user?.profile?.technicalRole === 'secretary';
 
   const loadPushSubscribers = useCallback(async () => {
     if (!canManagePush) return;
@@ -151,6 +154,25 @@ export function SettingsPage() {
     ? pushSubscribers.filter((device) => device.userId === selectedPushUserId)
     : [];
 
+  const customPushRecipientOptions = canManagePush
+    ? pushSubscriberGroups.map(({ userId, devices }) => {
+      const activeDevices = devices.filter((device) => device.enabled).length;
+      return {
+        id: userId,
+        email: devices[0].email,
+        displayName: devices[0].displayName,
+        detail: `${activeDevices} dispositivo${activeDevices === 1 ? '' : 's'} activo${activeDevices === 1 ? '' : 's'}`,
+      };
+    })
+    : lodgeMembers
+      .filter((member) => member.isActive && !member.deletedAt && member.email.trim())
+      .map((member) => ({
+        id: member.id,
+        email: member.email,
+        displayName: `${member.firstName} ${member.lastName}`.trim(),
+        detail: 'Miembro activo',
+      }));
+
   const toggleCustomPushRecipient = (userId: string) => {
     setCustomPushRecipients((prev) => prev.includes(userId)
       ? prev.filter((id) => id !== userId)
@@ -173,9 +195,9 @@ export function SettingsPage() {
     setIsSendingCustomPush(true);
     try {
       const recipientEmails = customPushAudience === 'seleccionados'
-        ? pushSubscriberGroups
-          .filter(({ userId }) => customPushRecipients.includes(userId))
-          .map(({ devices }) => devices[0].email.trim().toLowerCase())
+        ? customPushRecipientOptions
+          .filter(({ id }) => customPushRecipients.includes(id))
+          .map(({ email }) => email.trim().toLowerCase())
         : undefined;
       const pushFingerprint = getPushFingerprint([
         title,
@@ -241,8 +263,8 @@ export function SettingsPage() {
   }, []);
 
   useEffect(() => {
-    if (activeTab === 'notificaciones') void loadPushSubscribers();
-  }, [activeTab, loadPushSubscribers]);
+    if (activeTab === 'notificaciones' && canManagePush) void loadPushSubscribers();
+  }, [activeTab, canManagePush, loadPushSubscribers]);
 
   const handleToggleChecklistItem = async (item: OfficialVisitChecklistItem) => {
     if (!canConfigure) {
@@ -367,8 +389,8 @@ export function SettingsPage() {
           ...(canConfigure
             ? [{ id: 'configuracion' as const, label: 'CONFIGURACIÓN', shortLabel: 'CONFIG.', icon: Settings }]
             : []),
-          ...(canManagePush
-            ? [{ id: 'notificaciones' as const, label: 'PUSH', shortLabel: 'PUSH', icon: Bell }]
+          ...(canSendCustomPush
+            ? [{ id: 'notificaciones' as const, label: canManagePush ? 'PUSH' : 'NOTIFICACIONES', shortLabel: canManagePush ? 'PUSH' : 'NOTIF.', icon: Bell }]
             : []),
         ];
 
@@ -836,7 +858,7 @@ export function SettingsPage() {
       )}
 
       {/* 5. RESPALDO Y RESTAURACIÓN */}
-      {activeTab === 'notificaciones' && canManagePush && (
+      {activeTab === 'notificaciones' && canSendCustomPush && (
         <div className="space-y-6">
           <form onSubmit={handleSendCustomPush} className="rounded-xl border border-border bg-surface p-5 shadow-card sm:p-6">
             <div className="border-b border-border pb-4">
@@ -852,7 +874,7 @@ export function SettingsPage() {
                 <input
                   value={customPushTitle}
                   onChange={(event) => setCustomPushTitle(event.target.value)}
-                  maxLength={160}
+                  maxLength={80}
                   placeholder="Ej. Cambio de horario"
                   className="min-h-[42px] rounded-lg border border-border bg-surface-container-low px-3 text-sm font-normal text-ink outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
                 />
@@ -862,12 +884,12 @@ export function SettingsPage() {
                 <textarea
                   value={customPushBody}
                   onChange={(event) => setCustomPushBody(event.target.value)}
-                  maxLength={2000}
+                  maxLength={130}
                   rows={4}
                   placeholder="Escribe el mensaje que recibirán en su dispositivo..."
                   className="resize-y rounded-lg border border-border bg-surface-container-low px-3 py-2.5 text-sm font-normal text-ink outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
                 />
-                <span className="text-right text-[11px] font-normal text-ink-muted">{customPushBody.length}/2000</span>
+                <span className="text-right text-[11px] font-normal text-ink-muted">{customPushBody.length}/130</span>
               </label>
 
               <div className="grid gap-2">
@@ -892,22 +914,20 @@ export function SettingsPage() {
 
               {customPushAudience === 'seleccionados' && (
                 <div className="max-h-56 overflow-y-auto rounded-lg border border-border divide-y divide-border/60">
-                  {pushSubscriberGroups.length === 0 ? (
-                    <p className="p-4 text-xs text-ink-muted">No hay miembros con dispositivos push registrados.</p>
-                  ) : pushSubscriberGroups.map(({ userId, devices }) => {
-                    const subscriber = devices[0];
-                    const activeDevices = devices.filter((device) => device.enabled).length;
+                  {customPushRecipientOptions.length === 0 ? (
+                    <p className="p-4 text-xs text-ink-muted">No hay miembros activos disponibles.</p>
+                  ) : customPushRecipientOptions.map((recipient) => {
                     return (
-                      <label key={userId} className="flex cursor-pointer items-center gap-3 px-3 py-2.5 hover:bg-surface-container-low">
+                      <label key={recipient.id} className="flex cursor-pointer items-center gap-3 px-3 py-2.5 hover:bg-surface-container-low">
                         <input
                           type="checkbox"
-                          checked={customPushRecipients.includes(userId)}
-                          onChange={() => toggleCustomPushRecipient(userId)}
+                          checked={customPushRecipients.includes(recipient.id)}
+                          onChange={() => toggleCustomPushRecipient(recipient.id)}
                           className="h-4 w-4 accent-primary"
                         />
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-semibold text-ink">{subscriber.displayName}</span>
-                          <span className="block truncate text-[11px] text-ink-muted">{subscriber.email} · {activeDevices} dispositivo{activeDevices === 1 ? '' : 's'} activo{activeDevices === 1 ? '' : 's'}</span>
+                          <span className="block truncate text-sm font-semibold text-ink">{recipient.displayName}</span>
+                          <span className="block truncate text-[11px] text-ink-muted">{recipient.email} · {recipient.detail}</span>
                         </span>
                       </label>
                     );
@@ -928,6 +948,8 @@ export function SettingsPage() {
             </div>
           </form>
 
+          {canManagePush && (
+            <>
           <div className="rounded-xl border border-border bg-surface p-5 sm:p-6 shadow-card">
             <div className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -1034,6 +1056,8 @@ export function SettingsPage() {
               </div>
               </div>
             </div>
+          )}
+            </>
           )}
         </div>
       )}
