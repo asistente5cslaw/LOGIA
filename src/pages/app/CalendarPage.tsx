@@ -504,6 +504,7 @@ export function CalendarPage() {
   };
 
   const openConvocation = (ev: LodgeEvent) => {
+    if (ev.status === 'celebrada') return;
     setConvocationEvent(ev);
     setConvocationPdfFile(null);
     setConvocationPdfViewerUrl(null);
@@ -648,7 +649,7 @@ export function CalendarPage() {
   };
 
   const handleSendConvocation = async () => {
-    if (!convocationEvent) return;
+    if (!convocationEvent || convocationEvent.status === 'celebrada') return;
     try {
       await eventService.updateEventStatus(convocationEvent.id, 'convocada', {
         id: user?.id,
@@ -1026,7 +1027,7 @@ export function CalendarPage() {
                             <CalendarPlus className="h-3.5 w-3.5" /> Google Calendar
                           </a>
                         )}
-                        {canManageEvents && (
+                        {canManageEvents && ev.status !== 'celebrada' && (
                           <button
                             onClick={() => openConvocation(ev)}
                             className="flex items-center gap-1 rounded bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
@@ -1191,7 +1192,7 @@ export function CalendarPage() {
                         <span>Google Calendar</span>
                       </a>
                     )}
-                    {canManageEvents && (
+                    {canManageEvents && ev.status !== 'celebrada' && (
                       <button
                         type="button"
                         onClick={() => {
