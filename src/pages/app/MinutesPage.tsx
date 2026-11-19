@@ -247,7 +247,7 @@ export function MinutesPage() {
     }
     const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
     const pushToAll = submitter?.value === 'push';
-    const statusToSave = pushToAll && formStatus === 'borrador' ? 'circulada' : formStatus;
+    const statusToSave = pushToAll && formStatus === 'borrador' ? 'aprobada' : formStatus;
     try {
       const savedMinute = await minuteService.saveMinute(
         {
@@ -496,7 +496,7 @@ ${formDescription.trim()}${notes}`;
         </div>
 
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full no-scrollbar">
-          {(['all', 'borrador', 'circulada', 'aprobada', 'firmada', 'archivada'] as const).map((st) => (
+          {(['all', 'borrador', 'aprobada', 'firmada'] as const).map((st) => (
             <button
               key={st}
               onClick={() => setStatusFilter(st)}
@@ -556,10 +556,6 @@ ${formDescription.trim()}${notes}`;
                         ? 'bg-success/15 text-success'
                         : m.status === 'aprobada'
                         ? 'bg-info/15 text-info'
-                        : m.status === 'circulada'
-                        ? 'bg-gold/20 text-amber-800'
-                        : m.status === 'archivada'
-                        ? 'bg-surface-container text-ink-muted'
                         : 'bg-surface-container text-ink-secondary'
                     }`}
                   >
@@ -833,10 +829,8 @@ ${formDescription.trim()}${notes}`;
                           onChange={(status) => void handleStatusChange(selectedMinute, status)}
                           options={[
                             { value: 'borrador', label: 'Borrador' },
-                            { value: 'circulada', label: 'Circulada' },
                             { value: 'aprobada', label: 'Aprobada' },
                             { value: 'firmada', label: 'Firmada' },
-                            { value: 'archivada', label: 'Archivada' },
                           ]}
                           className="w-40"
                         />
@@ -847,19 +841,10 @@ ${formDescription.trim()}${notes}`;
                     {selectedMinute.status === 'borrador' && (
                       <button
                         type="button"
-                        onClick={() => handleStatusChange(selectedMinute, 'circulada')}
-                        className="rounded bg-gold/20 px-3 py-1 text-xs font-semibold text-amber-900 hover:bg-gold/30"
-                      >
-                        Poner a circular
-                      </button>
-                    )}
-                    {selectedMinute.status === 'circulada' && (
-                      <button
-                        type="button"
                         onClick={() => handleStatusChange(selectedMinute, 'aprobada')}
                         className="rounded bg-info/20 px-3 py-1 text-xs font-semibold text-info hover:bg-info/30"
                       >
-                        Aprobar trazado
+                        Aprobar comunicación
                       </button>
                     )}
                     {selectedMinute.status === 'aprobada' && (
@@ -869,15 +854,6 @@ ${formDescription.trim()}${notes}`;
                         className="rounded bg-success/20 px-3 py-1 text-xs font-semibold text-success hover:bg-success/30"
                       >
                         Firmar y sancionar
-                      </button>
-                    )}
-                    {selectedMinute.status === 'firmada' && (
-                      <button
-                        type="button"
-                        onClick={() => handleStatusChange(selectedMinute, 'archivada')}
-                        className="rounded border border-border px-3 py-1 text-xs font-semibold text-ink-secondary hover:bg-surface-container"
-                      >
-                        Archivar
                       </button>
                     )}
                       </>

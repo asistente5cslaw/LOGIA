@@ -185,7 +185,7 @@ export interface EventConflict {
   createdAt: string;
 }
 
-export type MinuteStatus = 'borrador' | 'circulada' | 'aprobada' | 'firmada' | 'archivada';
+export type MinuteStatus = 'borrador' | 'aprobada' | 'firmada';
 
 export type MinuteDocumentType = 'tenida' | 'duelo' | 'suspension' | 'administrativa';
 
