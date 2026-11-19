@@ -66,6 +66,21 @@ function eventKindLabel(event: Pick<LodgeEvent, 'eventCategory'>): string {
   return event.eventCategory === 'tenida' ? 'Tenida' : 'Reunión';
 }
 
+function getNextTenidaTitle(events: LodgeEvent[], date: string): string {
+  const year = Number(String(date || '').slice(0, 4)) || new Date().getFullYear();
+  const tenidaNumbers = events
+    .filter((event) => event.eventCategory === 'tenida' && event.status !== 'cancelada')
+    .map((event) => {
+      const match = event.title.match(/\btenida\s+no\.?\s*(\d+)\s*-\s*(\d{4})\b/i);
+      if (!match || Number(match[2]) !== year) return 0;
+      return Number(match[1]);
+    })
+    .filter((number) => Number.isInteger(number) && number > 0);
+
+  const nextNumber = tenidaNumbers.length > 0 ? Math.max(...tenidaNumbers) + 1 : 1;
+  return `Tenida No. ${nextNumber} - ${year} | `;
+}
+
 function googleCalendarUrl(event: LodgeEvent): string {
   const normalizeDate = (value: string): string => {
     const match = String(value || '').match(/^(\d{4}-\d{2}-\d{2})/);
@@ -274,7 +289,7 @@ export function CalendarPage() {
 
   const openNewEventModal = () => {
     setEditingEvent(null);
-    setFormTitle('');
+    setFormTitle(getNextTenidaTitle(events, selectedDateStr));
     setFormBodyId('uf21');
     setFormRole('apr');
     setFormDegrees(['aprendiz']);
@@ -1268,8 +1283,13 @@ export function CalendarPage() {
             required
             value={formTitle}
             onChange={(e) => setFormTitle(e.target.value)}
-            placeholder="Ej. Tenida Ordinaria de Primer Grado y Recepción"
+            placeholder="Tenida No. 23 - 2026 | Tenida Solemne de Instalación"
           />
+          {!editingEvent && formEventCategory === 'tenida' && (
+            <p className="-mt-2 text-[11px] text-ink-muted">
+              Se sugirió el próximo número de tenida del año. Puedes completar o modificar el título libremente.
+            </p>
+          )}
 
           <AppleSelect<MasonicBodyId>
             label="Cuerpo masónico *"
