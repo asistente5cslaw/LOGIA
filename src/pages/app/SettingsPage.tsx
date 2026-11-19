@@ -711,10 +711,12 @@ export function SettingsPage() {
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="rounded-full bg-success/15 px-2.5 py-1 text-[11px] font-bold uppercase text-success">Conectado</span>
-                  <span className="text-sm font-semibold text-ink">{googleCalendarStatus.integration?.account_email}</span>
+                  <span className="text-sm font-semibold text-ink">
+                    Calendario de: {googleCalendarStatus.integration?.account_email || 'Cuenta de Google conectada'}
+                  </span>
                 </div>
                 <p className="text-xs text-ink-secondary">
-                  Calendario utilizado: <strong>{googleCalendarStatus.integration?.calendar_id}</strong>
+                  Se utilizará el calendario principal de esa cuenta (<strong>{googleCalendarStatus.integration?.calendar_id}</strong>) para crear las reuniones automáticamente.
                 </p>
                 {googleCalendarStatus.integration?.last_sync_at && (
                   <p className="text-[11px] text-ink-muted">

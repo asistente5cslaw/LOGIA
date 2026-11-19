@@ -134,7 +134,7 @@ async function handleStart(userId: string, headers: HeadersInit) {
     access_type: 'offline',
     prompt: 'consent',
     include_granted_scopes: 'true',
-    scope: 'https://www.googleapis.com/auth/calendar.events',
+    scope: 'openid email https://www.googleapis.com/auth/calendar.events',
     state,
   });
   return response({ authUrl: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}` }, 200, headers);
