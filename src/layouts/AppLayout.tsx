@@ -28,7 +28,7 @@ import { DATA_CHANGED_EVENT } from '@/hooks/useRealtimeRefresh';
 const desktopNavItems = [
   { to: '/app', label: 'Inicio', icon: Home, end: true },
   { to: '/app/calendario', label: 'Calendario', icon: CalendarDays, end: false },
-  { to: '/app/actas', label: 'Actas', icon: FileText, end: false },
+  { to: '/app/actas', label: 'Comunicaciones', icon: FileText, end: false },
   { to: '/app/asistencia', label: 'Asistencia', icon: CheckSquare, end: false },
   { to: '/app/miembros', label: 'Miembros', icon: Users, end: false },
 ];
@@ -36,7 +36,7 @@ const desktopNavItems = [
 const mobileNavItems = [
   { to: '/app', label: 'Inicio', icon: Home, end: true },
   { to: '/app/calendario', label: 'Calendario', icon: CalendarDays, end: false },
-  { to: '/app/actas', label: 'Actas', icon: FileText, end: false },
+  { to: '/app/actas', label: 'Comunicaciones', icon: FileText, end: false },
   { to: '/app/asistencia', label: 'Asistencia', icon: CheckSquare, end: false },
   { to: '/app/miembros', label: 'Miembros', icon: Users, end: false },
 ];

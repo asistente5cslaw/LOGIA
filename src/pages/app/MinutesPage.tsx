@@ -466,8 +466,8 @@ ${formDescription.trim()}${notes}`;
     <div className="space-y-4 sm:space-y-6 px-4 pt-2.5 pb-6 sm:py-6 md:px-8 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <PageHeader
-          title="Libro de Actas y Resoluciones"
-          subtitle="Trazados protocolarios, resoluciones y acuerdos sancionados"
+          title="Comunicaciones"
+          subtitle="Actas, resoluciones y acuerdos oficiales de la Logia"
         />
 
         {canManageMinutes && (
