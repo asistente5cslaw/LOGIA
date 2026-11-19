@@ -157,6 +157,11 @@ export interface LodgeEvent {
   convocationPdfUrl?: string;
   convocationPdfFileName?: string;
   convocationPdfFileSize?: number;
+  googleCalendarEventId?: string;
+  googleCalendarHtmlLink?: string;
+  googleCalendarSyncStatus?: 'not_connected' | 'synced' | 'pending' | 'error';
+  googleCalendarSyncError?: string;
+  googleCalendarSyncedAt?: string;
   status: EventStatus;
   createdBy: string;
   createdByName?: string;

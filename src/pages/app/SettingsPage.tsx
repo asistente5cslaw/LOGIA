@@ -8,6 +8,7 @@ import { backupService, type ImportPreview } from '@/services/backupService';
 import { auditService } from '@/services/auditService';
 import { authService } from '@/services/authService';
 import { pushNotificationService, type PushSubscriber } from '@/services/pushNotificationService';
+import { googleCalendarService, type GoogleCalendarIntegrationStatus } from '@/services/googleCalendarService';
 import { institutionalRoles, permissionLabels } from '@/data/rolesData';
 import { PageHeader } from '@/components/shared/PageHeader';
 import type {
@@ -30,6 +31,9 @@ import {
   Send,
   Power,
   Trash2,
+  CalendarDays,
+  Link2,
+  Unlink,
 } from 'lucide-react';
 import { AppleSelect } from '@/components/shared/AppleSelect';
 import { toast } from 'sonner';
@@ -57,7 +61,7 @@ export function SettingsPage() {
   const { user, isSecretaryOrVM } = useAuth();
 
   const [activeTab, setActiveTab] = useState<
-    'visita' | 'configuracion' | 'permisos' | 'invitaciones' | 'notificaciones' | 'respaldo' | 'auditoria'
+    'visita' | 'configuracion' | 'google_calendar' | 'permisos' | 'invitaciones' | 'notificaciones' | 'respaldo' | 'auditoria'
   >('notificaciones');
 
   // Visita Oficial & Configuración
@@ -83,6 +87,8 @@ export function SettingsPage() {
   const [customPushAudience, setCustomPushAudience] = useState<'todos' | 'seleccionados'>('todos');
   const [customPushRecipients, setCustomPushRecipients] = useState<string[]>([]);
   const [isSendingCustomPush, setIsSendingCustomPush] = useState(false);
+  const [googleCalendarStatus, setGoogleCalendarStatus] = useState<GoogleCalendarIntegrationStatus | null>(null);
+  const [isLoadingGoogleCalendar, setIsLoadingGoogleCalendar] = useState(false);
 
   // Respaldo e Importación
   const [importJsonText, setImportJsonText] = useState('');
@@ -269,6 +275,31 @@ export function SettingsPage() {
     if (activeTab === 'notificaciones' && canManagePush) void loadPushSubscribers();
   }, [activeTab, canManagePush, loadPushSubscribers]);
 
+  const loadGoogleCalendarStatus = useCallback(async () => {
+    setIsLoadingGoogleCalendar(true);
+    try {
+      setGoogleCalendarStatus(await googleCalendarService.getStatus());
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo consultar Google Calendar.');
+    } finally {
+      setIsLoadingGoogleCalendar(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'google_calendar' && isSecretaryOrVM) void loadGoogleCalendarStatus();
+  }, [activeTab, isSecretaryOrVM, loadGoogleCalendarStatus]);
+
+  useEffect(() => {
+    const result = new URLSearchParams(window.location.search).get('google_calendar');
+    if (!result) return;
+    if (result === 'connected') toast.success('Google Calendar conectado correctamente.');
+    if (result === 'error') toast.error('No se pudo conectar Google Calendar.');
+    if (result === 'invalid_state') toast.error('La autorización de Google expiró. Intenta nuevamente.');
+    window.history.replaceState({}, '', window.location.pathname);
+    setActiveTab('google_calendar');
+  }, []);
+
   const handleToggleChecklistItem = async (item: OfficialVisitChecklistItem) => {
     if (!canConfigure) {
       toast.error('No tienes permisos para modificar el checklist de inspección.');
@@ -391,6 +422,9 @@ export function SettingsPage() {
         const settingsTabs = [
           ...(canConfigure
             ? [{ id: 'configuracion' as const, label: 'CONFIGURACIÓN', shortLabel: 'CONFIG.', icon: Settings }]
+            : []),
+          ...(isSecretaryOrVM
+            ? [{ id: 'google_calendar' as const, label: 'GOOGLE CALENDAR', shortLabel: 'CALENDAR', icon: CalendarDays }]
             : []),
           ...(canSendCustomPush
             ? [{ id: 'notificaciones' as const, label: canManagePush ? 'PUSH' : 'NOTIFICACIONES', shortLabel: canManagePush ? 'PUSH' : 'NOTIF.', icon: Bell }]
@@ -655,6 +689,87 @@ export function SettingsPage() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {activeTab === 'google_calendar' && isSecretaryOrVM && (
+        <div className="rounded-xl border border-border bg-surface p-5 sm:p-6 shadow-card max-w-3xl">
+          <div className="flex items-start justify-between gap-4 border-b border-border pb-4">
+            <div>
+              <h3 className="font-serif text-lg font-bold text-ink">Calendario institucional de Google</h3>
+              <p className="mt-1 text-xs text-ink-secondary">
+                Las actividades creadas en LOGIA se reflejarán automáticamente en el calendario del Secretario.
+              </p>
+            </div>
+            <CalendarDays className="h-6 w-6 shrink-0 text-primary" />
+          </div>
+
+          <div className="mt-5 rounded-xl border border-border bg-surface-container-low p-4">
+            {isLoadingGoogleCalendar ? (
+              <p className="text-sm text-ink-muted">Consultando conexión…</p>
+            ) : googleCalendarStatus?.connected ? (
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-success/15 px-2.5 py-1 text-[11px] font-bold uppercase text-success">Conectado</span>
+                  <span className="text-sm font-semibold text-ink">{googleCalendarStatus.integration?.account_email}</span>
+                </div>
+                <p className="text-xs text-ink-secondary">
+                  Calendario utilizado: <strong>{googleCalendarStatus.integration?.calendar_id}</strong>
+                </p>
+                {googleCalendarStatus.integration?.last_sync_at && (
+                  <p className="text-[11px] text-ink-muted">
+                    Última sincronización: {new Date(googleCalendarStatus.integration.last_sync_at).toLocaleString('es-PA')}
+                  </p>
+                )}
+                {googleCalendarStatus.integration?.last_error && (
+                  <p className="rounded-lg bg-destructive/10 p-2 text-xs text-destructive">{googleCalendarStatus.integration.last_error}</p>
+                )}
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => void googleCalendarService.connect()}
+                    className="inline-flex min-h-[40px] items-center gap-2 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary-pressed"
+                  >
+                    <Link2 className="h-4 w-4" /> Reconectar cuenta
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!window.confirm('¿Desconectar el calendario institucional de Google?')) return;
+                      try {
+                        await googleCalendarService.disconnect();
+                        toast.success('Google Calendar desconectado.');
+                        await loadGoogleCalendarStatus();
+                      } catch (error) {
+                        toast.error(error instanceof Error ? error.message : 'No se pudo desconectar Google Calendar.');
+                      }
+                    }}
+                    className="inline-flex min-h-[40px] items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-4 text-xs font-semibold text-destructive hover:bg-destructive/10"
+                  >
+                    <Unlink className="h-4 w-4" /> Desconectar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm font-semibold text-ink">No hay una cuenta conectada.</p>
+                <p className="text-xs leading-relaxed text-ink-secondary">
+                  Conecta el calendario del correo institucional del Secretario. Google solicitará autorización y LOGIA solo usará el acceso para crear y actualizar actividades.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void googleCalendarService.connect()}
+                  className="inline-flex min-h-[42px] items-center gap-2 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary-pressed"
+                >
+                  <Link2 className="h-4 w-4" /> Conectar Google Calendar
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-4 rounded-lg border border-info/20 bg-info/5 p-3 text-xs text-info">
+            Después de conectar la cuenta, las nuevas actividades y sus cambios se sincronizarán desde LOGIA hacia Google Calendar. El calendario podrá compartirse desde Google con los miembros de la Logia.
+          </div>
         </div>
       )}
 

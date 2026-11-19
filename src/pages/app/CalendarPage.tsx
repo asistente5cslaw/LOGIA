@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { eventService } from '@/services/eventService';
+import { googleCalendarService } from '@/services/googleCalendarService';
 import { memberService } from '@/services/memberService';
 import { convocationService } from '@/services/convocationService';
 import { getBodyById, masonicBodies } from '@/data/bodiesData';
@@ -386,6 +387,12 @@ export function CalendarPage() {
     try {
       const { savedEvent } = await eventService.saveEvent(candidate, { id: user?.id, email: user?.email, name: user?.displayName });
       await eventService.replaceDegreeSegments(savedEvent.id, formDegrees);
+      try {
+        await googleCalendarService.syncEvent(savedEvent, editingEvent ? 'update' : 'create');
+      } catch (syncError) {
+        console.warn('La actividad se guardó, pero no se sincronizó con Google Calendar:', syncError);
+        toast.warning('Actividad guardada. No se pudo sincronizar Google Calendar.');
+      }
       toast.success(editingEvent ? 'Actividad actualizada exitosamente' : 'Actividad agendada exitosamente');
       setShowEventModal(false);
       loadData();
@@ -397,10 +404,15 @@ export function CalendarPage() {
   const handleConfirmCancellation = async () => {
     if (!pendingCancellation) return;
     try {
-      await eventService.saveEvent(
+      const { savedEvent } = await eventService.saveEvent(
         pendingCancellation,
         { id: user?.id, email: user?.email, name: user?.displayName }
       );
+      try {
+        await googleCalendarService.syncEvent(savedEvent, 'cancel');
+      } catch (syncError) {
+        console.warn('La cancelación se guardó, pero no se sincronizó con Google Calendar:', syncError);
+      }
 
       if (notifyCancellationPush) {
         setIsSendingCancellationPush(true);
@@ -464,6 +476,11 @@ export function CalendarPage() {
         conflictJustification.trim()
       );
       await eventService.replaceDegreeSegments(savedEvent.id, pendingCandidate.degreeSegments?.map((segment) => segment.degree) || [pendingCandidate.degreeRequired]);
+      try {
+        await googleCalendarService.syncEvent(savedEvent, pendingCandidate.status === 'cancelada' ? 'cancel' : 'create');
+      } catch (syncError) {
+        console.warn('El evento se guardó, pero no se sincronizó con Google Calendar:', syncError);
+      }
       toast.warning('Evento guardado con conflicto registrado en auditoría.');
       setShowConflictModal(false);
       setPendingCandidate(null);
@@ -493,7 +510,15 @@ export function CalendarPage() {
     if (!confirmed) return;
 
     try {
+      const eventToDelete = events.find((event) => event.id === eventId);
       await eventService.deleteEvent(eventId, { id: user?.id, email: user?.email });
+      if (eventToDelete) {
+        try {
+          await googleCalendarService.syncEvent(eventToDelete, 'delete');
+        } catch (syncError) {
+          console.warn('La actividad se eliminó, pero no se eliminó de Google Calendar:', syncError);
+        }
+      }
       toast.success('Tenida eliminada exitosamente');
       setShowEventModal(false);
       setShowMobileDayModal(false);
