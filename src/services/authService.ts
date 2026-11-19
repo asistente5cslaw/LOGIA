@@ -47,8 +47,14 @@ export function translateAuthError(error: unknown): string {
   if (msg.includes('Rate limit')) {
     return 'Demasiados intentos. Espera unos momentos antes de intentar nuevamente.';
   }
-  if (msg.includes('Network') || msg.includes('fetch')) {
-    return 'Error de conexión de red. Verifica tu conexión a internet.';
+  const normalizedMessage = msg.toLowerCase();
+  if (
+    normalizedMessage.includes('network') ||
+    normalizedMessage.includes('fetch') ||
+    normalizedMessage.includes('load failed') ||
+    normalizedMessage.includes('failed to fetch')
+  ) {
+    return 'Supabase no está disponible en este momento. Confirma que el proyecto esté activo y vuelve a intentar en unos segundos.';
   }
   if (msg.includes('Database error saving new user')) {
     return 'Error en el disparador de base de datos de Supabase. Aplica la migración actualizada en el SQL Editor.';

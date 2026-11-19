@@ -5,7 +5,7 @@ import { memberService } from '@/services/memberService';
 import { eventService } from '@/services/eventService';
 import { convocationService } from '@/services/convocationService';
 import { PageHeader } from '@/components/shared/PageHeader';
-import type { Minute, MinuteStatus, MasonicDegree, Member, LodgeEvent } from '@/types';
+import type { Minute, MinuteStatus, MasonicDegree, Member, LodgeEvent, MinuteDocumentType } from '@/types';
 import {
   Plus,
   Search,
@@ -32,6 +32,20 @@ import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 import { pushNotificationService } from '@/services/pushNotificationService';
 import { PdfPageViewer } from '@/components/shared/PdfPageViewer';
 
+const documentTypeOptions: AppleSelectOption<MinuteDocumentType>[] = [
+  { value: 'tenida', label: 'Acta de Tenida', description: 'Reunión o trabajos celebrados por la Logia' },
+  { value: 'duelo', label: 'Resolución de Duelo', description: 'Acuerdo solemne por el fallecimiento de un hermano' },
+  { value: 'suspension', label: 'Resolución de Suspensión', description: 'Medida o resolución disciplinaria' },
+  { value: 'administrativa', label: 'Resolución Administrativa', description: 'Decisión administrativa del Taller' },
+];
+
+const documentTypeLabels: Record<MinuteDocumentType, string> = {
+  tenida: 'Acta de Tenida',
+  duelo: 'Resolución de Duelo',
+  suspension: 'Resolución de Suspensión',
+  administrativa: 'Resolución Administrativa',
+};
+
 export function MinutesPage() {
   const { user, hasPermission } = useAuth();
   const { showConfirm } = useAppleDialog();
@@ -50,6 +64,7 @@ export function MinutesPage() {
   const [editingMinute, setEditingMinute] = useState<Minute | null>(null);
   const [formEventId, setFormEventId] = useState('');
   const [formEventTitle, setFormEventTitle] = useState('');
+  const [formDocumentType, setFormDocumentType] = useState<MinuteDocumentType>('tenida');
   const [formYear, setFormYear] = useState(Number(getTodayIsoDate().slice(0, 4)));
   const [formNumber, setFormNumber] = useState('');
   const [formTitle, setFormTitle] = useState('');
@@ -120,6 +135,7 @@ export function MinutesPage() {
           m.title.toLowerCase().includes(q) ||
           m.description.toLowerCase().includes(q) ||
           m.meetingDate.includes(q) ||
+          documentTypeLabels[m.documentType || 'tenida'].toLowerCase().includes(q) ||
           String(m.year).includes(q)
         );
       }
@@ -193,6 +209,7 @@ export function MinutesPage() {
     setEditingMinute(null);
     setFormEventId('');
     setFormEventTitle('');
+    setFormDocumentType('tenida');
     setFormYear(Number(getTodayIsoDate().slice(0, 4)));
     setFormNumber('');
     setFormTitle('');
@@ -204,6 +221,21 @@ export function MinutesPage() {
     setFormNotes('');
     setFormPdfFile(null);
     setShowMinuteModal(true);
+  };
+
+  const handleSelectDocumentType = (documentType: MinuteDocumentType) => {
+    setFormDocumentType(documentType);
+    if (documentType !== 'tenida') {
+      setFormEventId('');
+      setFormEventTitle('');
+      setFormSegmentId('');
+      if (!formTitle || formTitle.startsWith('Trazado de')) {
+        setFormTitle(documentTypeLabels[documentType]);
+      }
+      if (!formDescription || formDescription.startsWith('A la Gloria')) {
+        setFormDescription('A la Gloria del Gran Arquitecto del Universo...\n\nLa Respetable Logia resuelve lo siguiente:\n\n');
+      }
+    }
   };
 
   const handleSaveMinute = async (e: React.FormEvent) => {
@@ -223,6 +255,7 @@ export function MinutesPage() {
           number: manualNumber,
           formatNumber: `${String(manualNumber).padStart(2, '0')}-${formYear}`,
           year: formYear,
+          documentType: formDocumentType,
           title: formTitle.trim(),
           description: formDescription.trim(),
           meetingDate: formMeetingDate,
@@ -433,8 +466,8 @@ ${formDescription.trim()}${notes}`;
     <div className="space-y-4 sm:space-y-6 px-4 pt-2.5 pb-6 sm:py-6 md:px-8 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <PageHeader
-          title="Libro de Actas de Tenidas"
-          subtitle="Trazados protocolarios foliados y sancionados"
+          title="Libro de Actas y Resoluciones"
+          subtitle="Trazados protocolarios, resoluciones y acuerdos sancionados"
         />
 
         {canManageMinutes && (
@@ -443,7 +476,7 @@ ${formDescription.trim()}${notes}`;
             className="w-full sm:w-auto flex flex-row min-h-[40px] items-center justify-center gap-2 rounded-xl bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary-pressed transition-colors cursor-pointer active:scale-95 shrink-0 whitespace-nowrap flex-nowrap"
           >
             <Plus className="h-4 w-4 shrink-0" />
-            <span className="whitespace-nowrap">Redactar Acta</span>
+            <span className="whitespace-nowrap">Redactar documento</span>
           </button>
         )}
       </div>
@@ -496,9 +529,12 @@ ${formDescription.trim()}${notes}`;
                 <div className="space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">
-                      Acta No. {m.formatNumber}
+                      Documento No. {m.formatNumber}
                     </span>
-                    <span className="text-xs text-ink-muted">• Tenida del {formatDateSpanish(m.meetingDate)}</span>
+                    <span className="text-xs text-ink-muted">• {m.documentType && m.documentType !== 'tenida' ? 'Fecha' : 'Tenida del'} {formatDateSpanish(m.meetingDate)}</span>
+                    <span className="rounded bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary uppercase">
+                      {documentTypeLabels[m.documentType || 'tenida']}
+                    </span>
                     <span className="rounded bg-surface-container px-2 py-0.5 text-[10px] font-semibold text-ink-secondary uppercase">
                       {m.degree}
                     </span>
@@ -532,7 +568,7 @@ ${formDescription.trim()}${notes}`;
 
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-primary font-medium hover:underline flex items-center gap-1">
-                      <Eye className="h-3.5 w-3.5" /> Ver trazado
+                      <Eye className="h-3.5 w-3.5" /> Ver documento
                     </span>
                     {canManageMinutes && (
                       <button
@@ -556,8 +592,8 @@ ${formDescription.trim()}${notes}`;
       <Modal
         isOpen={Boolean(selectedMinute)}
         onClose={() => setSelectedMinute(null)}
-        title={selectedMinute ? `Acta No. ${selectedMinute.formatNumber}` : ''}
-        subtitle={selectedMinute ? `${selectedMinute.title} • Tenida: ${selectedMinute.meetingDate} (Grado: ${selectedMinute.degree})` : ''}
+        title={selectedMinute ? `${documentTypeLabels[selectedMinute.documentType || 'tenida']} No. ${selectedMinute.formatNumber}` : ''}
+        subtitle={selectedMinute ? `${selectedMinute.title} • Fecha: ${selectedMinute.meetingDate} (Grado: ${selectedMinute.degree})` : ''}
         maxWidth="xl"
       >
         {selectedMinute && (
@@ -854,25 +890,32 @@ ${formDescription.trim()}${notes}`;
         )}
       </Modal>
 
-      {/* Modal Redactar Nueva Acta */}
+      {/* Modal Redactar Nueva Acta o Resolución */}
       <Modal
         isOpen={showMinuteModal}
         onClose={() => setShowMinuteModal(false)}
-        title="Redactar Nueva Acta"
+        title="Redactar Acta o Resolución"
         maxWidth="lg"
       >
         <form onSubmit={handleSaveMinute} noValidate className="space-y-4">
+          <AppleSelect<MinuteDocumentType>
+            label="Tipo de documento"
+            value={formDocumentType}
+            onChange={handleSelectDocumentType}
+            options={documentTypeOptions}
+          />
+
           {/* Selector de reunión agendada */}
-          <AppleSelect<string>
+          {formDocumentType === 'tenida' && <AppleSelect<string>
             label="Reunión agendada / Convocatoria asociada"
             value={formEventId}
             onChange={handleSelectMeeting}
             options={meetingOptions}
             searchable={true}
-          />
+          />}
 
           <AppleInput
-            label="Número de acta *"
+            label="Número correlativo del documento *"
             type="number"
             min={1}
             step={1}
@@ -885,7 +928,17 @@ ${formDescription.trim()}${notes}`;
             El número debe ser colocado manualmente por Secretaría. No se asignará automáticamente.
           </p>
 
-          {formEventId && (events.find((event) => event.id === formEventId)?.degreeSegments?.length || 0) > 0 && (
+          {formDocumentType !== 'tenida' && (
+            <AppleInput
+              label="Fecha de la resolución *"
+              type="date"
+              required
+              value={formMeetingDate}
+              onChange={(event) => setFormMeetingDate(event.target.value)}
+            />
+          )}
+
+          {formDocumentType === 'tenida' && formEventId && (events.find((event) => event.id === formEventId)?.degreeSegments?.length || 0) > 0 && (
             <AppleSelect<MasonicDegree>
               label="Tramo / grado del acta"
               value={formDegree}
@@ -903,7 +956,9 @@ ${formDescription.trim()}${notes}`;
           )}
 
           <div className="rounded-lg border border-border bg-surface-container-low px-3 py-2.5 text-xs text-ink-secondary">
-            {formEventId ? (
+            {formDocumentType !== 'tenida' ? (
+              <span>Resolución independiente del calendario · {formatDateSpanish(formMeetingDate)} · acceso de {formDegree}</span>
+            ) : formEventId ? (
               <>
                 <span className="font-semibold text-ink">Fecha, grado y reunión tomados del calendario:</span>{' '}
                 {formatDateSpanish(formMeetingDate)} · {formDegree}
@@ -914,15 +969,15 @@ ${formDescription.trim()}${notes}`;
           </div>
 
           <AppleInput
-            label="Asunto o Título del Trazado *"
+            label="Asunto o Título del Documento *"
             required
             value={formTitle}
             onChange={(e) => setFormTitle(e.target.value)}
-            placeholder="Ej. Tenida Ordinaria de Primer Grado y Recepción"
+            placeholder="Ej. Resolución de duelo por el Q.·. H.·. ..."
           />
 
           <AppleTextarea
-            label="Cuerpo del Trazado de Secretaría *"
+            label="Cuerpo del Acta o Resolución *"
             required
             rows={6}
             value={formDescription}

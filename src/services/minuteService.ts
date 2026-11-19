@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import type { Minute, MinuteCorrection, MasonicDegree } from '@/types';
+import type { Minute, MinuteCorrection, MasonicDegree, MinuteDocumentType } from '@/types';
 import { auditService } from './auditService';
 
 export const minuteService = {
@@ -29,6 +29,7 @@ export const minuteService = {
             number: d.number,
             year: d.year,
             formatNumber: d.format_number,
+            documentType: (d.document_type || 'tenida') as MinuteDocumentType,
             title: d.title,
             description: d.description,
             meetingDate: d.meeting_date,
@@ -138,6 +139,7 @@ export const minuteService = {
           number: fullMinute.number,
           year: fullMinute.year,
           format_number: fullMinute.formatNumber,
+          document_type: fullMinute.documentType || 'tenida',
           title: fullMinute.title,
           description: fullMinute.description,
           meeting_date: fullMinute.meetingDate,

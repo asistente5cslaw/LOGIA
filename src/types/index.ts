@@ -182,6 +182,8 @@ export interface EventConflict {
 
 export type MinuteStatus = 'borrador' | 'circulada' | 'aprobada' | 'firmada' | 'archivada';
 
+export type MinuteDocumentType = 'tenida' | 'duelo' | 'suspension' | 'administrativa';
+
 export interface MinuteCorrection {
   id: string;
   minuteId: string;
@@ -198,6 +200,7 @@ export interface Minute {
   number: number; // Consecutivo anual
   year: number;
   formatNumber: string; // XX-YYYY
+  documentType?: MinuteDocumentType;
   title: string;
   description: string;
   meetingDate: string;

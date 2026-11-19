@@ -1,6 +1,7 @@
 -- El Administrador técnico y Secretaría también pueden revisar y registrar
 -- la asistencia oficial, además del Venerable Maestro.
 DROP POLICY IF EXISTS "VM and Secretary manage official attendance" ON public.attendance;
+DROP POLICY IF EXISTS "Authorized officers manage official attendance" ON public.attendance;
 
 CREATE POLICY "Authorized officers manage official attendance"
   ON public.attendance FOR ALL TO authenticated
