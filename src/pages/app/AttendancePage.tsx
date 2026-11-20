@@ -69,12 +69,13 @@ export function AttendancePage() {
   const [dayEventChoices, setDayEventChoices] = useState<LodgeEvent[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Modal para agregar visitante
-  const [showVisitorModal, setShowVisitorModal] = useState(false);
-  const [visName, setVisName] = useState('');
-  const [visLodge, setVisLodge] = useState('');
-  const [visDegree, setVisDegree] = useState<MasonicDegree>('maestro');
-  const [visNotes, setVisNotes] = useState('');
+  // Modal para agregar un miembro local sin cuenta o un visitante externo.
+  const [showAddPersonModal, setShowAddPersonModal] = useState(false);
+  const [personType, setPersonType] = useState<'member' | 'visitor'>('member');
+  const [personName, setPersonName] = useState('');
+  const [personLodge, setPersonLodge] = useState('');
+  const [personDegree, setPersonDegree] = useState<MasonicDegree>('maestro');
+  const [personNotes, setPersonNotes] = useState('');
 
   const canManageAttendance = user?.profile?.roleId === 'vm'
     || user?.profile?.roleId === 'sec'
@@ -521,30 +522,40 @@ export function AttendancePage() {
     }
   };
 
-  const handleAddVisitor = async (e: React.FormEvent) => {
+  const handleAddPerson = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedEventId || !visName.trim() || !visLodge.trim()) return;
+    if (!selectedEventId || !personName.trim()) return;
 
     try {
-      const created = await attendanceService.addVisitor(
-        {
-          eventId: selectedEventId,
-          fullName: visName.trim(),
-          lodge: visLodge.trim(),
-          degree: visDegree,
-          notes: visNotes.trim() || undefined,
-        },
-        { id: user?.id, email: user?.email }
-      );
-
-      setVisitors((prev) => [...prev, created]);
-      setShowVisitorModal(false);
-      setVisName('');
-      setVisLodge('');
-      setVisNotes('');
-      toast.success(`Visitante registrado: Q.·. H.·. ${created.fullName}`);
+      if (personType === 'member') {
+        const duplicate = members.find((member) =>
+          `${member.firstName} ${member.lastName}`.trim().toLowerCase() === personName.trim().replace(/\s+/g, ' ').toLowerCase()
+        );
+        if (duplicate) {
+          toast.warning(`Ya existe una ficha con ese nombre: ${duplicate.firstName} ${duplicate.lastName}. Se permitirá el homónimo.`);
+        }
+        const created = await memberService.createQuickMember(personName, personDegree, {
+          id: user?.id,
+          email: user?.email,
+          name: user?.displayName,
+        });
+        setMembers((prev) => [...prev, created].sort((a, b) => `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`)));
+        toast.success(`Miembro agregado sin usuario: ${created.firstName} ${created.lastName}`);
+      } else {
+        if (!personLodge.trim()) return;
+        const created = await attendanceService.addVisitor(
+          { eventId: selectedEventId, fullName: personName.trim(), lodge: personLodge.trim(), degree: personDegree, notes: personNotes.trim() || undefined },
+          { id: user?.id, email: user?.email }
+        );
+        setVisitors((prev) => [...prev, created]);
+        toast.success(`Visitante registrado: Q.·. H.·. ${created.fullName}`);
+      }
+      setShowAddPersonModal(false);
+      setPersonName('');
+      setPersonLodge('');
+      setPersonNotes('');
     } catch {
-      toast.error('Error al registrar visitante');
+      toast.error(personType === 'member' ? 'Error al crear el miembro sin usuario' : 'Error al registrar visitante');
     }
   };
 
@@ -980,6 +991,11 @@ export function AttendancePage() {
                         {m.firstName} {m.lastName}
                       </p>
                       <p className="text-[11px] text-ink-muted uppercase">Grado: {m.roleId === 'vm' ? 'maestro' : m.degree}</p>
+                      {m.hasUserAccount === false && (
+                        <span className="mt-1 inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                          Sin usuario
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -1105,10 +1121,10 @@ export function AttendancePage() {
               <h3 className="font-serif text-base font-bold text-ink">QQ.·. HH.·. Visitantes</h3>
               {canManageAttendance && (
                 <button
-                  onClick={() => setShowVisitorModal(true)}
+                  onClick={() => setShowAddPersonModal(true)}
                   className="flex items-center gap-1 rounded bg-primary/10 px-2 py-1 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors"
                 >
-                  <Plus className="h-3.5 w-3.5" /> Agregar
+                  <Plus className="h-3.5 w-3.5" /> Agregar persona
                 </button>
               )}
             </div>
@@ -1211,44 +1227,65 @@ export function AttendancePage() {
         )}
       </Modal>
 
-      {/* Modal Registrar Visitante */}
+      {/* Modal para agregar miembro local sin cuenta o visitante externo */}
       <Modal
-        isOpen={showVisitorModal}
-        onClose={() => setShowVisitorModal(false)}
-        title="Registrar Visitante"
-        subtitle="Registra al hermano de otro taller masónico"
+        isOpen={showAddPersonModal}
+        onClose={() => setShowAddPersonModal(false)}
+        title="Agregar persona"
+        subtitle="Registra asistencia aunque todavía no tenga usuario"
         maxWidth="sm"
       >
-        <form onSubmit={handleAddVisitor} noValidate className="space-y-4">
+        <form onSubmit={handleAddPerson} noValidate className="space-y-4">
+          <AppleSelect<'member' | 'visitor'>
+            label="Tipo de persona"
+            value={personType}
+            onChange={setPersonType}
+            options={[
+              { value: 'member', label: 'Miembro de la logia', description: 'Se agrega al padrón aunque no tenga cuenta.' },
+              { value: 'visitor', label: 'Visitante externo', description: 'Se registra solo para esta actividad.' },
+            ]}
+          />
           <AppleInput
-            label="Nombre Completo del Hermano *"
+            label="Nombre Completo *"
             required
-            value={visName}
-            onChange={(e) => setVisName(e.target.value)}
+            value={personName}
+            onChange={(e) => setPersonName(e.target.value)}
             icon={<User className="h-4 w-4" />}
             placeholder="Ej. Juan Pérez"
           />
 
-          <AppleInput
-            label="Logia y Oriente de Origen *"
-            required
-            value={visLodge}
-            onChange={(e) => setVisLodge(e.target.value)}
-            icon={<Building2 className="h-4 w-4" />}
-            placeholder="Ej. Resp.·. Log.·. Acacia No. 10 (GLP)"
-          />
+          {personType === 'visitor' && (
+            <AppleInput
+              label="Logia y Oriente de Origen *"
+              required
+              value={personLodge}
+              onChange={(e) => setPersonLodge(e.target.value)}
+              icon={<Building2 className="h-4 w-4" />}
+              placeholder="Ej. Resp.·. Log.·. Acacia No. 10 (GLP)"
+            />
+          )}
 
           <AppleSelect<MasonicDegree>
             label="Grado Masónico"
-            value={visDegree}
-            onChange={setVisDegree}
+            value={personDegree}
+            onChange={setPersonDegree}
             options={visitorDegreeOptions}
           />
+
+          {personType === 'visitor' && (
+            <AppleInput
+              label="Notas"
+              value={personNotes}
+              onChange={(e) => setPersonNotes(e.target.value)}
+              icon={<Building2 className="h-4 w-4" />}
+              placeholder="Observaciones opcionales"
+            />
+          )}
 
           <div className="flex justify-end gap-2.5 pt-3 border-t border-border">
             <button
               type="button"
-              onClick={() => setShowVisitorModal(false)}
+              onClick={() => setShowAddPersonModal(false)}
               className="min-h-[44px] px-5 rounded-xl border border-border text-xs font-semibold text-ink-secondary hover:bg-surface-container transition-colors"
             >
               Cancelar
@@ -1257,7 +1294,7 @@ export function AttendancePage() {
               type="submit"
               className="min-h-[44px] px-6 rounded-xl bg-primary text-xs font-semibold text-primary-foreground hover:bg-primary-pressed shadow-sm transition-all"
             >
-              Registrar Visitante
+              Agregar persona
             </button>
           </div>
         </form>

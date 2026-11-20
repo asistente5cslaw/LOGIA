@@ -59,6 +59,8 @@ export interface Member {
   firstName: string;
   lastName: string;
   email: string;
+  hasUserAccount?: boolean;
+  personType?: 'miembro' | 'visitante';
   roleId: InstitutionalRoleCode;
   phone?: string;
   avatarUrl?: string;

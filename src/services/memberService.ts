@@ -20,6 +20,8 @@ function mapSupabaseMember(d: Record<string, unknown>): Member {
     firstName: String(value('first_name') || ''),
     lastName: String(value('last_name') || ''),
     email: String(value('email') || ''),
+    hasUserAccount: false,
+    personType: 'miembro',
     phone: value('phone') as string | undefined,
     roleId,
     degree: masonicDegreeForRole(roleId),
@@ -59,6 +61,8 @@ function mapProfileAsMember(profile: Record<string, unknown>): Member {
     firstName,
     lastName,
     email: String(profile.email || ''),
+    hasUserAccount: true,
+    personType: 'miembro',
     roleId,
     degree: masonicDegreeForRole(roleId),
     condition: 'activo',
@@ -149,6 +153,15 @@ export const memberService = {
       membersFromDatabase = [...membersFromDatabase, ...profileMembers];
     }
 
+    const accountMemberIds = new Set(
+      (profiles || []).map((profile) => profile.member_id).filter(Boolean).map((memberId) => String(memberId))
+    );
+    membersFromDatabase = membersFromDatabase.map((member) => ({
+      ...member,
+      hasUserAccount: member.hasUserAccount || accountMemberIds.has(member.id),
+      personType: 'miembro' as const,
+    }));
+
     const visibleMembers = membersFromDatabase.filter((member) => !isHiddenMember(member.email));
     return includeInactive ? visibleMembers : visibleMembers.filter((m) => m.isActive);
   },
@@ -199,7 +212,7 @@ export const memberService = {
           id: member.id,
           first_name: member.firstName,
           last_name: member.lastName,
-          email: member.email,
+          email: member.email.trim() || null,
           phone: member.phone,
           role_id: member.roleId,
           degree: masonicDegreeForRole(member.roleId),
@@ -264,6 +277,41 @@ export const memberService = {
     }
 
     return completeMember;
+  },
+
+  async createQuickMember(
+    fullName: string,
+    degree: MasonicDegree,
+    user: { id?: string; email?: string; name?: string }
+  ): Promise<Member> {
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    const cleanName = fullName.trim().replace(/\s+/g, ' ');
+    if (!cleanName) throw new Error('El nombre del miembro es obligatorio.');
+    const parts = cleanName.split(' ');
+    const firstName = parts.shift() || 'Hermano';
+    const lastName = parts.join(' ') || 'Sin apellido';
+    const roleId: InstitutionalRoleCode = degree === 'maestro' ? 'mae' : degree === 'companero' ? 'comp' : 'apr';
+    const { data, error } = await supabase.from('members').insert({
+      first_name: firstName,
+      last_name: lastName,
+      email: null,
+      role_id: roleId,
+      degree,
+      condition: 'activo',
+      mother_lodge: 'Resp.·. Log.·. Unión Fraternal No. 21',
+      is_active: true,
+      created_by: user.id,
+      updated_by: user.id,
+    }).select().single();
+    if (error) throw error;
+    const created = mapSupabaseMember(data);
+    created.hasUserAccount = false;
+    created.personType = 'miembro';
+    await auditService.log('CREAR_MIEMBRO_SIN_USUARIO', 'members', created.id, user, {
+      name: `${created.firstName} ${created.lastName}`,
+      degree,
+    });
+    return created;
   },
 
   async updateMemberRole(

@@ -353,7 +353,9 @@ export function MembersPage() {
           : [...current, savedMember];
       });
 
-      await authService.updateUserRole(formEmail.trim(), formRoleId);
+      if (formEmail.trim()) {
+        await authService.updateUserRole(formEmail.trim(), formRoleId);
+      }
 
       toast.success('Ficha y rol del hermano actualizados');
       setShowMemberModal(false);
@@ -913,9 +915,8 @@ export function MembersPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <AppleInput
-              label="Correo Electrónico *"
+              label="Correo Electrónico (opcional)"
               type="email"
-              required
               value={formEmail}
               onChange={(e) => setFormEmail(e.target.value)}
               icon={<Mail className="h-4 w-4" />}
