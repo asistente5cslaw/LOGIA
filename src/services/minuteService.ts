@@ -71,8 +71,8 @@ export const minuteService = {
     minute: Minute,
     member: { degree: MasonicDegree; id: string; roleId: string }
   ): boolean {
-    // Secretario y Venerable Maestro siempre tienen acceso a todas las actas
-    if (member.roleId === 'sec' || member.roleId === 'vm') return true;
+    // Administrador, Secretario y Venerable Maestro siempre tienen acceso a todas las actas
+    if (member.roleId === 'adm' || member.roleId === 'sec' || member.roleId === 'vm') return true;
 
     // Si tiene acceso individual concedido explícitamente
     if (minute.allowedMemberIds && minute.allowedMemberIds.includes(member.id)) {
@@ -81,7 +81,7 @@ export const minuteService = {
 
     // Actas en borrador solo visibles para dignatarios administradores
     if (minute.status === 'borrador') {
-      return ['sec', 'vm', 'ora'].includes(member.roleId);
+      return ['adm', 'sec', 'vm', 'ora'].includes(member.roleId);
     }
 
     // Regla de Grados Masónicos:

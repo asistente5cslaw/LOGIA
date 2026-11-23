@@ -1000,18 +1000,18 @@ ${formDescription.trim()}${notes}`;
             );
           })()}
 
-          <div className="rounded-lg border border-border bg-surface-container-low px-3 py-2.5 text-xs text-ink-secondary">
-            {formDocumentType !== 'tenida' ? (
-              <span>Resolución independiente del calendario · {formatDateSpanish(formMeetingDate)} · acceso de {formDegree}</span>
-            ) : formEventId ? (
-              <>
-                <span className="font-semibold text-ink">Fecha, grado y reunión tomados del calendario:</span>{' '}
-                {formatDateSpanish(formMeetingDate)} · {formDegree}
-              </>
-            ) : (
-              <span>Selecciona una reunión agendada para asociar esta acta. Si es un acta independiente, se utilizará la fecha actual.</span>
-            )}
-          </div>
+          {formDocumentType === 'tenida' && (
+            <div className="rounded-lg border border-border bg-surface-container-low px-3 py-2.5 text-xs text-ink-secondary">
+              {formEventId ? (
+                <>
+                  <span className="font-semibold text-ink">Fecha, grado y reunión tomados del calendario:</span>{' '}
+                  {formatDateSpanish(formMeetingDate)} · {formDegree}
+                </>
+              ) : (
+                <span>Selecciona una reunión agendada para asociar esta acta. Si es un acta independiente, se utilizará la fecha actual.</span>
+              )}
+            </div>
+          )}
 
           <AppleInput
             label="Asunto o Título del Documento *"
