@@ -34,7 +34,7 @@ import { PdfPageViewer } from '@/components/shared/PdfPageViewer';
 
 const documentTypeOptions: AppleSelectOption<MinuteDocumentType>[] = [
   { value: 'tenida', label: 'Acta de Tenida', description: 'Reunión o trabajos celebrados por la Logia' },
-  { value: 'administrativa', label: 'Resoluciones y decretos', description: 'Resoluciones, decretos y decisiones oficiales del Taller' },
+  { value: 'administrativa', label: 'Resoluciones y Decretos', description: 'Resoluciones, decretos y decisiones oficiales del Taller' },
 ];
 
 const documentTypeLabels: Record<MinuteDocumentType, string> = {
@@ -288,6 +288,10 @@ export function MinutesPage() {
           eventId: formEventId || undefined,
           eventTitle: formEventTitle || undefined,
           notes: formNotes.trim(),
+          // Mantener el PDF existente al editar si no se selecciona uno nuevo.
+          pdfUrl: editingMinute?.pdfUrl,
+          pdfFileName: editingMinute?.pdfFileName,
+          pdfFileSize: editingMinute?.pdfFileSize,
         },
         { id: user?.id, email: user?.email, name: user?.displayName }
       );
@@ -669,9 +673,9 @@ ${formDescription.trim()}${notes}`;
 
             {/* Visor PDF */}
             <div className="rounded-lg border border-border p-3 space-y-3 text-xs">
-              <div className="flex items-center gap-2">
+              <div className="flex min-w-0 items-start gap-2">
                 <Paperclip className="h-4 w-4 text-primary" />
-                <span className="font-medium text-ink">
+                <span className="min-w-0 flex-1 font-medium leading-snug text-ink break-words [overflow-wrap:anywhere]">
                   {selectedMinute.pdfUrl ? (selectedMinute.pdfFileName || `Acta_${selectedMinute.formatNumber}.pdf`) : 'No hay PDF adjunto'}
                 </span>
               </div>

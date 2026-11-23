@@ -71,13 +71,15 @@ export function Modal({
         aria-modal="true"
       >
         {/* Cabecera fija del modal */}
-        <div className="flex items-center justify-between border-b border-border px-5 py-3.5 shrink-0 bg-surface">
-          <div className="flex flex-col pr-2 overflow-hidden">
-            <h3 className="font-serif text-lg sm:text-xl font-bold text-ink truncate leading-tight">
+        <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-3.5 shrink-0 bg-surface">
+          <div className="min-w-0 flex-1 pr-1">
+            <h3 className="font-serif text-lg sm:text-xl font-bold text-ink leading-tight break-words [overflow-wrap:anywhere]">
               {title}
             </h3>
             {subtitle && (
-              <span className="text-xs text-ink-secondary truncate mt-0.5">{subtitle}</span>
+              <span className="mt-0.5 block text-xs leading-snug text-ink-secondary break-words [overflow-wrap:anywhere]">
+                {subtitle}
+              </span>
             )}
           </div>
           <button
