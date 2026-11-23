@@ -12,6 +12,10 @@ function isHiddenMember(email: string | undefined): boolean {
   return Boolean(email && HIDDEN_MEMBER_EMAILS.has(email.trim().toLowerCase()));
 }
 
+function nowIsoDate(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 function mapSupabaseMember(d: Record<string, unknown>): Member {
   const value = (key: string) => d[key];
   const roleId = value('role_id') as InstitutionalRoleCode;
@@ -291,7 +295,11 @@ export const memberService = {
     const firstName = parts.shift() || 'Hermano';
     const lastName = parts.join(' ') || 'Sin apellido';
     const roleId: InstitutionalRoleCode = degree === 'maestro' ? 'mae' : degree === 'companero' ? 'comp' : 'apr';
-    const { data, error } = await supabase.from('members').insert({
+    const now = new Date().toISOString();
+    const memberId = crypto.randomUUID();
+    const joinedAt = nowIsoDate();
+    const { error } = await supabase.from('members').insert({
+      id: memberId,
       first_name: firstName,
       last_name: lastName,
       email: null,
@@ -302,9 +310,24 @@ export const memberService = {
       is_active: true,
       created_by: user.id,
       updated_by: user.id,
-    }).select().single();
+    });
     if (error) throw error;
-    const created = mapSupabaseMember(data);
+    const created: Member = {
+      id: memberId,
+      firstName,
+      lastName,
+      email: '',
+      hasUserAccount: false,
+      personType: 'miembro',
+      roleId,
+      degree,
+      condition: 'activo',
+      motherLodge: 'Resp.·. Log.·. Unión Fraternal No. 21',
+      joinedAt,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    };
     created.hasUserAccount = false;
     created.personType = 'miembro';
     await auditService.log('CREAR_MIEMBRO_SIN_USUARIO', 'members', created.id, user, {
@@ -312,6 +335,63 @@ export const memberService = {
       degree,
     });
     return created;
+  },
+
+  async updateQuickMember(
+    memberId: string,
+    fullName: string,
+    degree: MasonicDegree,
+    user: { id?: string; email?: string; name?: string }
+  ): Promise<Member> {
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    const cleanName = fullName.trim().replace(/\s+/g, ' ');
+    if (!cleanName) throw new Error('El nombre del miembro es obligatorio.');
+    const parts = cleanName.split(' ');
+    const firstName = parts.shift() || 'Hermano';
+    const lastName = parts.join(' ') || 'Sin apellido';
+    const roleId: InstitutionalRoleCode = degree === 'maestro' ? 'mae' : degree === 'companero' ? 'comp' : 'apr';
+    const now = new Date().toISOString();
+    const { error } = await supabase.from('members').update({
+      first_name: firstName,
+      last_name: lastName,
+      role_id: roleId,
+      degree,
+      updated_by: user.id,
+      updated_at: now,
+    }).eq('id', memberId);
+    if (error) throw error;
+    await auditService.log('ACTUALIZAR_MIEMBRO_SIN_USUARIO', 'members', memberId, user, {
+      name: `${firstName} ${lastName}`,
+      degree,
+    });
+    return {
+      id: memberId,
+      firstName,
+      lastName,
+      email: '',
+      hasUserAccount: false,
+      personType: 'miembro',
+      roleId,
+      degree,
+      condition: 'activo',
+      motherLodge: 'Resp.·. Log.·. Unión Fraternal No. 21',
+      joinedAt: nowIsoDate(),
+      isActive: true,
+      updatedAt: now,
+    };
+  },
+
+  async removeQuickMember(memberId: string, user: { id?: string; email?: string; name?: string }): Promise<void> {
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    const now = new Date().toISOString();
+    const { error } = await supabase.from('members').update({
+      is_active: false,
+      deleted_at: now,
+      updated_by: user.id,
+      updated_at: now,
+    }).eq('id', memberId);
+    if (error) throw error;
+    await auditService.log('ELIMINAR_MIEMBRO_SIN_USUARIO', 'members', memberId, user, { deletedAt: now });
   },
 
   async updateMemberRole(

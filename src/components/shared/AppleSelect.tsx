@@ -43,6 +43,7 @@ export function AppleSelect<T extends string = string>({
 
   // Activar búsqueda automáticamente si hay más de 5 opciones o si se especifica searchable
   const isSearchEnabled = searchable !== undefined ? searchable : options.length > 5;
+  const shouldScroll = options.length > 5 || isSearchEnabled;
 
   const filteredOptions = isSearchEnabled && searchQuery.trim()
     ? options.filter(
@@ -56,7 +57,9 @@ export function AppleSelect<T extends string = string>({
   const updatePosition = useCallback(() => {
     if (!triggerRef.current) return;
     const rect = triggerRef.current.getBoundingClientRect();
-    const dropdownHeight = Math.min(320, options.length * 44 + (isSearchEnabled ? 50 : 0) + 20);
+    const dropdownHeight = shouldScroll
+      ? 320
+      : options.reduce((height, option) => height + (option.description ? 56 : 44), 0) + 20;
     const spaceBelow = window.innerHeight - rect.bottom;
     const openUpwards = spaceBelow < dropdownHeight && rect.top > dropdownHeight;
     const topPos = openUpwards ? rect.top - dropdownHeight - 6 : rect.bottom + 6;
@@ -70,11 +73,11 @@ export function AppleSelect<T extends string = string>({
       left: `${left}px`,
       width: `${width}px`,
       maxWidth: 'calc(100vw - 24px)',
-      maxHeight: `${dropdownHeight}px`,
+      ...(shouldScroll ? { maxHeight: '320px' } : {}),
       zIndex: 9999,
       backgroundColor: '#ffffff',
     });
-  }, [isSearchEnabled, options.length]);
+  }, [isSearchEnabled, options, shouldScroll]);
 
   useEffect(() => {
     if (isOpen) {
@@ -212,7 +215,10 @@ export function AppleSelect<T extends string = string>({
             )}
 
             {/* Lista de opciones scrolleable */}
-            <div className="flex-1 overflow-y-auto scrollbar-none space-y-0.5 overscroll-contain pr-0.5">
+            <div className={cn(
+              'flex-1 space-y-0.5 overscroll-contain pr-0.5',
+              shouldScroll ? 'overflow-y-auto scrollbar-none' : 'overflow-visible'
+            )}>
               {filteredOptions.length === 0 ? (
                 <div className="py-6 text-center text-xs text-ink-muted">
                   No se encontraron resultados

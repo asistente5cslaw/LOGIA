@@ -187,7 +187,7 @@ export interface EventConflict {
   createdAt: string;
 }
 
-export type MinuteStatus = 'borrador' | 'aprobada' | 'firmada';
+export type MinuteStatus = 'borrador' | 'circulada' | 'aprobada';
 
 export type MinuteDocumentType = 'tenida' | 'duelo' | 'suspension' | 'administrativa';
 
@@ -263,7 +263,7 @@ export interface VisitorAttendance {
   eventId: string;
   fullName: string;
   lodge: string;
-  degree: MasonicDegree;
+  degree?: MasonicDegree;
   notes?: string;
   createdAt: string;
 }

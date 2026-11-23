@@ -21,6 +21,8 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
+  Edit,
+  Trash2,
 } from 'lucide-react';
 import { Modal } from '@/components/shared/Modal';
 import { AppleSelect, type AppleSelectOption } from '@/components/shared/AppleSelect';
@@ -76,6 +78,8 @@ export function AttendancePage() {
   const [personLodge, setPersonLodge] = useState('');
   const [personDegree, setPersonDegree] = useState<MasonicDegree>('maestro');
   const [personNotes, setPersonNotes] = useState('');
+  const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
+  const [editingVisitorId, setEditingVisitorId] = useState<string | null>(null);
 
   const canManageAttendance = user?.profile?.roleId === 'vm'
     || user?.profile?.roleId === 'sec'
@@ -222,16 +226,17 @@ export function AttendancePage() {
         const segmentId = event.degreeSegments?.[0]?.id;
         if (!segmentId) return null;
         const records = await attendanceService.getAttendanceForEvent(event.id, segmentId);
-        return records.length === 0 ? event : null;
+        return { event, hasRecords: records.length > 0 };
       }));
       if (cancelled) return;
-      setPendingAttendanceEvents(
-        results
-          .filter((result): result is PromiseFulfilledResult<LodgeEvent | null> => result.status === 'fulfilled')
-          .map((result) => result.value)
-          .filter((event): event is LodgeEvent => Boolean(event))
-          .sort((a, b) => `${a.startDate}T${a.startTime || ''}`.localeCompare(`${b.startDate}T${b.startTime || ''}`))
-      );
+      const evaluatedEvents = results
+        .filter((result): result is PromiseFulfilledResult<{ event: LodgeEvent; hasRecords: boolean } | null> => result.status === 'fulfilled')
+        .map((result) => result.value)
+        .filter((result): result is { event: LodgeEvent; hasRecords: boolean } => Boolean(result));
+      const sortEvents = (items: LodgeEvent[]) => items.sort((a, b) => `${a.startDate}T${a.startTime || ''}`.localeCompare(`${b.startDate}T${b.startTime || ''}`));
+      // Todos los eventos culminados quedan disponibles en la lista principal
+      // para continuar completando o corrigiendo su registro de asistencia.
+      setPendingAttendanceEvents(sortEvents(evaluatedEvents.map((result) => result.event)));
     };
     void loadPendingAttendance();
     return () => { cancelled = true; };
@@ -312,7 +317,7 @@ export function AttendancePage() {
     return !Number.isNaN(eventStart.getTime()) && Date.now() < eventStart.getTime();
   };
 
-  const handleStatusToggle = async (memberId: string, status: AttendanceStatus) => {
+  const handleStatusToggle = (memberId: string, status: AttendanceStatus) => {
     if (!canManageAttendance) return;
     const nextMap = {
       ...attendanceMap,
@@ -335,31 +340,7 @@ export function AttendancePage() {
       setExcuseDraft(excuseReasons[memberId] || '');
     }
 
-    if (!selectedEventId || !selectedSegmentId) return;
-    setIsSaving(true);
-    try {
-      const records = Object.entries(nextMap).map(([currentMemberId, currentStatus]) => ({
-        memberId: currentMemberId,
-        status: currentStatus,
-        excuseReason: currentMemberId === memberId && status !== 'excusa'
-          ? undefined
-          : excuseReasons[currentMemberId],
-      }));
-      await attendanceService.saveAttendanceBatch(selectedEventId, selectedSegmentId, records, {
-        id: user?.id,
-        email: user?.email,
-      });
-      setHasUnsavedChanges(false);
-      setSavedAttendanceKeys((prev) => ({
-        ...prev,
-        [`${selectedEventId}:${selectedSegmentId}`]: true,
-      }));
-      setPendingAttendanceEvents((prev) => prev.filter((event) => event.id !== selectedEventId));
-    } catch {
-      toast.error('No se pudo guardar el estado de asistencia.');
-    } finally {
-      setIsSaving(false);
-    }
+    toast.info('Cambio pendiente. Pulsa “Guardar cambios” para registrarlo.');
   };
 
   const handleMemberResponseToggle = async (memberId: string, status: 'presente' | 'excusa') => {
@@ -522,12 +503,78 @@ export function AttendancePage() {
     }
   };
 
+  const resetPersonModal = () => {
+    setShowAddPersonModal(false);
+    setEditingMemberId(null);
+    setEditingVisitorId(null);
+    setPersonType('member');
+    setPersonName('');
+    setPersonLodge('');
+    setPersonDegree('maestro');
+    setPersonNotes('');
+  };
+
+  const openEditMember = (member: Member) => {
+    setEditingMemberId(member.id);
+    setEditingVisitorId(null);
+    setPersonType('member');
+    setPersonName(`${member.firstName} ${member.lastName}`.trim());
+    setPersonLodge('');
+    setPersonDegree(member.degree);
+    setPersonNotes('');
+    setShowAddPersonModal(true);
+  };
+
+  const openEditVisitor = (visitor: VisitorAttendance) => {
+    setEditingVisitorId(visitor.id);
+    setEditingMemberId(null);
+    setPersonType('visitor');
+    setPersonName(visitor.fullName);
+    setPersonLodge(visitor.lodge);
+    setPersonDegree('maestro');
+    setPersonNotes(visitor.notes || '');
+    setShowAddPersonModal(true);
+  };
+
+  const handleRemoveQuickMember = async (member: Member) => {
+    if (!window.confirm(`¿Eliminar de la lista a ${member.firstName} ${member.lastName}? Su historial de asistencia se conservará.`)) return;
+    try {
+      await memberService.removeQuickMember(member.id, { id: user?.id, email: user?.email, name: user?.displayName });
+      setMembers((prev) => prev.filter((candidate) => candidate.id !== member.id));
+      toast.success('Miembro eliminado de la lista activa. El historial se conserva.');
+    } catch {
+      toast.error('No se pudo eliminar el miembro sin usuario.');
+    }
+  };
+
+  const handleRemoveVisitor = async (visitor: VisitorAttendance) => {
+    if (!window.confirm(`¿Eliminar al visitante ${visitor.fullName} de esta tenida?`)) return;
+    try {
+      await attendanceService.removeVisitor(visitor.id, { id: user?.id, email: user?.email });
+      setVisitors((prev) => prev.filter((candidate) => candidate.id !== visitor.id));
+      toast.success('Visitante eliminado de esta tenida.');
+    } catch {
+      toast.error('No se pudo eliminar el visitante.');
+    }
+  };
+
   const handleAddPerson = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedEventId || !personName.trim()) return;
 
     try {
       if (personType === 'member') {
+        if (editingMemberId) {
+          const updated = await memberService.updateQuickMember(editingMemberId, personName, personDegree, {
+            id: user?.id,
+            email: user?.email,
+            name: user?.displayName,
+          });
+          setMembers((prev) => prev.map((member) => member.id === updated.id ? updated : member));
+          toast.success('Miembro actualizado correctamente.');
+          resetPersonModal();
+          return;
+        }
         const duplicate = members.find((member) =>
           `${member.firstName} ${member.lastName}`.trim().toLowerCase() === personName.trim().replace(/\s+/g, ' ').toLowerCase()
         );
@@ -543,17 +590,26 @@ export function AttendancePage() {
         toast.success(`Miembro agregado sin usuario: ${created.firstName} ${created.lastName}`);
       } else {
         if (!personLodge.trim()) return;
+        if (editingVisitorId) {
+          const updated = await attendanceService.updateVisitor(editingVisitorId, {
+            fullName: personName,
+            lodge: personLodge,
+            degree: undefined,
+            notes: personNotes,
+          }, { id: user?.id, email: user?.email });
+          setVisitors((prev) => prev.map((visitor) => visitor.id === updated.id ? updated : visitor));
+          toast.success('Visitante actualizado correctamente.');
+          resetPersonModal();
+          return;
+        }
         const created = await attendanceService.addVisitor(
-          { eventId: selectedEventId, fullName: personName.trim(), lodge: personLodge.trim(), degree: personDegree, notes: personNotes.trim() || undefined },
+          { eventId: selectedEventId, fullName: personName.trim(), lodge: personLodge.trim(), degree: undefined, notes: personNotes.trim() || undefined },
           { id: user?.id, email: user?.email }
         );
         setVisitors((prev) => [...prev, created]);
         toast.success(`Visitante registrado: Q.·. H.·. ${created.fullName}`);
       }
-      setShowAddPersonModal(false);
-      setPersonName('');
-      setPersonLodge('');
-      setPersonNotes('');
+      resetPersonModal();
     } catch {
       toast.error(personType === 'member' ? 'Error al crear el miembro sin usuario' : 'Error al registrar visitante');
     }
@@ -987,9 +1043,31 @@ export function AttendancePage() {
                       {m.lastName[0]}
                     </div>
                     <div>
-                      <p className="text-xs sm:text-sm font-semibold text-ink">
-                        {m.firstName} {m.lastName}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs sm:text-sm font-semibold text-ink">
+                          {m.firstName} {m.lastName}
+                        </p>
+                        {canManageAttendance && m.hasUserAccount === false && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => openEditMember(m)}
+                              title="Editar miembro sin usuario"
+                              className="rounded p-1 text-ink-muted hover:bg-surface-container hover:text-primary"
+                            >
+                              <Edit className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handleRemoveQuickMember(m)}
+                              title="Eliminar miembro sin usuario"
+                              className="rounded p-1 text-ink-muted hover:bg-red-50 hover:text-destructive"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
                       <p className="text-[11px] text-ink-muted uppercase">Grado: {m.roleId === 'vm' ? 'maestro' : m.degree}</p>
                       {m.hasUserAccount === false && (
                         <span className="mt-1 inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
@@ -1137,9 +1215,33 @@ export function AttendancePage() {
               ) : (
                 visitors.map((v) => (
                   <div key={v.id} className="rounded-lg border border-border p-3 bg-surface-container-low">
-                    <p className="text-xs font-bold text-ink">{v.fullName}</p>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-xs font-bold text-ink">{v.fullName}</p>
+                      {canManageAttendance && (
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => openEditVisitor(v)}
+                            title="Editar visitante"
+                            className="rounded p-1 text-ink-muted hover:bg-surface hover:text-primary"
+                          >
+                            <Edit className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void handleRemoveVisitor(v)}
+                            title="Eliminar visitante"
+                            className="rounded p-1 text-ink-muted hover:bg-red-50 hover:text-destructive"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
                     <p className="text-[11px] text-ink-secondary">Logia: {v.lodge}</p>
-                    <span className="text-[10px] text-primary uppercase font-semibold">Grado: {v.degree}</span>
+                    {v.degree && (
+                      <span className="text-[10px] text-primary uppercase font-semibold">Grado: {v.degree}</span>
+                    )}
                   </div>
                 ))
               )}
@@ -1230,8 +1332,8 @@ export function AttendancePage() {
       {/* Modal para agregar miembro local sin cuenta o visitante externo */}
       <Modal
         isOpen={showAddPersonModal}
-        onClose={() => setShowAddPersonModal(false)}
-        title="Agregar persona"
+        onClose={resetPersonModal}
+        title={editingMemberId || editingVisitorId ? 'Editar persona' : 'Agregar persona'}
         subtitle="Registra asistencia aunque todavía no tenga usuario"
         maxWidth="sm"
       >
@@ -1240,6 +1342,7 @@ export function AttendancePage() {
             label="Tipo de persona"
             value={personType}
             onChange={setPersonType}
+            disabled={Boolean(editingMemberId || editingVisitorId)}
             options={[
               { value: 'member', label: 'Miembro de la logia', description: 'Se agrega al padrón aunque no tenga cuenta.' },
               { value: 'visitor', label: 'Visitante externo', description: 'Se registra solo para esta actividad.' },
@@ -1265,12 +1368,14 @@ export function AttendancePage() {
             />
           )}
 
-          <AppleSelect<MasonicDegree>
-            label="Grado Masónico"
-            value={personDegree}
-            onChange={setPersonDegree}
-            options={visitorDegreeOptions}
-          />
+          {personType === 'member' && (
+            <AppleSelect<MasonicDegree>
+              label="Grado Masónico"
+              value={personDegree}
+              onChange={setPersonDegree}
+              options={visitorDegreeOptions}
+            />
+          )}
 
           {personType === 'visitor' && (
             <AppleInput
@@ -1285,7 +1390,7 @@ export function AttendancePage() {
           <div className="flex justify-end gap-2.5 pt-3 border-t border-border">
             <button
               type="button"
-              onClick={() => setShowAddPersonModal(false)}
+              onClick={resetPersonModal}
               className="min-h-[44px] px-5 rounded-xl border border-border text-xs font-semibold text-ink-secondary hover:bg-surface-container transition-colors"
             >
               Cancelar
@@ -1294,7 +1399,7 @@ export function AttendancePage() {
               type="submit"
               className="min-h-[44px] px-6 rounded-xl bg-primary text-xs font-semibold text-primary-foreground hover:bg-primary-pressed shadow-sm transition-all"
             >
-              Agregar persona
+              {editingMemberId || editingVisitorId ? 'Guardar cambios' : 'Agregar persona'}
             </button>
           </div>
         </form>

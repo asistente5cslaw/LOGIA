@@ -171,7 +171,7 @@ export const officialVisitService = {
       }
     }
 
-    const approvedMinutesCount = minutes.filter((m) => m.status === 'aprobada' || m.status === 'firmada').length;
+    const approvedMinutesCount = minutes.filter((m) => m.status === 'aprobada').length;
     const pendingMinutesCount = minutes.filter((m) => m.status === 'borrador').length;
 
     const checklistItemsCompleted = checklist.filter((c) => c.completed).length;

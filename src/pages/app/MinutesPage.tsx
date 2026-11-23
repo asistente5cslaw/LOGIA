@@ -34,9 +34,7 @@ import { PdfPageViewer } from '@/components/shared/PdfPageViewer';
 
 const documentTypeOptions: AppleSelectOption<MinuteDocumentType>[] = [
   { value: 'tenida', label: 'Acta de Tenida', description: 'Reunión o trabajos celebrados por la Logia' },
-  { value: 'duelo', label: 'Resolución de Duelo', description: 'Acuerdo solemne por el fallecimiento de un hermano' },
-  { value: 'suspension', label: 'Resolución de Suspensión', description: 'Medida o resolución disciplinaria' },
-  { value: 'administrativa', label: 'Resolución Administrativa', description: 'Decisión administrativa del Taller' },
+  { value: 'administrativa', label: 'Resoluciones y decretos', description: 'Resoluciones, decretos y decisiones oficiales del Taller' },
 ];
 
 const documentTypeLabels: Record<MinuteDocumentType, string> = {
@@ -45,6 +43,12 @@ const documentTypeLabels: Record<MinuteDocumentType, string> = {
   suspension: 'Resolución de Suspensión',
   administrativa: 'Resolución Administrativa',
 };
+
+const degreeOptions: AppleSelectOption<MasonicDegree>[] = [
+  { value: 'aprendiz', label: 'Primer grado — Aprendiz', description: 'Acceso para miembros de primer grado' },
+  { value: 'companero', label: 'Segundo grado — Compañero', description: 'Acceso para miembros de segundo grado' },
+  { value: 'maestro', label: 'Tercer grado — Maestro', description: 'Acceso para miembros de tercer grado' },
+];
 
 export function MinutesPage() {
   const { user, hasPermission } = useAuth();
@@ -223,6 +227,25 @@ export function MinutesPage() {
     setShowMinuteModal(true);
   };
 
+  const handleEditMinute = (minute: Minute) => {
+    setEditingMinute(minute);
+    setSelectedMinute(null);
+    setFormEventId(minute.eventId || '');
+    setFormEventTitle(minute.eventTitle || '');
+    setFormDocumentType(minute.documentType || 'tenida');
+    setFormYear(minute.year);
+    setFormNumber(String(minute.number));
+    setFormTitle(minute.title);
+    setFormDescription(minute.description);
+    setFormMeetingDate(minute.meetingDate);
+    setFormDegree(minute.degree);
+    setFormSegmentId(minute.segmentId || '');
+    setFormStatus(minute.status);
+    setFormNotes(minute.notes || '');
+    setFormPdfFile(null);
+    setShowMinuteModal(true);
+  };
+
   const handleSelectDocumentType = (documentType: MinuteDocumentType) => {
     setFormDocumentType(documentType);
     if (documentType !== 'tenida') {
@@ -294,9 +317,15 @@ export function MinutesPage() {
       setShowMinuteModal(false);
       loadData();
     } catch (error) {
-      const message = error instanceof Error ? error.message.toLowerCase() : '';
-      toast.error(message.includes('duplicate') || message.includes('unique')
-        ? 'Ese número de acta ya existe para ese año.'
+      const databaseError = error as { code?: string; message?: string; details?: string; status?: number };
+      const message = `${databaseError.message || ''} ${databaseError.details || ''}`.toLowerCase();
+      const isDuplicateNumber = databaseError.code === '23505'
+        || databaseError.status === 409
+        || message.includes('duplicate')
+        || message.includes('unique');
+
+      toast.error(isDuplicateNumber
+        ? 'Ese número de documento ya existe para ese año. Usa otro número correlativo.'
         : 'Error al guardar acta');
     }
   };
@@ -496,7 +525,7 @@ ${formDescription.trim()}${notes}`;
         </div>
 
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full no-scrollbar">
-          {(['all', 'borrador', 'aprobada', 'firmada'] as const).map((st) => (
+          {(['all', 'borrador', 'circulada', 'aprobada'] as const).map((st) => (
             <button
               key={st}
               onClick={() => setStatusFilter(st)}
@@ -552,8 +581,8 @@ ${formDescription.trim()}${notes}`;
                 <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2">
                   <span
                     className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase ${
-                      m.status === 'firmada'
-                        ? 'bg-success/15 text-success'
+                      m.status === 'circulada'
+                        ? 'bg-amber-500/15 text-amber-700'
                         : m.status === 'aprobada'
                         ? 'bg-info/15 text-info'
                         : 'bg-surface-container text-ink-secondary'
@@ -562,10 +591,31 @@ ${formDescription.trim()}${notes}`;
                     {m.status}
                   </span>
 
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-primary font-medium hover:underline flex items-center gap-1">
-                      <Eye className="h-3.5 w-3.5" /> Ver documento
-                    </span>
+                  <div className="flex flex-wrap items-center justify-end gap-1.5">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenDetail(m);
+                      }}
+                      className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-2.5 text-xs font-semibold text-primary transition-colors hover:border-primary/40 hover:bg-primary/10 cursor-pointer"
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      <span>Ver documento</span>
+                    </button>
+                    {canManageMinutes && m.status === 'borrador' && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditMinute(m);
+                        }}
+                        className="inline-flex min-h-8 items-center gap-1.5 rounded-lg bg-primary px-2.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary-pressed cursor-pointer"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        <span>Editar</span>
+                      </button>
+                    )}
                     {canManageMinutes && (
                       <button
                         type="button"
@@ -785,6 +835,17 @@ ${formDescription.trim()}${notes}`;
                 </button>
               )}
 
+              {canManageMinutes && selectedMinute.status === 'borrador' && (
+                <button
+                  type="button"
+                  onClick={() => handleEditMinute(selectedMinute)}
+                  className="rounded-xl bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-pressed transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                  Editar borrador
+                </button>
+              )}
+
               {canManageMinutes && (
                 <a
                   href={convocationService.generateMailtoUrl(
@@ -829,8 +890,8 @@ ${formDescription.trim()}${notes}`;
                           onChange={(status) => void handleStatusChange(selectedMinute, status)}
                           options={[
                             { value: 'borrador', label: 'Borrador' },
+                            { value: 'circulada', label: 'Circulada' },
                             { value: 'aprobada', label: 'Aprobada' },
-                            { value: 'firmada', label: 'Firmada' },
                           ]}
                           className="w-40"
                         />
@@ -841,19 +902,19 @@ ${formDescription.trim()}${notes}`;
                     {selectedMinute.status === 'borrador' && (
                       <button
                         type="button"
+                        onClick={() => handleStatusChange(selectedMinute, 'circulada')}
+                        className="rounded bg-amber-500/20 px-3 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-500/30"
+                      >
+                        Circular comunicación
+                      </button>
+                    )}
+                    {selectedMinute.status === 'circulada' && (
+                      <button
+                        type="button"
                         onClick={() => handleStatusChange(selectedMinute, 'aprobada')}
                         className="rounded bg-info/20 px-3 py-1 text-xs font-semibold text-info hover:bg-info/30"
                       >
                         Aprobar comunicación
-                      </button>
-                    )}
-                    {selectedMinute.status === 'aprobada' && (
-                      <button
-                        type="button"
-                        onClick={() => handleStatusChange(selectedMinute, 'firmada')}
-                        className="rounded bg-success/20 px-3 py-1 text-xs font-semibold text-success hover:bg-success/30"
-                      >
-                        Firmar y sancionar
                       </button>
                     )}
                       </>
@@ -914,22 +975,30 @@ ${formDescription.trim()}${notes}`;
             />
           )}
 
-          {formDocumentType === 'tenida' && formEventId && (events.find((event) => event.id === formEventId)?.degreeSegments?.length || 0) > 0 && (
-            <AppleSelect<MasonicDegree>
-              label="Tramo / grado del acta"
-              value={formDegree}
-              onChange={(degree) => {
-                setFormDegree(degree);
-                const segment = events.find((event) => event.id === formEventId)?.degreeSegments?.find((item) => item.degree === degree);
-                setFormSegmentId(segment?.id || '');
-              }}
-              options={(events.find((event) => event.id === formEventId)?.degreeSegments || []).map((segment) => ({
+          {(() => {
+            const selectedEvent = events.find((event) => event.id === formEventId);
+            const eventSegments = selectedEvent?.degreeSegments || [];
+            const options = formDocumentType === 'tenida' && eventSegments.length > 0
+              ? eventSegments.map((segment) => ({
                 value: segment.degree,
                 label: segment.degree === 'aprendiz' ? 'Primer grado — Aprendiz' : segment.degree === 'companero' ? 'Segundo grado — Compañero' : 'Tercer grado — Maestro',
                 description: `Acta correspondiente al tramo ${segment.sequence} de la misma tenida`,
-              }))}
-            />
-          )}
+              }))
+              : degreeOptions;
+
+            return (
+              <AppleSelect<MasonicDegree>
+                label="Tramo / grado del acta"
+                value={formDegree}
+                onChange={(degree) => {
+                  setFormDegree(degree);
+                  const segment = eventSegments.find((item) => item.degree === degree);
+                  setFormSegmentId(segment?.id || '');
+                }}
+                options={options}
+              />
+            );
+          })()}
 
           <div className="rounded-lg border border-border bg-surface-container-low px-3 py-2.5 text-xs text-ink-secondary">
             {formDocumentType !== 'tenida' ? (

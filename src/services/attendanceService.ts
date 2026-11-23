@@ -84,7 +84,7 @@ export const attendanceService = {
             eventId: d.event_id,
             fullName: d.full_name,
             lodge: d.lodge,
-            degree: d.degree,
+            degree: d.degree || undefined,
             notes: d.notes,
             createdAt: d.created_at,
           }));
@@ -255,7 +255,7 @@ export const attendanceService = {
   ): Promise<VisitorAttendance> {
     const fullVisitor: VisitorAttendance = {
       ...visitor,
-      id: `vis-${Date.now()}`,
+      id: crypto.randomUUID(),
       createdAt: new Date().toISOString(),
     };
 
@@ -266,8 +266,9 @@ export const attendanceService = {
           event_id: fullVisitor.eventId,
           full_name: fullVisitor.fullName,
           lodge: fullVisitor.lodge,
-          degree: fullVisitor.degree,
+          degree: fullVisitor.degree || null,
           notes: fullVisitor.notes,
+          created_by: user.id,
         });
         if (error) throw error;
     }
@@ -278,6 +279,39 @@ export const attendanceService = {
     });
 
     return fullVisitor;
+  },
+
+  async updateVisitor(
+    visitorId: string,
+    visitor: Pick<VisitorAttendance, 'fullName' | 'lodge' | 'degree' | 'notes'>,
+    user: { id?: string; email?: string }
+  ): Promise<VisitorAttendance> {
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    const { data, error } = await supabase.from('attendance_visitors').update({
+      full_name: visitor.fullName.trim(),
+      lodge: visitor.lodge.trim(),
+      degree: visitor.degree || null,
+      notes: visitor.notes?.trim() || null,
+    }).eq('id', visitorId).select('id,event_id,full_name,lodge,degree,notes,created_at').single();
+    if (error) throw error;
+    const updated: VisitorAttendance = {
+      id: data.id,
+      eventId: data.event_id,
+      fullName: data.full_name,
+      lodge: data.lodge,
+      degree: data.degree || undefined,
+      notes: data.notes || undefined,
+      createdAt: data.created_at,
+    };
+    await auditService.log('ACTUALIZAR_VISITANTE', 'attendance_visitors', visitorId, user, { fullName: updated.fullName });
+    return updated;
+  },
+
+  async removeVisitor(visitorId: string, user: { id?: string; email?: string }): Promise<void> {
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    const { error } = await supabase.from('attendance_visitors').delete().eq('id', visitorId);
+    if (error) throw error;
+    await auditService.log('ELIMINAR_VISITANTE', 'attendance_visitors', visitorId, user, {});
   },
 
   /**
