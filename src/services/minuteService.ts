@@ -19,6 +19,7 @@ export const minuteService = {
           .from('minutes')
           .select('*, minute_corrections(*)')
           .is('deleted_at', null)
+          .is('minute_corrections.deleted_at', null)
           .order('year', { ascending: false })
           .order('number', { ascending: false });
 
@@ -44,7 +45,7 @@ export const minuteService = {
             pdfUrl: d.pdf_url,
             pdfFileName: d.pdf_file_name,
             pdfFileSize: d.pdf_file_size,
-            corrections: d.minute_corrections?.map((c: { id: string; minute_id: string; author_id: string; author_name: string; comment: string; created_at: string; edited_at?: string | null; deleted_at?: string | null }) => ({
+            corrections: d.minute_corrections?.filter((c: { deleted_at?: string | null }) => !c.deleted_at).map((c: { id: string; minute_id: string; author_id: string; author_name: string; comment: string; created_at: string; edited_at?: string | null; deleted_at?: string | null }) => ({
               id: c.id,
               minuteId: c.minute_id,
               authorId: c.author_id,
