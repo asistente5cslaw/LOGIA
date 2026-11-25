@@ -35,7 +35,7 @@ export const masonicBodies: MasonicBody[] = [
     symbol: 'Cruz Templaria',
     appleEmoji: 'cross',
     color: '#701A75', // Purple
-    description: 'Capítulo de Real Arco, Concilio y Encomienda Templaria',
+    description: 'Real Arco, Crípticos y Comandancias',
   },
   {
     id: 'supremo_consejo',
@@ -44,16 +44,16 @@ export const masonicBodies: MasonicBody[] = [
     symbol: 'Águila Bicéfala',
     appleEmoji: 'eagle',
     color: '#1E1E24', // Black / Gold
-    description: 'Rito Escocés Antiguo y Aceptado para la República de Panamá',
+    description: 'Órgano rector del rito Escocés Antiguo y Aceptado',
   },
   {
     id: 'shriners',
     name: 'Abou Saad Shriners',
-    shortName: 'ABU / Shriners',
+    shortName: 'Abou Saad',
     symbol: 'Media Luna',
     appleEmoji: 'moon',
     color: '#B83A28', // Crimson Red
-    description: 'Fraternidad filantrópica Shriner de Panamá',
+    description: 'Shriners International',
   },
 ];
 
