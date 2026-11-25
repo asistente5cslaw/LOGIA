@@ -44,7 +44,7 @@ function mapSupabaseMember(d: Record<string, unknown>): Member {
     createdAt: value('created_at') as string | undefined,
     updatedAt: value('updated_at') as string | undefined,
     identityVerified: value('identity_verified') as boolean | undefined,
-    identityStatus: (value('identity_status') as Member['identityStatus']) || (value('is_active') ? 'verified' : 'pending'),
+    identityStatus: (value('identity_status') as Member['identityStatus']) || 'pending',
     selfieUrl: value('selfie_url') as string | undefined,
     identityValidatedAt: value('identity_validated_at') as string | undefined,
     identityValidatedBy: value('identity_validated_by') as string | undefined,

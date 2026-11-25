@@ -392,8 +392,8 @@ export const authService = {
             displayName: data.display_name || defaultEmail.split('@')[0],
             roleId: data.role_id || 'apr',
             technicalRole: data.technical_role || 'member',
-            identityVerified: data.identity_verified ?? true,
-            identityStatus: data.identity_status || 'verified',
+            identityVerified: data.identity_verified ?? false,
+            identityStatus: data.identity_status || 'pending',
             accessDisabled: data.access_disabled ?? false,
             createdAt: data.created_at,
           };

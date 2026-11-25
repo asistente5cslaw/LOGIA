@@ -6,7 +6,7 @@ import { memberService } from '@/services/memberService';
 import { attendanceService } from '@/services/attendanceService';
 import { getBodyById } from '@/data/bodiesData';
 import { PageHeader } from '@/components/shared/PageHeader';
-import type { LodgeEvent, Member, AttendanceStatus, AttendanceResponseStatus, VisitorAttendance, MasonicDegree } from '@/types';
+import type { LodgeEvent, Member, AttendanceStatus, AttendanceResponseStatus, VisitorAttendance } from '@/types';
 import {
   Users,
   Search,
@@ -25,7 +25,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { Modal } from '@/components/shared/Modal';
-import { AppleSelect, type AppleSelectOption } from '@/components/shared/AppleSelect';
+import { AppleSelect } from '@/components/shared/AppleSelect';
 import { AppleInput } from '@/components/shared/AppleInput';
 import { AppleEmoji } from '@/components/shared/AppleEmoji';
 import { formatDateSpanish, formatTime12, formatTimeRange12, normalizeDateOnly } from '@/lib/dateUtils';
@@ -33,12 +33,6 @@ import { getLocalIsoDate } from '@/domain/dashboardStats';
 import { toast } from 'sonner';
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 import { ErrorState } from '@/components/shared/ErrorState';
-
-const visitorDegreeOptions: AppleSelectOption<MasonicDegree>[] = [
-  { value: 'aprendiz', label: 'Primer Grado — Aprendiz', icon: <AppleEmoji name="ruler" size={16} /> },
-  { value: 'companero', label: 'Segundo Grado — Compañero', icon: <AppleEmoji name="cross" size={16} /> },
-  { value: 'maestro', label: 'Tercer Grado — Maestro', icon: <AppleEmoji name="temple" size={16} /> },
-];
 
 export function AttendancePage() {
   const navigate = useNavigate();
@@ -71,14 +65,11 @@ export function AttendancePage() {
   const [dayEventChoices, setDayEventChoices] = useState<LodgeEvent[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Modal para agregar un miembro local sin cuenta o un visitante externo.
+  // Modal para registrar un visitante únicamente en la actividad actual.
   const [showAddPersonModal, setShowAddPersonModal] = useState(false);
-  const [personType, setPersonType] = useState<'member' | 'visitor'>('member');
   const [personName, setPersonName] = useState('');
   const [personLodge, setPersonLodge] = useState('');
-  const [personDegree, setPersonDegree] = useState<MasonicDegree>('maestro');
   const [personNotes, setPersonNotes] = useState('');
-  const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
   const [editingVisitorId, setEditingVisitorId] = useState<string | null>(null);
 
   const canManageAttendance = user?.profile?.roleId === 'vm'
@@ -505,46 +496,18 @@ export function AttendancePage() {
 
   const resetPersonModal = () => {
     setShowAddPersonModal(false);
-    setEditingMemberId(null);
     setEditingVisitorId(null);
-    setPersonType('member');
     setPersonName('');
     setPersonLodge('');
-    setPersonDegree('maestro');
     setPersonNotes('');
-  };
-
-  const openEditMember = (member: Member) => {
-    setEditingMemberId(member.id);
-    setEditingVisitorId(null);
-    setPersonType('member');
-    setPersonName(`${member.firstName} ${member.lastName}`.trim());
-    setPersonLodge('');
-    setPersonDegree(member.degree);
-    setPersonNotes('');
-    setShowAddPersonModal(true);
   };
 
   const openEditVisitor = (visitor: VisitorAttendance) => {
     setEditingVisitorId(visitor.id);
-    setEditingMemberId(null);
-    setPersonType('visitor');
     setPersonName(visitor.fullName);
     setPersonLodge(visitor.lodge);
-    setPersonDegree('maestro');
     setPersonNotes(visitor.notes || '');
     setShowAddPersonModal(true);
-  };
-
-  const handleRemoveQuickMember = async (member: Member) => {
-    if (!window.confirm(`¿Eliminar de la lista a ${member.firstName} ${member.lastName}? Su historial de asistencia se conservará.`)) return;
-    try {
-      await memberService.removeQuickMember(member.id, { id: user?.id, email: user?.email, name: user?.displayName });
-      setMembers((prev) => prev.filter((candidate) => candidate.id !== member.id));
-      toast.success('Miembro eliminado de la lista activa. El historial se conserva.');
-    } catch {
-      toast.error('No se pudo eliminar el miembro sin usuario.');
-    }
   };
 
   const handleRemoveVisitor = async (visitor: VisitorAttendance) => {
@@ -563,45 +526,17 @@ export function AttendancePage() {
     if (!selectedEventId || !personName.trim()) return;
 
     try {
-      if (personType === 'member') {
-        if (editingMemberId) {
-          const updated = await memberService.updateQuickMember(editingMemberId, personName, personDegree, {
-            id: user?.id,
-            email: user?.email,
-            name: user?.displayName,
-          });
-          setMembers((prev) => prev.map((member) => member.id === updated.id ? updated : member));
-          toast.success('Miembro actualizado correctamente.');
-          resetPersonModal();
-          return;
-        }
-        const duplicate = members.find((member) =>
-          `${member.firstName} ${member.lastName}`.trim().toLowerCase() === personName.trim().replace(/\s+/g, ' ').toLowerCase()
-        );
-        if (duplicate) {
-          toast.warning(`Ya existe una ficha con ese nombre: ${duplicate.firstName} ${duplicate.lastName}. Se permitirá el homónimo.`);
-        }
-        const created = await memberService.createQuickMember(personName, personDegree, {
-          id: user?.id,
-          email: user?.email,
-          name: user?.displayName,
-        });
-        setMembers((prev) => [...prev, created].sort((a, b) => `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`)));
-        toast.success(`Miembro agregado sin usuario: ${created.firstName} ${created.lastName}`);
+      if (editingVisitorId) {
+        const updated = await attendanceService.updateVisitor(editingVisitorId, {
+          fullName: personName,
+          lodge: personLodge,
+          degree: undefined,
+          notes: personNotes,
+        }, { id: user?.id, email: user?.email });
+        setVisitors((prev) => prev.map((visitor) => visitor.id === updated.id ? updated : visitor));
+        toast.success('Visitante actualizado correctamente.');
       } else {
         if (!personLodge.trim()) return;
-        if (editingVisitorId) {
-          const updated = await attendanceService.updateVisitor(editingVisitorId, {
-            fullName: personName,
-            lodge: personLodge,
-            degree: undefined,
-            notes: personNotes,
-          }, { id: user?.id, email: user?.email });
-          setVisitors((prev) => prev.map((visitor) => visitor.id === updated.id ? updated : visitor));
-          toast.success('Visitante actualizado correctamente.');
-          resetPersonModal();
-          return;
-        }
         const created = await attendanceService.addVisitor(
           { eventId: selectedEventId, fullName: personName.trim(), lodge: personLodge.trim(), degree: undefined, notes: personNotes.trim() || undefined },
           { id: user?.id, email: user?.email }
@@ -611,7 +546,7 @@ export function AttendancePage() {
       }
       resetPersonModal();
     } catch {
-      toast.error(personType === 'member' ? 'Error al crear el miembro sin usuario' : 'Error al registrar visitante');
+      toast.error('Error al registrar visitante');
     }
   };
 
@@ -1047,26 +982,6 @@ export function AttendancePage() {
                         <p className="text-xs sm:text-sm font-semibold text-ink">
                           {m.firstName} {m.lastName}
                         </p>
-                        {canManageAttendance && m.hasUserAccount === false && (
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => openEditMember(m)}
-                              title="Editar miembro sin usuario"
-                              className="rounded p-1 text-ink-muted hover:bg-surface-container hover:text-primary"
-                            >
-                              <Edit className="h-3.5 w-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void handleRemoveQuickMember(m)}
-                              title="Eliminar miembro sin usuario"
-                              className="rounded p-1 text-ink-muted hover:bg-red-50 hover:text-destructive"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        )}
                       </div>
                       <p className="text-[11px] text-ink-muted uppercase">Grado: {m.roleId === 'vm' ? 'maestro' : m.degree}</p>
                       {m.hasUserAccount === false && (
@@ -1199,7 +1114,7 @@ export function AttendancePage() {
               <h3 className="font-serif text-base font-bold text-ink">QQ.·. HH.·. Visitantes</h3>
               {canManageAttendance && (
                 <button
-                  onClick={() => setShowAddPersonModal(true)}
+                  onClick={() => { resetPersonModal(); setShowAddPersonModal(true); }}
                   className="flex items-center gap-1 rounded bg-primary/10 px-2 py-1 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors"
                 >
                   <Plus className="h-3.5 w-3.5" /> Agregar persona
@@ -1329,25 +1244,15 @@ export function AttendancePage() {
         )}
       </Modal>
 
-      {/* Modal para agregar miembro local sin cuenta o visitante externo */}
+      {/* Modal para registrar un visitante solo en esta actividad */}
       <Modal
         isOpen={showAddPersonModal}
         onClose={resetPersonModal}
-        title={editingMemberId || editingVisitorId ? 'Editar persona' : 'Agregar persona'}
-        subtitle="Registra asistencia aunque todavía no tenga usuario"
+        title={editingVisitorId ? 'Editar visitante' : 'Agregar visitante'}
+        subtitle="Este registro pertenece solo a la actividad y no modifica el padrón de miembros"
         maxWidth="sm"
       >
         <form onSubmit={handleAddPerson} noValidate className="space-y-4">
-          <AppleSelect<'member' | 'visitor'>
-            label="Tipo de persona"
-            value={personType}
-            onChange={setPersonType}
-            disabled={Boolean(editingMemberId || editingVisitorId)}
-            options={[
-              { value: 'member', label: 'Miembro de la logia', description: 'Se agrega al padrón aunque no tenga cuenta.' },
-              { value: 'visitor', label: 'Visitante externo', description: 'Se registra solo para esta actividad.' },
-            ]}
-          />
           <AppleInput
             label="Nombre Completo *"
             required
@@ -1357,35 +1262,22 @@ export function AttendancePage() {
             placeholder="Ej. Juan Pérez"
           />
 
-          {personType === 'visitor' && (
-            <AppleInput
-              label="Logia y Oriente de Origen *"
-              required
-              value={personLodge}
-              onChange={(e) => setPersonLodge(e.target.value)}
-              icon={<Building2 className="h-4 w-4" />}
-              placeholder="Ej. Resp.·. Log.·. Acacia No. 10 (GLP)"
-            />
-          )}
+          <AppleInput
+            label="Logia y Oriente de Origen *"
+            required
+            value={personLodge}
+            onChange={(e) => setPersonLodge(e.target.value)}
+            icon={<Building2 className="h-4 w-4" />}
+            placeholder="Ej. Resp.·. Log.·. Acacia No. 10 (GLP)"
+          />
 
-          {personType === 'member' && (
-            <AppleSelect<MasonicDegree>
-              label="Grado Masónico"
-              value={personDegree}
-              onChange={setPersonDegree}
-              options={visitorDegreeOptions}
-            />
-          )}
-
-          {personType === 'visitor' && (
-            <AppleInput
-              label="Notas"
-              value={personNotes}
-              onChange={(e) => setPersonNotes(e.target.value)}
-              icon={<Building2 className="h-4 w-4" />}
-              placeholder="Observaciones opcionales"
-            />
-          )}
+          <AppleInput
+            label="Notas"
+            value={personNotes}
+            onChange={(e) => setPersonNotes(e.target.value)}
+            icon={<Building2 className="h-4 w-4" />}
+            placeholder="Observaciones opcionales"
+          />
 
           <div className="flex justify-end gap-2.5 pt-3 border-t border-border">
             <button
@@ -1399,7 +1291,7 @@ export function AttendancePage() {
               type="submit"
               className="min-h-[44px] px-6 rounded-xl bg-primary text-xs font-semibold text-primary-foreground hover:bg-primary-pressed shadow-sm transition-all"
             >
-              {editingMemberId || editingVisitorId ? 'Guardar cambios' : 'Agregar persona'}
+              {editingVisitorId ? 'Guardar cambios' : 'Registrar visitante'}
             </button>
           </div>
         </form>

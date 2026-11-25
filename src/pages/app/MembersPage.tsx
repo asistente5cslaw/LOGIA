@@ -535,7 +535,7 @@ export function MembersPage() {
               const isDeleted = Boolean(m.deletedAt);
 
               const isPendingValidation = m.identityStatus === 'pending';
-              const isVerified = m.identityStatus === 'verified';
+              const isVerified = m.identityStatus === 'verified' && m.identityVerified === true;
               const isRejected = m.identityStatus === 'rejected';
 
               return (

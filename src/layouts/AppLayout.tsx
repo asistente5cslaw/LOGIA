@@ -57,7 +57,7 @@ export function AppLayout() {
   });
   const isIdentityRestricted = Boolean(
     user?.profile &&
-    user.profile.identityStatus !== 'verified' &&
+    (user.profile.identityStatus !== 'verified' || user.profile.identityVerified !== true) &&
     user.profile.roleId !== 'vm' &&
     user.profile.roleId !== 'sec' &&
     user.profile.technicalRole !== 'admin'
