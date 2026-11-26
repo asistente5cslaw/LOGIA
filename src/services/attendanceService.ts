@@ -40,6 +40,19 @@ export const attendanceService = {
     return [];
   },
 
+  async getAttendanceHistory(): Promise<Pick<AttendanceRecord, 'eventId' | 'memberId' | 'status'>[]> {
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    const { data, error } = await supabase
+      .from('attendance')
+      .select('event_id, member_id, status');
+    if (error) throw error;
+    return (data || []).map((record) => ({
+      eventId: record.event_id,
+      memberId: record.member_id,
+      status: record.status as AttendanceStatus,
+    }));
+  },
+
   async getPendingExcusesForMember(memberId: string): Promise<{ eventId: string }[]> {
     if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
 

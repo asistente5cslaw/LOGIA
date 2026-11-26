@@ -6,7 +6,7 @@ import { memberService } from '@/services/memberService';
 import { attendanceService } from '@/services/attendanceService';
 import { getBodyById } from '@/data/bodiesData';
 import { PageHeader } from '@/components/shared/PageHeader';
-import type { LodgeEvent, Member, AttendanceStatus, AttendanceResponseStatus, VisitorAttendance } from '@/types';
+import type { LodgeEvent, Member, AttendanceStatus, AttendanceResponseStatus, VisitorAttendance, AttendancePercentage } from '@/types';
 import {
   Users,
   Search,
@@ -41,6 +41,7 @@ export function AttendancePage() {
   const [selectedEventId, setSelectedEventId] = useState<string>('');
   const [selectedSegmentId, setSelectedSegmentId] = useState<string>('');
   const [members, setMembers] = useState<Member[]>([]);
+  const [attendanceHistory, setAttendanceHistory] = useState<Pick<import('@/types').AttendanceRecord, 'eventId' | 'memberId' | 'status'>[]>([]);
   const [attendanceMap, setAttendanceMap] = useState<Record<string, AttendanceStatus>>({});
   const [excuseReasons, setExcuseReasons] = useState<Record<string, string>>({});
   const [excuseSubmittedAt, setExcuseSubmittedAt] = useState<Record<string, string>>({});
@@ -92,15 +93,17 @@ export function AttendancePage() {
 
   const loadInitial = async () => {
     try {
-      const [evList, memList] = await Promise.all([
+      const [evList, memList, history] = await Promise.all([
         eventService.getAllEvents(),
         memberService.getAllMembers(false),
+        attendanceService.getAttendanceHistory(),
       ]);
       // La asistencia también aplica a reuniones informales y actividades de
       // otros cuerpos masónicos; solo se excluyen las actividades canceladas.
       const attendanceEvents = evList.filter((e) => e.status !== 'cancelada');
       setMeetings(attendanceEvents);
       setMembers(memList);
+      setAttendanceHistory(history);
       setLoadError(null);
     } catch {
       toast.error('Error al cargar datos de asistencia');
@@ -246,6 +249,39 @@ export function AttendancePage() {
   const selectedEvent = useMemo(() => {
     return meetings.find((m) => m.id === selectedEventId);
   }, [meetings, selectedEventId]);
+
+  const attendancePercentages = useMemo<Record<string, AttendancePercentage>>(() => {
+    const completedMeetingIds = new Set(
+      meetings
+        .filter((event) => event.eventCategory === 'tenida' && event.status === 'celebrada')
+        .map((event) => event.id)
+    );
+    const memberMeetings = new Map<string, Map<string, AttendanceStatus>>();
+
+    attendanceHistory.forEach((record) => {
+      if (!completedMeetingIds.has(record.eventId)) return;
+      const meetingsForMember = memberMeetings.get(record.memberId) || new Map<string, AttendanceStatus>();
+      const previousStatus = meetingsForMember.get(record.eventId);
+      if (!previousStatus || record.status === 'presente') {
+        meetingsForMember.set(record.eventId, record.status);
+      }
+      memberMeetings.set(record.memberId, meetingsForMember);
+    });
+
+    const percentages = Object.fromEntries(
+      members.map((member) => [member.id, { percentage: 0, recordedMeetings: 0 }])
+    );
+    Object.assign(percentages, Object.fromEntries(
+      [...memberMeetings.entries()].map(([memberId, records]) => {
+        const present = [...records.values()].filter((status) => status === 'presente').length;
+        return [memberId, {
+          percentage: records.size > 0 ? Math.round((present / records.size) * 100) : 0,
+          recordedMeetings: records.size,
+        }];
+      })
+    ));
+    return percentages;
+  }, [attendanceHistory, meetings, members]);
 
   const memberMeetingCards = useMemo(() => {
     const today = getLocalIsoDate();
@@ -449,6 +485,7 @@ export function AttendancePage() {
         [`${selectedEventId}:${selectedSegmentId}`]: true,
       }));
       setPendingAttendanceEvents((prev) => prev.filter((event) => event.id !== selectedEventId));
+      void loadInitial();
       toast.success('Lista de asistencia guardada correctamente.');
     } catch {
       toast.error('Error al guardar la asistencia');
@@ -988,6 +1025,23 @@ export function AttendancePage() {
                         <span className="mt-1 inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
                           Sin usuario
                         </span>
+                      )}
+                      {(canManageAttendance || isOwn) && attendancePercentages[m.id] && (
+                        <div className="mt-1.5 w-44 max-w-full">
+                          <div className="mb-0.5 flex items-center justify-between text-[10px] text-ink-muted">
+                            <span>Asistencia</span>
+                            <span className="font-semibold text-primary">{attendancePercentages[m.id].percentage}%</span>
+                          </div>
+                          <div className="h-1.5 overflow-hidden rounded-full bg-surface-container">
+                            <div
+                              className="h-full rounded-full bg-primary transition-all"
+                              style={{ width: `${attendancePercentages[m.id].percentage}%` }}
+                            />
+                          </div>
+                          <p className="mt-0.5 text-[9px] text-ink-muted">
+                            {attendancePercentages[m.id].recordedMeetings} reunión(es) registrada(s)
+                          </p>
+                        </div>
                       )}
                     </div>
                   </div>

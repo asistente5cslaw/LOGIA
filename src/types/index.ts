@@ -262,6 +262,11 @@ export interface AttendanceRecord {
   excuseSubmittedAt?: string;
 }
 
+export interface AttendancePercentage {
+  percentage: number;
+  recordedMeetings: number;
+}
+
 export interface VisitorAttendance {
   id: string;
   eventId: string;
