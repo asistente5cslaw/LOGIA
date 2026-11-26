@@ -212,6 +212,7 @@ export interface Minute {
   description: string;
   meetingDate: string;
   degree: MasonicDegree;
+  allowedRoleIds?: InstitutionalRoleCode[]; // Roles institucionales adicionales autorizados
   status: MinuteStatus;
   eventId?: string; // ID de la tenida / convocatoria asociada
   eventTitle?: string; // Título de la tenida asociada

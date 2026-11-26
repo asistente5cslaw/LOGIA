@@ -11,7 +11,7 @@ import { authService } from '@/services/authService';
 import { auditService } from '@/services/auditService';
 import { supabase } from '@/lib/supabase';
 import { masonicDegreeForRole } from '@/domain/masonicDegree';
-import type { LodgeEvent, Minute, Member, AttendanceRecord, OfficialVisitChecklistItem } from '@/types';
+import type { LodgeEvent, Minute, Member, AttendanceRecord, OfficialVisitChecklistItem, InstitutionalRoleCode } from '@/types';
 
 describe('Equivalencia de grados masónicos', () => {
   it('asigna Aprendiz al primer grado, Compañero al segundo y Maestro o superior al tercero', () => {
@@ -236,6 +236,16 @@ describe('3. Actas y Control de Acceso por Grado', () => {
     const secMember = { id: 'm-sec', degree: 'companero' as const, roleId: 'sec' };
     const canAccess = minuteService.canMemberAccessMinute(sampleMinute, secMember);
     expect(canAccess).toBe(true);
+  });
+
+  it('exige uno de los roles autorizados además del grado', () => {
+    const restrictedMinute = { ...sampleMinute, degree: 'companero' as const, allowedRoleIds: ['comp'] as InstitutionalRoleCode[] };
+    expect(minuteService.canMemberAccessMinute(restrictedMinute, { id: 'm-comp', degree: 'companero', roleId: 'comp' })).toBe(true);
+    expect(minuteService.canMemberAccessMinute(restrictedMinute, { id: 'm-mae', degree: 'maestro', roleId: 'mae' })).toBe(false);
+  });
+
+  it('sin roles autorizados conserva el acceso por grado', () => {
+    expect(minuteService.canMemberAccessMinute(sampleMinute, { id: 'm-comp', degree: 'companero', roleId: 'comp' })).toBe(false);
   });
 });
 

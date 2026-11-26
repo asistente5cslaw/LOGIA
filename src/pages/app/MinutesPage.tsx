@@ -6,6 +6,8 @@ import { eventService } from '@/services/eventService';
 import { convocationService } from '@/services/convocationService';
 import { PageHeader } from '@/components/shared/PageHeader';
 import type { Minute, MinuteStatus, MasonicDegree, Member, LodgeEvent, MinuteDocumentType } from '@/types';
+import { institutionalRoles } from '@/data/rolesData';
+import type { InstitutionalRoleCode } from '@/types';
 import {
   Plus,
   Search,
@@ -75,6 +77,7 @@ export function MinutesPage() {
   const [formDescription, setFormDescription] = useState('');
   const [formMeetingDate, setFormMeetingDate] = useState(getTodayIsoDate());
   const [formDegree, setFormDegree] = useState<MasonicDegree>('aprendiz');
+  const [formAllowedRoleIds, setFormAllowedRoleIds] = useState<InstitutionalRoleCode[]>([]);
   const [formSegmentId, setFormSegmentId] = useState('');
   const [formStatus, setFormStatus] = useState<MinuteStatus>('borrador');
   const [formNotes, setFormNotes] = useState('');
@@ -174,7 +177,15 @@ export function MinutesPage() {
       description: 'Crear trazado sin vincular a evento del calendario',
       icon: <AppleEmoji name="temple" size={16} />,
     },
-    ...events.map((ev) => ({
+    ...[...events].sort((a, b) => {
+      const today = getTodayIsoDate();
+      const aFuture = a.startDate >= today;
+      const bFuture = b.startDate >= today;
+      if (aFuture !== bFuture) return aFuture ? -1 : 1;
+      return aFuture
+        ? a.startDate.localeCompare(b.startDate)
+        : b.startDate.localeCompare(a.startDate);
+    }).map((ev) => ({
       value: ev.id,
       label: `${ev.title} (${formatDateSpanish(ev.startDate)})`,
       description: ev.location || 'Gran Templo Masónico',
@@ -220,6 +231,7 @@ export function MinutesPage() {
     setFormDescription('A la Gloria del Gran Arquitecto del Universo...\n\nEn el Oriente de Panamá, reunidos los hermanos en el Gran Templo Masónico...');
     setFormMeetingDate(getTodayIsoDate());
     setFormDegree('aprendiz');
+    setFormAllowedRoleIds([]);
     setFormSegmentId('');
     setFormStatus('borrador');
     setFormNotes('');
@@ -239,6 +251,7 @@ export function MinutesPage() {
     setFormDescription(minute.description);
     setFormMeetingDate(minute.meetingDate);
     setFormDegree(minute.degree);
+    setFormAllowedRoleIds(minute.allowedRoleIds || []);
     setFormSegmentId(minute.segmentId || '');
     setFormStatus(minute.status);
     setFormNotes(minute.notes || '');
@@ -283,6 +296,7 @@ export function MinutesPage() {
           description: formDescription.trim(),
           meetingDate: formMeetingDate,
           degree: formDegree,
+          allowedRoleIds: formAllowedRoleIds,
           segmentId: formSegmentId || undefined,
           status: statusToSave,
           eventId: formEventId || undefined,
@@ -1003,6 +1017,29 @@ ${formDescription.trim()}${notes}`;
               />
             );
           })()}
+
+          <div className="rounded-xl border border-border bg-surface-container-low p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Roles autorizados (opcional)</p>
+            <p className="mt-1 text-[11px] text-ink-muted">
+              Si no seleccionas roles, se aplicará únicamente el grado. Si seleccionas varios, cualquiera de esos roles podrá ver el documento, siempre respetando el grado.
+            </p>
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {institutionalRoles.map((role) => {
+                const checked = formAllowedRoleIds.includes(role.id);
+                return (
+                  <label key={role.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm text-ink hover:border-primary/50">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => setFormAllowedRoleIds((current) => checked ? current.filter((id) => id !== role.id) : [...current, role.id])}
+                      className="h-4 w-4 accent-primary"
+                    />
+                    <span>{role.name}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
 
           {formDocumentType === 'tenida' && (
             <div className="rounded-lg border border-border bg-surface-container-low px-3 py-2.5 text-xs text-ink-secondary">

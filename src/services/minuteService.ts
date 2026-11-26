@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import type { Minute, MinuteCorrection, MasonicDegree, MinuteDocumentType } from '@/types';
+import type { Minute, MinuteCorrection, MasonicDegree, MinuteDocumentType, InstitutionalRoleCode } from '@/types';
 import { auditService } from './auditService';
 
 export const minuteService = {
@@ -35,6 +35,7 @@ export const minuteService = {
             description: d.description,
             meetingDate: d.meeting_date,
             degree: d.degree,
+            allowedRoleIds: (d.allowed_role_ids || []) as InstitutionalRoleCode[],
             status: d.status,
             eventId: d.event_id,
             eventTitle: d.event_title,
@@ -83,6 +84,16 @@ export const minuteService = {
     // Actas en borrador solo visibles para dignatarios administradores
     if (minute.status === 'borrador') {
       return ['adm', 'sec', 'vm', 'ora'].includes(member.roleId);
+    }
+
+    // Si el documento tiene roles configurados, el miembro debe pertenecer a uno de ellos.
+    // Se conservan aliases históricos para perfiles creados con el catálogo anterior.
+    const canonicalRoleId = member.roleId === 'her' ? 'apr'
+      : member.roleId === 'pv' || member.roleId === 'sv' ? 'vig'
+        : member.roleId === 'vmi' ? 'pm'
+          : member.roleId;
+    if (minute.allowedRoleIds?.length && !minute.allowedRoleIds.includes(canonicalRoleId as InstitutionalRoleCode)) {
+      return false;
     }
 
     // Regla de Grados Masónicos:
@@ -145,6 +156,7 @@ export const minuteService = {
           description: fullMinute.description,
           meeting_date: fullMinute.meetingDate,
           degree: fullMinute.degree,
+          allowed_role_ids: fullMinute.allowedRoleIds || [],
           status: fullMinute.status,
           event_id: fullMinute.eventId,
           event_title: fullMinute.eventTitle,
