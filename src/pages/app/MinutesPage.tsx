@@ -76,9 +76,10 @@ export function MinutesPage() {
   const [formTitle, setFormTitle] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formMeetingDate, setFormMeetingDate] = useState(getTodayIsoDate());
-  const [formDegree, setFormDegree] = useState<MasonicDegree>('aprendiz');
+  const [formDegree, setFormDegree] = useState<MasonicDegree | ''>('');
   const [formVisibilityMode, setFormVisibilityMode] = useState<MinuteVisibilityMode>('degree');
   const [formAllowedRoleIds, setFormAllowedRoleIds] = useState<InstitutionalRoleCode[]>([]);
+  const [showRolePicker, setShowRolePicker] = useState(false);
   const [formSegmentId, setFormSegmentId] = useState('');
   const [formStatus, setFormStatus] = useState<MinuteStatus>('borrador');
   const [formNotes, setFormNotes] = useState('');
@@ -205,9 +206,8 @@ export function MinutesPage() {
     if (found) {
       setFormEventTitle(found.title);
       setFormMeetingDate(found.startDate);
-      const firstSegment = found.degreeSegments?.[0];
-      setFormDegree(firstSegment?.degree || found.degreeRequired);
-      setFormSegmentId(firstSegment?.id || '');
+      setFormDegree('');
+      setFormSegmentId('');
       const dateLabel = formatDateSpanish(found.startDate);
       const naturalDateLabel = dateLabel.charAt(0).toLowerCase() + dateLabel.slice(1);
       if (!formTitle || formTitle.startsWith('Trazado de')) {
@@ -231,9 +231,10 @@ export function MinutesPage() {
     setFormTitle('');
     setFormDescription('A la Gloria del Gran Arquitecto del Universo...\n\nEn el Oriente de Panamá, reunidos los hermanos en el Gran Templo Masónico...');
     setFormMeetingDate(getTodayIsoDate());
-    setFormDegree('aprendiz');
+    setFormDegree('');
     setFormVisibilityMode('degree');
     setFormAllowedRoleIds([]);
+    setShowRolePicker(false);
     setFormSegmentId('');
     setFormStatus('borrador');
     setFormNotes('');
@@ -252,9 +253,11 @@ export function MinutesPage() {
     setFormTitle(minute.title);
     setFormDescription(minute.description);
     setFormMeetingDate(minute.meetingDate);
-    setFormDegree(minute.degree);
-    setFormVisibilityMode(minute.visibilityMode || (minute.allowedRoleIds?.length ? 'roles' : 'degree'));
+    const visibilityMode = minute.visibilityMode || (minute.allowedRoleIds?.length ? 'roles' : 'degree');
+    setFormDegree(visibilityMode === 'roles' ? '' : minute.degree);
+    setFormVisibilityMode(visibilityMode);
     setFormAllowedRoleIds(minute.allowedRoleIds || []);
+    setShowRolePicker(visibilityMode === 'roles');
     setFormSegmentId(minute.segmentId || '');
     setFormStatus(minute.status);
     setFormNotes(minute.notes || '');
@@ -288,6 +291,10 @@ export function MinutesPage() {
       toast.error('Selecciona al menos un rol autorizado o cambia la modalidad a grado.');
       return;
     }
+    if (formVisibilityMode === 'degree' && !formDegree) {
+      toast.error('Selecciona un tramo o grado antes de guardar.');
+      return;
+    }
     const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
     const pushToAll = submitter?.value === 'push';
     const statusToSave = pushToAll && formStatus === 'borrador' ? 'aprobada' : formStatus;
@@ -302,7 +309,7 @@ export function MinutesPage() {
           title: formTitle.trim(),
           description: formDescription.trim(),
           meetingDate: formMeetingDate,
-          degree: formDegree,
+          degree: formDegree || 'aprendiz',
           visibilityMode: formVisibilityMode,
           allowedRoleIds: formVisibilityMode === 'roles' ? formAllowedRoleIds : [],
           segmentId: formSegmentId || undefined,
@@ -1013,13 +1020,15 @@ ${formDescription.trim()}${notes}`;
               : degreeOptions;
 
             return (
-              <AppleSelect<MasonicDegree>
+              <AppleSelect<MasonicDegree | ''>
                 label="Tramo / grado del acta"
                 value={formDegree}
                 disabled={formVisibilityMode === 'roles'}
+                placeholder="Seleccionar grado..."
                 onChange={(degree) => {
                   setFormVisibilityMode('degree');
                   setFormAllowedRoleIds([]);
+                  setShowRolePicker(false);
                   setFormDegree(degree);
                   const segment = eventSegments.find((item) => item.degree === degree);
                   setFormSegmentId(segment?.id || '');
@@ -1029,41 +1038,56 @@ ${formDescription.trim()}${notes}`;
             );
           })()}
 
-          <div className="rounded-xl border border-border bg-surface-container-low p-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Roles autorizados (alternativa al grado)</p>
-            <p className="mt-1 text-[11px] text-ink-muted">
-              Selecciona roles en lugar de un grado. No se pueden aplicar ambas modalidades al mismo documento.
-            </p>
-            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {institutionalRoles.filter((role) => role.id !== 'adm').map((role) => {
-                const checked = formAllowedRoleIds.includes(role.id);
-                return (
-                  <label key={role.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm text-ink hover:border-primary/50">
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => {
-                        setFormVisibilityMode('roles');
-                        setFormAllowedRoleIds((current) => checked ? current.filter((id) => id !== role.id) : [...current, role.id]);
-                      }}
-                      className="h-4 w-4 accent-primary"
-                    />
-                    <span>{role.name}</span>
-                  </label>
-                );
-              })}
-            </div>
-            {formVisibilityMode === 'roles' && (
-              <button
-                type="button"
-                onClick={() => {
-                  setFormVisibilityMode('degree');
-                  setFormAllowedRoleIds([]);
-                }}
-                className="mt-3 text-xs font-semibold text-primary hover:underline"
-              >
-                Volver a seleccionar por grado
-              </button>
+          <div className="rounded-xl border border-border bg-surface-container-low px-3 py-2">
+            <button
+              type="button"
+              disabled={Boolean(formDegree)}
+              onClick={() => {
+                setFormVisibilityMode('roles');
+                setShowRolePicker((open) => !open);
+                setFormDegree('');
+              }}
+              className="flex w-full items-center justify-between text-left text-xs font-semibold uppercase tracking-wide text-ink-muted disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <span>Roles autorizados (alternativa al grado)</span>
+              <span className="normal-case tracking-normal text-primary">
+                {formAllowedRoleIds.length ? `${formAllowedRoleIds.length} seleccionado(s)` : 'Seleccionar'}
+              </span>
+            </button>
+            {showRolePicker && !formDegree && (
+              <>
+                <p className="mt-1 text-[10px] text-ink-muted">Selecciona uno o varios roles. Esta modalidad reemplaza el grado.</p>
+                <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                  {institutionalRoles.filter((role) => role.id !== 'adm').map((role) => {
+                    const checked = formAllowedRoleIds.includes(role.id);
+                    return (
+                      <label key={role.id} className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-background px-2 py-1.5 text-xs text-ink hover:border-primary/50">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => {
+                            setFormVisibilityMode('roles');
+                            setFormAllowedRoleIds((current) => checked ? current.filter((id) => id !== role.id) : [...current, role.id]);
+                          }}
+                          className="h-3.5 w-3.5 accent-primary"
+                        />
+                        <span className="truncate">{role.name}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormVisibilityMode('degree');
+                    setFormAllowedRoleIds([]);
+                    setShowRolePicker(false);
+                  }}
+                  className="mt-2 text-[10px] font-semibold text-primary hover:underline"
+                >
+                  Volver a seleccionar por grado
+                </button>
+              </>
             )}
           </div>
 
@@ -1071,8 +1095,8 @@ ${formDescription.trim()}${notes}`;
             <div className="rounded-lg border border-border bg-surface-container-low px-3 py-2.5 text-xs text-ink-secondary">
               {formEventId ? (
                 <>
-                  <span className="font-semibold text-ink">Fecha, grado y reunión tomados del calendario:</span>{' '}
-                  {formatDateSpanish(formMeetingDate)} · {formDegree}
+                  <span className="font-semibold text-ink">Reunión y fecha tomadas del calendario:</span>{' '}
+                  {formatDateSpanish(formMeetingDate)}{formDegree ? ` · ${formDegree}` : ' · selecciona el tramo o grado'}
                 </>
               ) : (
                 <span>Selecciona una reunión agendada para asociar esta acta. Si es un acta independiente, se utilizará la fecha actual.</span>
