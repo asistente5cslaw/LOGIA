@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import type { Minute, MinuteCorrection, MasonicDegree, MinuteDocumentType, InstitutionalRoleCode } from '@/types';
+import type { Minute, MinuteCorrection, MasonicDegree, MinuteDocumentType, InstitutionalRoleCode, MinuteVisibilityMode } from '@/types';
 import { auditService } from './auditService';
 
 export const minuteService = {
@@ -35,6 +35,7 @@ export const minuteService = {
             description: d.description,
             meetingDate: d.meeting_date,
             degree: d.degree,
+            visibilityMode: (d.visibility_mode || 'degree') as MinuteVisibilityMode,
             allowedRoleIds: (d.allowed_role_ids || []) as InstitutionalRoleCode[],
             status: d.status,
             eventId: d.event_id,
@@ -86,14 +87,14 @@ export const minuteService = {
       return ['adm', 'sec', 'vm', 'ora'].includes(member.roleId);
     }
 
-    // Si el documento tiene roles configurados, el miembro debe pertenecer a uno de ellos.
+    // La visibilidad se define por una sola modalidad: grado o roles.
     // Se conservan aliases históricos para perfiles creados con el catálogo anterior.
     const canonicalRoleId = member.roleId === 'her' ? 'apr'
       : member.roleId === 'pv' || member.roleId === 'sv' ? 'vig'
         : member.roleId === 'vmi' ? 'pm'
           : member.roleId;
-    if (minute.allowedRoleIds?.length && !minute.allowedRoleIds.includes(canonicalRoleId as InstitutionalRoleCode)) {
-      return false;
+    if (minute.visibilityMode === 'roles') {
+      return Boolean(minute.allowedRoleIds?.length && minute.allowedRoleIds.includes(canonicalRoleId as InstitutionalRoleCode));
     }
 
     // Regla de Grados Masónicos:
@@ -156,7 +157,8 @@ export const minuteService = {
           description: fullMinute.description,
           meeting_date: fullMinute.meetingDate,
           degree: fullMinute.degree,
-          allowed_role_ids: fullMinute.allowedRoleIds || [],
+          visibility_mode: fullMinute.visibilityMode || 'degree',
+          allowed_role_ids: fullMinute.visibilityMode === 'roles' ? (fullMinute.allowedRoleIds || []) : [],
           status: fullMinute.status,
           event_id: fullMinute.eventId,
           event_title: fullMinute.eventTitle,

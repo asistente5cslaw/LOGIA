@@ -5,7 +5,7 @@ import { memberService } from '@/services/memberService';
 import { eventService } from '@/services/eventService';
 import { convocationService } from '@/services/convocationService';
 import { PageHeader } from '@/components/shared/PageHeader';
-import type { Minute, MinuteStatus, MasonicDegree, Member, LodgeEvent, MinuteDocumentType } from '@/types';
+import type { Minute, MinuteStatus, MasonicDegree, Member, LodgeEvent, MinuteDocumentType, MinuteVisibilityMode } from '@/types';
 import { institutionalRoles } from '@/data/rolesData';
 import type { InstitutionalRoleCode } from '@/types';
 import {
@@ -77,6 +77,7 @@ export function MinutesPage() {
   const [formDescription, setFormDescription] = useState('');
   const [formMeetingDate, setFormMeetingDate] = useState(getTodayIsoDate());
   const [formDegree, setFormDegree] = useState<MasonicDegree>('aprendiz');
+  const [formVisibilityMode, setFormVisibilityMode] = useState<MinuteVisibilityMode>('degree');
   const [formAllowedRoleIds, setFormAllowedRoleIds] = useState<InstitutionalRoleCode[]>([]);
   const [formSegmentId, setFormSegmentId] = useState('');
   const [formStatus, setFormStatus] = useState<MinuteStatus>('borrador');
@@ -231,6 +232,7 @@ export function MinutesPage() {
     setFormDescription('A la Gloria del Gran Arquitecto del Universo...\n\nEn el Oriente de Panamá, reunidos los hermanos en el Gran Templo Masónico...');
     setFormMeetingDate(getTodayIsoDate());
     setFormDegree('aprendiz');
+    setFormVisibilityMode('degree');
     setFormAllowedRoleIds([]);
     setFormSegmentId('');
     setFormStatus('borrador');
@@ -251,6 +253,7 @@ export function MinutesPage() {
     setFormDescription(minute.description);
     setFormMeetingDate(minute.meetingDate);
     setFormDegree(minute.degree);
+    setFormVisibilityMode(minute.visibilityMode || (minute.allowedRoleIds?.length ? 'roles' : 'degree'));
     setFormAllowedRoleIds(minute.allowedRoleIds || []);
     setFormSegmentId(minute.segmentId || '');
     setFormStatus(minute.status);
@@ -281,6 +284,10 @@ export function MinutesPage() {
       toast.error('El Secretario debe colocar un número de acta válido.');
       return;
     }
+    if (formVisibilityMode === 'roles' && formAllowedRoleIds.length === 0) {
+      toast.error('Selecciona al menos un rol autorizado o cambia la modalidad a grado.');
+      return;
+    }
     const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
     const pushToAll = submitter?.value === 'push';
     const statusToSave = pushToAll && formStatus === 'borrador' ? 'aprobada' : formStatus;
@@ -296,7 +303,8 @@ export function MinutesPage() {
           description: formDescription.trim(),
           meetingDate: formMeetingDate,
           degree: formDegree,
-          allowedRoleIds: formAllowedRoleIds,
+          visibilityMode: formVisibilityMode,
+          allowedRoleIds: formVisibilityMode === 'roles' ? formAllowedRoleIds : [],
           segmentId: formSegmentId || undefined,
           status: statusToSave,
           eventId: formEventId || undefined,
@@ -1008,7 +1016,10 @@ ${formDescription.trim()}${notes}`;
               <AppleSelect<MasonicDegree>
                 label="Tramo / grado del acta"
                 value={formDegree}
+                disabled={formVisibilityMode === 'roles'}
                 onChange={(degree) => {
+                  setFormVisibilityMode('degree');
+                  setFormAllowedRoleIds([]);
                   setFormDegree(degree);
                   const segment = eventSegments.find((item) => item.degree === degree);
                   setFormSegmentId(segment?.id || '');
@@ -1019,19 +1030,22 @@ ${formDescription.trim()}${notes}`;
           })()}
 
           <div className="rounded-xl border border-border bg-surface-container-low p-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Roles autorizados (opcional)</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Roles autorizados (alternativa al grado)</p>
             <p className="mt-1 text-[11px] text-ink-muted">
-              Si no seleccionas roles, se aplicará únicamente el grado. Si seleccionas varios, cualquiera de esos roles podrá ver el documento, siempre respetando el grado.
+              Selecciona roles en lugar de un grado. No se pueden aplicar ambas modalidades al mismo documento.
             </p>
             <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {institutionalRoles.map((role) => {
+              {institutionalRoles.filter((role) => role.id !== 'adm').map((role) => {
                 const checked = formAllowedRoleIds.includes(role.id);
                 return (
                   <label key={role.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm text-ink hover:border-primary/50">
                     <input
                       type="checkbox"
                       checked={checked}
-                      onChange={() => setFormAllowedRoleIds((current) => checked ? current.filter((id) => id !== role.id) : [...current, role.id])}
+                      onChange={() => {
+                        setFormVisibilityMode('roles');
+                        setFormAllowedRoleIds((current) => checked ? current.filter((id) => id !== role.id) : [...current, role.id]);
+                      }}
                       className="h-4 w-4 accent-primary"
                     />
                     <span>{role.name}</span>
@@ -1039,6 +1053,18 @@ ${formDescription.trim()}${notes}`;
                 );
               })}
             </div>
+            {formVisibilityMode === 'roles' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFormVisibilityMode('degree');
+                  setFormAllowedRoleIds([]);
+                }}
+                className="mt-3 text-xs font-semibold text-primary hover:underline"
+              >
+                Volver a seleccionar por grado
+              </button>
+            )}
           </div>
 
           {formDocumentType === 'tenida' && (

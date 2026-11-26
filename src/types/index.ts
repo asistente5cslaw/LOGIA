@@ -191,6 +191,8 @@ export type MinuteStatus = 'borrador' | 'circulada' | 'aprobada';
 
 export type MinuteDocumentType = 'tenida' | 'duelo' | 'suspension' | 'administrativa';
 
+export type MinuteVisibilityMode = 'degree' | 'roles';
+
 export interface MinuteCorrection {
   id: string;
   minuteId: string;
@@ -212,7 +214,8 @@ export interface Minute {
   description: string;
   meetingDate: string;
   degree: MasonicDegree;
-  allowedRoleIds?: InstitutionalRoleCode[]; // Roles institucionales adicionales autorizados
+  visibilityMode?: MinuteVisibilityMode;
+  allowedRoleIds?: InstitutionalRoleCode[]; // Roles autorizados cuando visibilityMode es roles
   status: MinuteStatus;
   eventId?: string; // ID de la tenida / convocatoria asociada
   eventTitle?: string; // Título de la tenida asociada

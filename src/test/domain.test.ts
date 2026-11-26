@@ -239,9 +239,14 @@ describe('3. Actas y Control de Acceso por Grado', () => {
   });
 
   it('exige uno de los roles autorizados además del grado', () => {
-    const restrictedMinute = { ...sampleMinute, degree: 'companero' as const, allowedRoleIds: ['comp'] as InstitutionalRoleCode[] };
+    const restrictedMinute = { ...sampleMinute, visibilityMode: 'roles' as const, allowedRoleIds: ['comp'] as InstitutionalRoleCode[] };
     expect(minuteService.canMemberAccessMinute(restrictedMinute, { id: 'm-comp', degree: 'companero', roleId: 'comp' })).toBe(true);
     expect(minuteService.canMemberAccessMinute(restrictedMinute, { id: 'm-mae', degree: 'maestro', roleId: 'mae' })).toBe(false);
+  });
+
+  it('cuando usa roles, ignora el grado del documento', () => {
+    const roleOnlyMinute = { ...sampleMinute, visibilityMode: 'roles' as const, degree: 'maestro' as const, allowedRoleIds: ['comp'] as InstitutionalRoleCode[] };
+    expect(minuteService.canMemberAccessMinute(roleOnlyMinute, { id: 'm-comp', degree: 'aprendiz', roleId: 'comp' })).toBe(true);
   });
 
   it('sin roles autorizados conserva el acceso por grado', () => {
