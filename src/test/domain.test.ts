@@ -249,6 +249,24 @@ describe('3. Actas y Control de Acceso por Grado', () => {
     expect(minuteService.canMemberAccessMinute(roleOnlyMinute, { id: 'm-comp', degree: 'aprendiz', roleId: 'comp' })).toBe(true);
   });
 
+  it('permite únicamente el rol seleccionado, incluyendo Past Master', () => {
+    const roleOnlyMinute = { ...sampleMinute, visibilityMode: 'roles' as const, allowedRoleIds: ['pm'] as InstitutionalRoleCode[] };
+    expect(minuteService.canMemberAccessMinute(roleOnlyMinute, { id: 'm-pm', degree: 'maestro', roleId: 'pm' })).toBe(true);
+    for (const roleId of ['apr', 'comp', 'mae', 'tes', 'vig'] as const) {
+      expect(minuteService.canMemberAccessMinute(roleOnlyMinute, { id: `m-${roleId}`, degree: 'maestro', roleId })).toBe(false);
+    }
+  });
+
+  it('no permite que un acceso individual antiguo amplíe un acta configurada por roles', () => {
+    const roleOnlyMinute = {
+      ...sampleMinute,
+      visibilityMode: 'roles' as const,
+      allowedRoleIds: ['pm'] as InstitutionalRoleCode[],
+      allowedMemberIds: ['m-comp'],
+    };
+    expect(minuteService.canMemberAccessMinute(roleOnlyMinute, { id: 'm-comp', degree: 'maestro', roleId: 'comp' })).toBe(false);
+  });
+
   it('sin roles autorizados conserva el acceso por grado', () => {
     expect(minuteService.canMemberAccessMinute(sampleMinute, { id: 'm-comp', degree: 'companero', roleId: 'comp' })).toBe(false);
   });

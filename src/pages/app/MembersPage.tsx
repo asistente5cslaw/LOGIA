@@ -4,7 +4,7 @@ import { memberService } from '@/services/memberService';
 import { authService } from '@/services/authService';
 import { institutionalRoles } from '@/data/rolesData';
 import { PageHeader } from '@/components/shared/PageHeader';
-import type { Member, MasonicDegree, MemberStatusCondition, InstitutionalRoleCode } from '@/types';
+import type { Member, MasonicDegree, MemberStatusCondition, InstitutionalRoleCode, MemberLinkRequest } from '@/types';
 import {
   Search,
   Edit,
@@ -23,6 +23,7 @@ import {
   History,
   Clock,
   RotateCcw,
+  Link2,
 } from 'lucide-react';
 import { Modal } from '@/components/shared/Modal';
 import { AppleSelect, type AppleSelectOption } from '@/components/shared/AppleSelect';
@@ -55,6 +56,7 @@ export function MembersPage() {
   const { user, hasPermission, refreshUser } = useAuth();
   const { showConfirm } = useAppleDialog();
   const [members, setMembers] = useState<Member[]>([]);
+  const [memberLinkRequests, setMemberLinkRequests] = useState<MemberLinkRequest[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<FilterTab>('todos');
 
@@ -83,7 +85,7 @@ export function MembersPage() {
   const [formEmail, setFormEmail] = useState('');
   const [formPhone, setFormPhone] = useState('');
   const [formRoleId, setFormRoleId] = useState<InstitutionalRoleCode>('apr');
-  const [formDegree, setFormDegree] = useState<MasonicDegree>('aprendiz');
+  const [formDegree, setFormDegree] = useState<MasonicDegree | null>('aprendiz');
   const [formCondition, setFormCondition] = useState<MemberStatusCondition>('activo');
   const [formMotherLodge, setFormMotherLodge] = useState('Resp.·. Log.·. Unión Fraternal No. 21');
   const [formInitiationDate, setFormInitiationDate] = useState('');
@@ -115,6 +117,7 @@ export function MembersPage() {
 
   // Solo Secretaría y Administración validan las solicitudes de identidad.
   const canValidateIdentity = isSecretario || isAdministrador;
+  const canReviewMemberLinks = canValidateIdentity || isVenerableMaestro;
   const canViewDeletedMembers = isVenerableMaestro || isSecretario || user?.profile?.technicalRole === 'admin';
   // El borrado irreversible está reservado a Venerable, Secretaría y
   // Administración, igual que la función SECURITY DEFINER de Supabase.
@@ -122,14 +125,18 @@ export function MembersPage() {
 
   const loadMembers = useCallback(async () => {
     try {
-      const list = await memberService.getAllMembers(true, canViewDeletedMembers, canValidateIdentity);
+      const [list, linkRequests] = await Promise.all([
+        memberService.getAllMembers(true, canViewDeletedMembers, canValidateIdentity),
+        canReviewMemberLinks ? memberService.getPendingMemberLinkRequests() : Promise.resolve([]),
+      ]);
       setMembers(list);
+      setMemberLinkRequests(linkRequests);
       setLoadError(null);
     } catch {
       toast.error('Error al cargar miembros');
       setLoadError('No se pudo cargar el directorio de miembros. Revisa tu conexión e inténtalo nuevamente.');
     }
-  }, [canViewDeletedMembers, canValidateIdentity]);
+  }, [canViewDeletedMembers, canValidateIdentity, canReviewMemberLinks]);
 
   useEffect(() => {
     void loadMembers();
@@ -146,6 +153,26 @@ export function MembersPage() {
     }
     setRoleModalMember(m);
     setRoleModalSelectedId(m.roleId || 'apr');
+  };
+
+  const handleReviewMemberLink = async (request: MemberLinkRequest, approve: boolean) => {
+    const confirmed = await showConfirm({
+      title: approve ? 'Vincular cuenta' : 'Rechazar vinculación',
+      message: approve
+        ? `¿Confirmas que la cuenta ${request.sourceEmail} corresponde a la ficha de ${request.candidateName}? Se conservará su historial de asistencia.`
+        : `¿Rechazar la vinculación de ${request.sourceEmail} con ${request.candidateName}?`,
+      confirmText: approve ? 'Vincular' : 'Rechazar',
+      cancelText: 'Cancelar',
+      type: approve ? 'info' : 'warning',
+    });
+    if (!confirmed) return;
+    try {
+      await memberService.reviewMemberLinkRequest(request.id, approve);
+      toast.success(approve ? 'Cuenta vinculada y asistencia conservada.' : 'Solicitud de vinculación rechazada.');
+      await loadMembers();
+    } catch {
+      toast.error('No se pudo procesar la solicitud de vinculación.');
+    }
   };
 
   const handleSaveRoleOnly = async (e: React.FormEvent) => {
@@ -437,6 +464,32 @@ export function MembersPage() {
           subtitle={`${members.length} hermanos registrados`}
         />
       </div>
+
+      {canReviewMemberLinks && memberLinkRequests.length > 0 && (
+        <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 sm:p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <Link2 className="h-4 w-4 text-primary" />
+            <div>
+              <p className="text-sm font-semibold text-ink">Solicitudes de vinculación</p>
+              <p className="text-[11px] text-ink-muted">Confirma si la cuenta nueva corresponde a una ficha existente del padrón.</p>
+            </div>
+          </div>
+          <div className="space-y-2">
+            {memberLinkRequests.map((request) => (
+              <div key={request.id} className="flex flex-col gap-2 rounded-lg border border-border bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0 text-xs text-ink">
+                  <p className="font-semibold">{request.sourceDisplayName}</p>
+                  <p className="text-ink-muted">{request.sourceEmail} → ficha: <span className="font-semibold text-ink-secondary">{request.candidateName}</span></p>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <button type="button" onClick={() => void handleReviewMemberLink(request, false)} className="rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50">Rechazar</button>
+                  <button type="button" onClick={() => void handleReviewMemberLink(request, true)} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-pressed">Vincular</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {loadError && <ErrorState description={loadError} onRetry={() => void loadMembers()} />}
 
@@ -761,7 +814,7 @@ export function MembersPage() {
             </div>
             <div className="space-y-2 rounded-xl border border-border p-4 text-sm bg-white">
               <h3 className="font-serif text-base font-bold text-ink">{validatingMember.firstName} {validatingMember.lastName}</h3>
-              <p className="text-xs text-ink-muted">{validatingMember.degree.toUpperCase()} · {validatingMember.email}</p>
+              <p className="text-xs text-ink-muted">{validatingMember.degree?.toUpperCase() || 'GRADO NO INFORMADO'} · {validatingMember.email || 'sin correo'}</p>
               <p className="pt-2 text-xs text-ink-secondary">Teléfono registrado: <span className="font-semibold text-ink">{validatingMember.phone || 'No informado'}</span></p>
               {validatingMember.identityValidatedAt && (
                 <div className="flex items-center justify-between">

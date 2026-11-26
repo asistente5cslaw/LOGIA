@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import type { Member, MasonicDegree, MemberStatusCondition, InstitutionalRoleCode } from '@/types';
+import type { Member, MasonicDegree, MemberStatusCondition, InstitutionalRoleCode, MemberLinkRequest } from '@/types';
 import { auditService } from './auditService';
 import { masonicDegreeForRole } from '@/domain/masonicDegree';
 import { getTodayIsoDate } from '@/lib/dateUtils';
@@ -28,7 +28,7 @@ function mapSupabaseMember(d: Record<string, unknown>): Member {
     personType: 'miembro',
     phone: value('phone') as string | undefined,
     roleId,
-    degree: masonicDegreeForRole(roleId),
+    degree: (value('degree') as MasonicDegree | null) || null,
     condition: value('condition') as MemberStatusCondition,
     motherLodge: value('mother_lodge') as string | undefined,
     initiationDate: value('initiation_date') as string | undefined,
@@ -80,6 +80,41 @@ function mapProfileAsMember(profile: Record<string, unknown>): Member {
 }
 
 export const memberService = {
+  async requestMemberLink(memberId: string): Promise<{ matched: boolean; candidateName?: string }> {
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    const { data, error } = await supabase.rpc('request_member_link', { target_member_id: memberId });
+    if (error) throw error;
+    return {
+      matched: Boolean(data?.matched),
+      candidateName: data?.candidate_name || undefined,
+    };
+  },
+
+  async getPendingMemberLinkRequests(): Promise<MemberLinkRequest[]> {
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    const { data, error } = await supabase.rpc('get_pending_member_link_requests');
+    if (error) throw error;
+    return (data || []).map((request: Record<string, unknown>) => ({
+      id: String(request.id),
+      sourceMemberId: String(request.source_member_id),
+      candidateMemberId: String(request.candidate_member_id),
+      sourceEmail: String(request.source_email || ''),
+      sourceDisplayName: String(request.source_display_name || ''),
+      candidateName: String(request.candidate_name || ''),
+      createdAt: String(request.created_at),
+    }));
+  },
+
+  async reviewMemberLinkRequest(id: string, approve: boolean, notes?: string): Promise<void> {
+    if (!isSupabaseConfigured()) throw new Error('Supabase no está configurado.');
+    const { error } = await supabase.rpc('review_member_link_request', {
+      target_request_id: id,
+      approve_request: approve,
+      review_notes: notes || null,
+    });
+    if (error) throw error;
+  },
+
   async saveRegistrationIdentity(
     memberId: string,
     identity: Pick<Member, 'identityVerified' | 'identityStatus' | 'selfieUrl' | 'identityValidatedAt'>
@@ -219,7 +254,7 @@ export const memberService = {
           email: member.email.trim() || null,
           phone: member.phone,
           role_id: member.roleId,
-          degree: masonicDegreeForRole(member.roleId),
+          degree: member.degree || null,
           condition: member.condition,
           mother_lodge: member.motherLodge,
           initiation_date: member.initiationDate,

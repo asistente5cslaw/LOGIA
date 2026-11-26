@@ -77,11 +77,6 @@ export const minuteService = {
     // Administrador, Secretario y Venerable Maestro siempre tienen acceso a todas las actas
     if (member.roleId === 'adm' || member.roleId === 'sec' || member.roleId === 'vm') return true;
 
-    // Si tiene acceso individual concedido explícitamente
-    if (minute.allowedMemberIds && minute.allowedMemberIds.includes(member.id)) {
-      return true;
-    }
-
     // Actas en borrador solo visibles para dignatarios administradores
     if (minute.status === 'borrador') {
       return ['adm', 'sec', 'vm', 'ora'].includes(member.roleId);
@@ -95,6 +90,12 @@ export const minuteService = {
           : member.roleId;
     if (minute.visibilityMode === 'roles') {
       return Boolean(minute.allowedRoleIds?.length && minute.allowedRoleIds.includes(canonicalRoleId as InstitutionalRoleCode));
+    }
+
+    // El acceso individual solo aplica a documentos configurados por grado.
+    // Si el documento usa roles, únicamente esos roles pueden verlo.
+    if (minute.allowedMemberIds && minute.allowedMemberIds.includes(member.id)) {
+      return true;
     }
 
     // Regla de Grados Masónicos:

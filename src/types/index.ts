@@ -64,7 +64,7 @@ export interface Member {
   roleId: InstitutionalRoleCode;
   phone?: string;
   avatarUrl?: string;
-  degree: MasonicDegree;
+  degree: MasonicDegree | null;
   condition: MemberStatusCondition;
   motherLodge?: string;
   initiationDate?: string;
@@ -85,6 +85,16 @@ export interface Member {
   identityValidatedAt?: string;
   identityValidatedBy?: string;
   identityNotes?: string;
+}
+
+export interface MemberLinkRequest {
+  id: string;
+  sourceMemberId: string;
+  candidateMemberId: string;
+  sourceEmail: string;
+  sourceDisplayName: string;
+  candidateName: string;
+  createdAt: string;
 }
 
 export interface UserProfile {

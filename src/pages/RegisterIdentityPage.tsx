@@ -91,6 +91,17 @@ export function RegisterIdentityPage() {
         );
       }
 
+      if (registeredUser.memberId) {
+        try {
+          const linkResult = await memberService.requestMemberLink(registeredUser.memberId);
+          if (linkResult.matched) {
+            console.info('Se creó una solicitud de vinculación para Secretaría.', linkResult.candidateName);
+          }
+        } catch (linkError) {
+          console.warn('No se pudo crear la solicitud de vinculación de la ficha:', linkError);
+        }
+      }
+
       // 3. La solicitud se inició desde el clic de captura. Después de crear la
       // sesión podemos persistir la suscripción en Supabase.
       if (pushNotificationService.getPermission() === 'granted') {
