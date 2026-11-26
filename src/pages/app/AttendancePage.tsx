@@ -639,10 +639,10 @@ export function AttendancePage() {
         {ownAttendancePercentage && (
           <div className="w-full rounded-2xl border border-primary/15 bg-primary/[0.04] px-4 py-3 sm:min-w-[260px] sm:max-w-[340px]">
             <div className="flex items-center justify-between gap-3">
-              <span className="text-xs font-semibold text-ink-secondary">Mi asistencia</span>
+              <span className="text-xs font-semibold text-ink-secondary">Mi asistencia a tenidas UF21</span>
               <span className="text-lg font-bold text-primary">{ownAttendancePercentage.percentage}%</span>
             </div>
-            <div className="mt-2 h-2 overflow-hidden rounded-full bg-primary/10" role="progressbar" aria-label="Porcentaje de asistencia" aria-valuemin={0} aria-valuemax={100} aria-valuenow={ownAttendancePercentage.percentage}>
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-primary/10" role="progressbar" aria-label="Porcentaje de asistencia a tenidas UF21" aria-valuemin={0} aria-valuemax={100} aria-valuenow={ownAttendancePercentage.percentage}>
               <div
                 className="h-full rounded-full bg-primary transition-all"
                 style={{ width: `${ownAttendancePercentage.percentage}%` }}
@@ -650,8 +650,8 @@ export function AttendancePage() {
             </div>
             <p className="mt-1.5 text-[11px] text-ink-muted">
               {ownAttendancePercentage.recordedMeetings > 0
-                ? `Basado en ${ownAttendancePercentage.recordedMeetings} reunión${ownAttendancePercentage.recordedMeetings === 1 ? '' : 'es'} celebrada${ownAttendancePercentage.recordedMeetings === 1 ? '' : 's'}.`
-                : 'Aún no hay reuniones celebradas registradas.'}
+                ? `Basado en ${ownAttendancePercentage.recordedMeetings} tenida${ownAttendancePercentage.recordedMeetings === 1 ? '' : 's'} UF21 celebrada${ownAttendancePercentage.recordedMeetings === 1 ? '' : 's'}.`
+                : 'Aún no hay tenidas UF21 celebradas registradas.'}
             </p>
           </div>
         )}
@@ -693,7 +693,7 @@ export function AttendancePage() {
         <section className="rounded-2xl border border-border bg-white p-4 shadow-xs sm:p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h3 className="font-serif text-base font-bold text-ink">Porcentaje de asistencia</h3>
+              <h3 className="font-serif text-base font-bold text-ink">Asistencia a tenidas UF21</h3>
               <p className="mt-1 text-xs text-ink-muted">Consulta el resumen individual de los hermanos en una ventana aparte.</p>
             </div>
             <button
@@ -892,8 +892,8 @@ export function AttendancePage() {
       <Modal
         isOpen={showAttendancePercentagesModal}
         onClose={() => setShowAttendancePercentagesModal(false)}
-        title="Porcentaje de asistencia"
-        subtitle="Resumen individual de las reuniones celebradas registradas."
+        title="Asistencia a tenidas UF21"
+        subtitle="Resumen individual de las tenidas celebradas de Logia UF21."
         maxWidth="xl"
       >
         <div className="mb-3 flex items-center justify-between text-xs text-ink-muted">
@@ -911,7 +911,7 @@ export function AttendancePage() {
                   </p>
                   <span className="shrink-0 text-xs font-bold text-primary">{percentage.percentage}%</span>
                 </div>
-                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-surface-container" role="progressbar" aria-label={`Asistencia de ${member.firstName} ${member.lastName}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percentage.percentage}>
+                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-surface-container" role="progressbar" aria-label={`Asistencia a tenidas UF21 de ${member.firstName} ${member.lastName}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percentage.percentage}>
                   <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${percentage.percentage}%` }} />
                 </div>
                 <p className="mt-1 text-[10px] text-ink-muted">
