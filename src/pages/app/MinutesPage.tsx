@@ -1011,11 +1011,6 @@ ${formDescription.trim()}${notes}`;
           {(() => {
             const selectedEvent = events.find((event) => event.id === formEventId);
             const eventSegments = selectedEvent?.degreeSegments || [];
-            const clearDegreeOption: AppleSelectOption<MasonicDegree | ''> = {
-              value: '',
-              label: 'Quitar selección de grado',
-              description: 'Habilitar selección por roles',
-            };
             const degreeSelectionOptions: AppleSelectOption<MasonicDegree | ''>[] = formDocumentType === 'tenida' && eventSegments.length > 0
               ? eventSegments.map((segment) => ({
                 value: segment.degree,
@@ -1023,22 +1018,12 @@ ${formDescription.trim()}${notes}`;
                 description: `Acta correspondiente al tramo ${segment.sequence} de la misma tenida`,
               }))
               : degreeOptions;
-            const options = [clearDegreeOption, ...degreeSelectionOptions];
-
             return (
               <AppleSelect<MasonicDegree | ''>
                 label="Tramo / grado del acta"
                 value={formDegree}
                 placeholder="Seleccionar grado..."
                 onChange={(degree) => {
-                  if (degree === '') {
-                    setFormVisibilityMode('roles');
-                    setFormAllowedRoleIds([]);
-                    setShowRolePicker(true);
-                    setFormDegree('');
-                    setFormSegmentId('');
-                    return;
-                  }
                   setFormVisibilityMode('degree');
                   setFormAllowedRoleIds([]);
                   setShowRolePicker(false);
@@ -1046,7 +1031,7 @@ ${formDescription.trim()}${notes}`;
                   const segment = eventSegments.find((item) => item.degree === degree);
                   setFormSegmentId(segment?.id || '');
                 }}
-                options={options}
+                options={degreeSelectionOptions}
               />
             );
           })()}
