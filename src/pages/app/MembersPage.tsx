@@ -557,12 +557,12 @@ export function MembersPage() {
                       </div>
 
                       {/* Icono de verificación en la esquina del avatar */}
-                      {isVerified && (
+                      {canValidateIdentity && isVerified && (
                         <span className="absolute bottom-0 right-0 rounded-tl-lg bg-emerald-500 p-0.5 text-white shadow-xs">
                           <Check className="h-2.5 w-2.5 stroke-[3]" />
                         </span>
                       )}
-                      {isPendingValidation && (
+                      {canValidateIdentity && isPendingValidation && (
                         <span className="absolute -top-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-amber-500 text-white shadow-xs">
                           <span className="h-1.5 w-1.5 rounded-full bg-white animate-ping" />
                         </span>
@@ -637,7 +637,7 @@ export function MembersPage() {
                   {/* Estado de Validación de Identidad y Acciones */}
                   <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/50">
                     {/* Píldora de Validación de Identidad para Secretario / VM */}
-                    {isVerified ? (
+                    {canValidateIdentity && isVerified ? (
                       <button
                         type="button"
                         onClick={() => handleOpenValidationModal(m)}
@@ -647,7 +647,7 @@ export function MembersPage() {
                         <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
                         <span>Verificado</span>
                       </button>
-                    ) : isPendingValidation ? (
+                    ) : canValidateIdentity && isPendingValidation ? (
                       <button
                         type="button"
                         onClick={() => handleOpenValidationModal(m)}
@@ -657,7 +657,7 @@ export function MembersPage() {
                         <ShieldAlert className="h-3.5 w-3.5 text-amber-600 animate-pulse" />
                         <span>Validación Pendiente</span>
                       </button>
-                    ) : isRejected ? (
+                    ) : canValidateIdentity && isRejected ? (
                       <button
                         type="button"
                         onClick={() => handleOpenValidationModal(m)}
@@ -667,7 +667,7 @@ export function MembersPage() {
                         <XCircle className="h-3.5 w-3.5 text-rose-600" />
                         <span>Rechazado</span>
                       </button>
-                    ) : (
+                    ) : canValidateIdentity ? (
                       <button
                         type="button"
                         onClick={() => handleOpenValidationModal(m)}
@@ -677,7 +677,7 @@ export function MembersPage() {
                         <ShieldAlert className="h-3 w-3 text-zinc-400" />
                         <span>Pendiente</span>
                       </button>
-                    )}
+                    ) : null}
 
                     {/* Botones de Edición y Baja */}
                     <div className="flex items-center gap-1">
