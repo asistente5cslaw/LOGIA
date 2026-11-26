@@ -254,7 +254,7 @@ export function AttendancePage() {
   const attendancePercentages = useMemo<Record<string, AttendancePercentage>>(() => {
     const completedMeetingIds = new Set(
       meetings
-        .filter((event) => event.eventCategory === 'tenida' && event.status === 'celebrada')
+        .filter((event) => event.bodyId === 'uf21' && event.eventCategory === 'tenida' && event.status === 'celebrada')
         .map((event) => event.id)
     );
     const memberMeetings = new Map<string, Map<string, AttendanceStatus>>();
