@@ -63,6 +63,7 @@ export function AttendancePage() {
     return new Date(today.getFullYear(), today.getMonth(), 1);
   });
   const [showAttendanceCalendar, setShowAttendanceCalendar] = useState(false);
+  const [showAttendancePercentagesModal, setShowAttendancePercentagesModal] = useState(false);
   const [dayEventChoices, setDayEventChoices] = useState<LodgeEvent[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -690,33 +691,18 @@ export function AttendancePage() {
 
       {canManageAttendance && !selectedEventId && members.length > 0 && (
         <section className="rounded-2xl border border-border bg-white p-4 shadow-xs sm:p-5">
-          <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h3 className="font-serif text-base font-bold text-ink">Porcentaje de asistencia</h3>
-              <p className="mt-1 text-xs text-ink-muted">Resumen individual de los hermanos sobre las reuniones celebradas registradas.</p>
+              <p className="mt-1 text-xs text-ink-muted">Consulta el resumen individual de los hermanos en una ventana aparte.</p>
             </div>
-            <span className="text-[11px] font-semibold text-ink-muted">{members.length} hermanos</span>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {members.map((member) => {
-              const percentage = attendancePercentages[member.id] || { percentage: 0, recordedMeetings: 0 };
-              return (
-                <div key={member.id} className="rounded-xl border border-border/70 bg-surface px-3 py-2.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="min-w-0 truncate text-xs font-semibold text-ink" title={`${member.firstName} ${member.lastName}`}>
-                      {member.firstName} {member.lastName}
-                    </p>
-                    <span className="shrink-0 text-xs font-bold text-primary">{percentage.percentage}%</span>
-                  </div>
-                  <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-surface-container" role="progressbar" aria-label={`Asistencia de ${member.firstName} ${member.lastName}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percentage.percentage}>
-                    <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${percentage.percentage}%` }} />
-                  </div>
-                  <p className="mt-1 text-[10px] text-ink-muted">
-                    {percentage.recordedMeetings} reunión{percentage.recordedMeetings === 1 ? '' : 'es'} registrada{percentage.recordedMeetings === 1 ? '' : 's'}
-                  </p>
-                </div>
-              );
-            })}
+            <button
+              type="button"
+              onClick={() => setShowAttendancePercentagesModal(true)}
+              className="inline-flex min-h-[40px] items-center justify-center rounded-xl bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary-pressed"
+            >
+              Ver porcentajes · {members.length}
+            </button>
           </div>
         </section>
       )}
@@ -900,6 +886,40 @@ export function AttendancePage() {
               </span>
             </button>
           ))}
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={showAttendancePercentagesModal}
+        onClose={() => setShowAttendancePercentagesModal(false)}
+        title="Porcentaje de asistencia"
+        subtitle="Resumen individual de las reuniones celebradas registradas."
+        maxWidth="xl"
+      >
+        <div className="mb-3 flex items-center justify-between text-xs text-ink-muted">
+          <span>Hermanos registrados</span>
+          <span className="font-semibold text-ink">{members.length}</span>
+        </div>
+        <div className="grid max-h-[60vh] gap-2 overflow-y-auto pr-1 sm:grid-cols-2 lg:grid-cols-3">
+          {members.map((member) => {
+            const percentage = attendancePercentages[member.id] || { percentage: 0, recordedMeetings: 0 };
+            return (
+              <div key={member.id} className="rounded-xl border border-border/70 bg-surface px-3 py-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="min-w-0 truncate text-xs font-semibold text-ink" title={`${member.firstName} ${member.lastName}`}>
+                    {member.firstName} {member.lastName}
+                  </p>
+                  <span className="shrink-0 text-xs font-bold text-primary">{percentage.percentage}%</span>
+                </div>
+                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-surface-container" role="progressbar" aria-label={`Asistencia de ${member.firstName} ${member.lastName}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percentage.percentage}>
+                  <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${percentage.percentage}%` }} />
+                </div>
+                <p className="mt-1 text-[10px] text-ink-muted">
+                  {percentage.recordedMeetings} reunión{percentage.recordedMeetings === 1 ? '' : 'es'} registrada{percentage.recordedMeetings === 1 ? '' : 's'}
+                </p>
+              </div>
+            );
+          })}
         </div>
       </Modal>
 
