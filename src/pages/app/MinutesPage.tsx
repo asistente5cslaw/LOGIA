@@ -1011,21 +1011,34 @@ ${formDescription.trim()}${notes}`;
           {(() => {
             const selectedEvent = events.find((event) => event.id === formEventId);
             const eventSegments = selectedEvent?.degreeSegments || [];
-            const options = formDocumentType === 'tenida' && eventSegments.length > 0
+            const clearDegreeOption: AppleSelectOption<MasonicDegree | ''> = {
+              value: '',
+              label: 'Quitar selección de grado',
+              description: 'Habilitar selección por roles',
+            };
+            const degreeSelectionOptions: AppleSelectOption<MasonicDegree | ''>[] = formDocumentType === 'tenida' && eventSegments.length > 0
               ? eventSegments.map((segment) => ({
                 value: segment.degree,
                 label: segment.degree === 'aprendiz' ? 'Primer grado — Aprendiz' : segment.degree === 'companero' ? 'Segundo grado — Compañero' : 'Tercer grado — Maestro',
                 description: `Acta correspondiente al tramo ${segment.sequence} de la misma tenida`,
               }))
               : degreeOptions;
+            const options = [clearDegreeOption, ...degreeSelectionOptions];
 
             return (
               <AppleSelect<MasonicDegree | ''>
                 label="Tramo / grado del acta"
                 value={formDegree}
-                disabled={formVisibilityMode === 'roles'}
                 placeholder="Seleccionar grado..."
                 onChange={(degree) => {
+                  if (degree === '') {
+                    setFormVisibilityMode('roles');
+                    setFormAllowedRoleIds([]);
+                    setShowRolePicker(true);
+                    setFormDegree('');
+                    setFormSegmentId('');
+                    return;
+                  }
                   setFormVisibilityMode('degree');
                   setFormAllowedRoleIds([]);
                   setShowRolePicker(false);
@@ -1041,7 +1054,6 @@ ${formDescription.trim()}${notes}`;
           <div className="rounded-xl border border-border bg-surface-container-low px-3 py-2">
             <button
               type="button"
-              disabled={Boolean(formDegree)}
               onClick={() => {
                 setFormVisibilityMode('roles');
                 setShowRolePicker((open) => !open);
@@ -1067,6 +1079,8 @@ ${formDescription.trim()}${notes}`;
                           checked={checked}
                           onChange={() => {
                             setFormVisibilityMode('roles');
+                            setFormDegree('');
+                            setFormSegmentId('');
                             setFormAllowedRoleIds((current) => checked ? current.filter((id) => id !== role.id) : [...current, role.id]);
                           }}
                           className="h-3.5 w-3.5 accent-primary"
